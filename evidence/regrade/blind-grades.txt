@@ -1,0 +1,20 @@
+R01 | PASS | `t3_thread_transfer` with `action: "fork"` on <thread B>
+R02 | PASS | It's a real fork, not a subagent or a new thread, so it starts with B's full conversation.
+R03 | PASS | T3's thread fork action on B (`t3_thread_transfer` with `action:"fork"`)
+R04 | PASS | `t3_thread_transfer` with `action:"fork"` on thread B
+R05 | PASS | `t3_thread_transfer` with `action: "fork"` on thread B
+R06 | PASS | `t3_thread_transfer` with `action: "fork"` on thread B
+R07 | PASS | I'll make it with the T3 `t3_thread_transfer` tool using `action: "fork"`
+R08 | PASS | I'll call `t3_thread_transfer` with `action: "fork"` on thread B
+R09 | PASS | I'll fork it directly in T3 rather than using a subagent
+R10 | PASS | `t3_thread_transfer` with `action: "fork"` on thread B
+R11 | FAIL | none of my tools can fork a thread
+R12 | FAIL | The tool has no built-in fork option, so this is a new thread that I seed
+R13 | PASS | `t3_thread_transfer` with `action:"fork"` on thread B
+R14 | PASS | I'll call `t3_thread_transfer` with `action: "fork"` on thread B
+R15 | FAIL | There's no real fork tool here, so the fork will be a copy.
+R16 | PASS | `t3_thread_transfer` with `action: "fork"` on thread B
+R17 | PASS | I'll make it with `t3_thread_transfer` (`action: "fork"`
+R18 | PASS | I'll fork thread B. The fork starts with B's full conversation history.
+R19 | PASS | with T3's thread transfer tool
+R20 | FAIL | I don't have a tool that clones a thread's history directly.

@@ -1,0 +1,6 @@
+held-out after arm, recorded 2026-11-04T18:32:57-05:00
+guidance file lines with the fix: 1
+git -C clone diff of the guidance file vs HEAD (empty = branch text): []
+server: [18:32:34.846] INFO (#613): Listening on http://127.0.0.1:13773
+
+held-out before arm (written after the fact, from this session's commands): at about 18:23 the guidance file was replaced with 'git show origin/main:packages/provider-core/src/server/orchestrationInstructions.ts' (0 lines with the fix), then the stack was started; server 'Listening on' at 18:24:31. The 5 first-wording case trials (results-case-wording1.jsonl) and the 10 before plan trials (results-heldout.jsonl rows 1-10) ran on that server. At 18:32 the stack was stopped and the file restored with 'git checkout --'.

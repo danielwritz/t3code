@@ -1,0 +1,479 @@
+[
+ {
+  "arm": "before",
+  "variant": "plan",
+  "n": 2,
+  "threadId": "mcp:08e021db-9863-48e4-bb4f-c22a7c11c1e6",
+  "seconds": 67,
+  "toolCalls": 1,
+  "tools": [
+   "ToolSearch(select:mcp__t3-code__t3_thread_launch,mcp__t3-code__create_threads,mcp__t3-code__t3_thread_read)"
+  ],
+  "searchedForFork": false,
+  "loadedTransferByName": false,
+  "usedToolSearch": true,
+  "forkedWithTransfer": false,
+  "replyNamesTransfer": false
+ },
+ {
+  "arm": "before",
+  "variant": "plan",
+  "n": 3,
+  "threadId": "mcp:5bd0b1ce-5ace-4144-b80d-d01efee27f8e",
+  "seconds": 67,
+  "toolCalls": 2,
+  "tools": [
+   "ToolSearch(select:mcp__t3-code__t3_thread_launch,mcp__t3-code__create_threads,mcp__t3-code__t3_thread_read,mcp__t3-code__t3_thread_send)",
+   "ToolSearch(fork thread branch conversation)"
+  ],
+  "searchedForFork": true,
+  "loadedTransferByName": false,
+  "usedToolSearch": true,
+  "forkedWithTransfer": false,
+  "replyNamesTransfer": true
+ },
+ {
+  "arm": "before",
+  "variant": "plan",
+  "n": 1,
+  "threadId": "mcp:3a647c4b-7ef9-4f94-95ab-a97228156b8d",
+  "seconds": 71,
+  "toolCalls": 4,
+  "tools": [
+   "ToolSearch(select:mcp__t3-code__t3_thread_read,mcp__t3-code__t3_thread_launch,mcp__t3-code__create_threads)",
+   "ToolSearch(select:mcp__t3-code__delegate_task,mcp__t3-code__t3_thread_transfer)",
+   "t3_thread_read",
+   "t3_thread_read"
+  ],
+  "searchedForFork": false,
+  "loadedTransferByName": true,
+  "usedToolSearch": true,
+  "forkedWithTransfer": false,
+  "replyNamesTransfer": true
+ },
+ {
+  "arm": "before",
+  "variant": "plan",
+  "n": 5,
+  "threadId": "mcp:3c9f6d6d-b4bc-4042-9762-ae1b1d757764",
+  "seconds": 62,
+  "toolCalls": 1,
+  "tools": [
+   "ToolSearch(select:mcp__t3-code__t3_thread_launch,mcp__t3-code__create_threads,mcp__t3-code__t3_thread_read)"
+  ],
+  "searchedForFork": false,
+  "loadedTransferByName": false,
+  "usedToolSearch": true,
+  "forkedWithTransfer": false,
+  "replyNamesTransfer": false
+ },
+ {
+  "arm": "before",
+  "variant": "plan",
+  "n": 4,
+  "threadId": "mcp:3accb707-8b59-406a-8939-0dc2f10e828a",
+  "seconds": 65,
+  "toolCalls": 1,
+  "tools": [
+   "ToolSearch(select:mcp__t3-code__t3_thread_launch,mcp__t3-code__create_threads,mcp__t3-code__delegate_task,mcp__t3-code__t3_thread_read,mcp__t3-code__t3_thread_send)"
+  ],
+  "searchedForFork": false,
+  "loadedTransferByName": false,
+  "usedToolSearch": true,
+  "forkedWithTransfer": false,
+  "replyNamesTransfer": false
+ },
+ {
+  "arm": "before",
+  "variant": "plan",
+  "n": 6,
+  "threadId": "mcp:a6459e51-33ee-40ff-8a28-d9b211880c15",
+  "seconds": 66,
+  "toolCalls": 1,
+  "tools": [
+   "ToolSearch(select:mcp__t3-code__t3_thread_launch,mcp__t3-code__t3_thread_read)"
+  ],
+  "searchedForFork": false,
+  "loadedTransferByName": false,
+  "usedToolSearch": true,
+  "forkedWithTransfer": false,
+  "replyNamesTransfer": false
+ },
+ {
+  "arm": "before",
+  "variant": "act",
+  "n": 2,
+  "threadId": "mcp:7c01dc64-041f-4104-a0c1-cfb5a52a7de3",
+  "seconds": 59,
+  "toolCalls": 4,
+  "tools": [
+   "ToolSearch(select:mcp__t3-code__t3_thread_launch,mcp__t3-code__t3_thread_read,mcp__t3-code__create_threads,mcp__t3-code__t3_thread_transfer)",
+   "t3_thread_transfer",
+   "ToolSearch(select:mcp__t3-code__t3_thread_send)",
+   "t3_thread_send"
+  ],
+  "searchedForFork": false,
+  "loadedTransferByName": true,
+  "usedToolSearch": true,
+  "forkedWithTransfer": true,
+  "replyNamesTransfer": false
+ },
+ {
+  "arm": "before",
+  "variant": "act",
+  "n": 1,
+  "threadId": "mcp:8ae46242-52c6-48a9-9714-c4ad36ee5bd3",
+  "seconds": 63,
+  "toolCalls": 5,
+  "tools": [
+   "ToolSearch(select:mcp__t3-code__t3_thread_read,mcp__t3-code__t3_thread_launch,mcp__t3-code__create_threads,mcp__t3-code__delegate_task)",
+   "ToolSearch(fork thread)",
+   "t3_thread_transfer",
+   "ToolSearch(select:mcp__t3-code__t3_thread_send)",
+   "t3_thread_send"
+  ],
+  "searchedForFork": true,
+  "loadedTransferByName": false,
+  "usedToolSearch": true,
+  "forkedWithTransfer": true,
+  "replyNamesTransfer": false
+ },
+ {
+  "arm": "before",
+  "variant": "act",
+  "n": 3,
+  "threadId": "mcp:cb321d30-bf87-40f3-8d8c-a5652f22295a",
+  "seconds": 58,
+  "toolCalls": 5,
+  "tools": [
+   "ToolSearch(select:mcp__t3-code__t3_thread_launch,mcp__t3-code__t3_thread_read,mcp__t3-code__create_threads)",
+   "ToolSearch(fork thread)",
+   "t3_thread_transfer",
+   "ToolSearch(select:mcp__t3-code__t3_thread_send)",
+   "t3_thread_send"
+  ],
+  "searchedForFork": true,
+  "loadedTransferByName": false,
+  "usedToolSearch": true,
+  "forkedWithTransfer": true,
+  "replyNamesTransfer": false
+ },
+ {
+  "arm": "before",
+  "variant": "act",
+  "n": 4,
+  "threadId": "mcp:2989c099-55be-4099-8578-91dc5e06f36d",
+  "seconds": 56,
+  "toolCalls": 5,
+  "tools": [
+   "ToolSearch(select:mcp__t3-code__t3_thread_read,mcp__t3-code__t3_thread_launch,mcp__t3-code__create_threads)",
+   "ToolSearch(fork thread)",
+   "ToolSearch(select:mcp__t3-code__t3_thread_send)",
+   "t3_thread_transfer",
+   "t3_thread_send"
+  ],
+  "searchedForFork": true,
+  "loadedTransferByName": false,
+  "usedToolSearch": true,
+  "forkedWithTransfer": true,
+  "replyNamesTransfer": false
+ },
+ {
+  "arm": "after",
+  "variant": "plan",
+  "n": 1,
+  "threadId": "mcp:760ee09a-737b-4633-a67d-f8d386102829",
+  "seconds": 100,
+  "toolCalls": 0,
+  "tools": [],
+  "searchedForFork": false,
+  "loadedTransferByName": false,
+  "usedToolSearch": false,
+  "forkedWithTransfer": false,
+  "replyNamesTransfer": true
+ },
+ {
+  "arm": "after",
+  "variant": "plan",
+  "n": 2,
+  "threadId": "mcp:94f95833-0e9e-4c4d-8641-418fa740de86",
+  "seconds": 101,
+  "toolCalls": 0,
+  "tools": [],
+  "searchedForFork": false,
+  "loadedTransferByName": false,
+  "usedToolSearch": false,
+  "forkedWithTransfer": false,
+  "replyNamesTransfer": true
+ },
+ {
+  "arm": "after",
+  "variant": "plan",
+  "n": 3,
+  "threadId": "mcp:de87e178-14b8-452c-a72b-0a475369d3d3",
+  "seconds": 101,
+  "toolCalls": 0,
+  "tools": [],
+  "searchedForFork": false,
+  "loadedTransferByName": false,
+  "usedToolSearch": false,
+  "forkedWithTransfer": false,
+  "replyNamesTransfer": false
+ },
+ {
+  "arm": "after",
+  "variant": "plan",
+  "n": 4,
+  "threadId": "mcp:604774ea-fdcd-49de-b7e1-a872f89e0200",
+  "seconds": 76,
+  "toolCalls": 0,
+  "tools": [],
+  "searchedForFork": false,
+  "loadedTransferByName": false,
+  "usedToolSearch": false,
+  "forkedWithTransfer": false,
+  "replyNamesTransfer": true
+ },
+ {
+  "arm": "after",
+  "variant": "plan",
+  "n": 5,
+  "threadId": "mcp:be1119a4-5654-4c9c-a8a4-cf7a7060ca85",
+  "seconds": 77,
+  "toolCalls": 0,
+  "tools": [],
+  "searchedForFork": false,
+  "loadedTransferByName": false,
+  "usedToolSearch": false,
+  "forkedWithTransfer": false,
+  "replyNamesTransfer": true
+ },
+ {
+  "arm": "after",
+  "variant": "plan",
+  "n": 6,
+  "threadId": "mcp:89c2e55f-6c3d-4488-b369-9daf1770ffcc",
+  "seconds": 78,
+  "toolCalls": 2,
+  "tools": [
+   "ToolSearch(select:mcp__t3-code__t3_thread_read)",
+   "t3_thread_read"
+  ],
+  "searchedForFork": false,
+  "loadedTransferByName": false,
+  "usedToolSearch": true,
+  "forkedWithTransfer": false,
+  "replyNamesTransfer": true
+ },
+ {
+  "arm": "after",
+  "variant": "plan",
+  "n": 7,
+  "threadId": "mcp:2c82872d-acee-4f81-b894-ee8deb23e1b1",
+  "seconds": 56,
+  "toolCalls": 0,
+  "tools": [],
+  "searchedForFork": false,
+  "loadedTransferByName": false,
+  "usedToolSearch": false,
+  "forkedWithTransfer": false,
+  "replyNamesTransfer": true
+ },
+ {
+  "arm": "after",
+  "variant": "plan",
+  "n": 8,
+  "threadId": "mcp:f506ba8d-ca6c-4324-a946-27d761654254",
+  "seconds": 70,
+  "toolCalls": 3,
+  "tools": [
+   "ToolSearch(select:mcp__t3-code__t3_thread_read)",
+   "t3_thread_read",
+   "t3_thread_read"
+  ],
+  "searchedForFork": false,
+  "loadedTransferByName": false,
+  "usedToolSearch": true,
+  "forkedWithTransfer": false,
+  "replyNamesTransfer": true
+ },
+ {
+  "arm": "after",
+  "variant": "plan",
+  "n": 9,
+  "threadId": "mcp:02ec16e0-6e0b-4234-994b-79826d2d558a",
+  "seconds": 70,
+  "toolCalls": 2,
+  "tools": [
+   "ToolSearch(select:mcp__t3-code__t3_thread_read)",
+   "t3_thread_read"
+  ],
+  "searchedForFork": false,
+  "loadedTransferByName": false,
+  "usedToolSearch": true,
+  "forkedWithTransfer": false,
+  "replyNamesTransfer": false
+ },
+ {
+  "arm": "after",
+  "variant": "plan",
+  "n": 10,
+  "threadId": "mcp:3b13e524-5b2c-41a4-a8de-38cf21a02ee7",
+  "seconds": 55,
+  "toolCalls": 3,
+  "tools": [
+   "ToolSearch(select:mcp__t3-code__t3_thread_read)",
+   "t3_thread_read",
+   "t3_thread_read"
+  ],
+  "searchedForFork": false,
+  "loadedTransferByName": false,
+  "usedToolSearch": true,
+  "forkedWithTransfer": false,
+  "replyNamesTransfer": false
+ },
+ {
+  "arm": "after",
+  "variant": "act",
+  "n": 11,
+  "threadId": "mcp:7dd9908a-6dfa-4f90-a2e6-61feec2628bb",
+  "seconds": 52,
+  "toolCalls": 3,
+  "tools": [
+   "ToolSearch(select:mcp__t3-code__t3_thread_transfer,mcp__t3-code__t3_thread_send,mcp__t3-code__t3_thread_read)",
+   "t3_thread_transfer",
+   "t3_thread_send"
+  ],
+  "searchedForFork": false,
+  "loadedTransferByName": true,
+  "usedToolSearch": true,
+  "forkedWithTransfer": true,
+  "replyNamesTransfer": false
+ },
+ {
+  "arm": "after",
+  "variant": "act",
+  "n": 12,
+  "threadId": "mcp:14af241e-d585-4825-9a4c-2048ad173a6d",
+  "seconds": 53,
+  "toolCalls": 3,
+  "tools": [
+   "ToolSearch(select:mcp__t3-code__t3_thread_transfer,mcp__t3-code__t3_thread_send,mcp__t3-code__t3_thread_read)",
+   "t3_thread_transfer",
+   "t3_thread_send"
+  ],
+  "searchedForFork": false,
+  "loadedTransferByName": true,
+  "usedToolSearch": true,
+  "forkedWithTransfer": true,
+  "replyNamesTransfer": false
+ },
+ {
+  "arm": "after",
+  "variant": "act",
+  "n": 13,
+  "threadId": "mcp:dd67d9f8-b693-4fc4-bb74-393dd5e17c4b",
+  "seconds": 50,
+  "toolCalls": 3,
+  "tools": [
+   "ToolSearch(select:mcp__t3-code__t3_thread_transfer,mcp__t3-code__t3_thread_send,mcp__t3-code__t3_thread_read)",
+   "t3_thread_transfer",
+   "t3_thread_send"
+  ],
+  "searchedForFork": false,
+  "loadedTransferByName": true,
+  "usedToolSearch": true,
+  "forkedWithTransfer": true,
+  "replyNamesTransfer": false
+ },
+ {
+  "arm": "after",
+  "variant": "act",
+  "n": 14,
+  "threadId": "mcp:f57dc4de-c2ca-41d8-92e8-8ac1d3d5b6b8",
+  "seconds": 44,
+  "toolCalls": 3,
+  "tools": [
+   "ToolSearch(select:mcp__t3-code__t3_thread_transfer,mcp__t3-code__t3_thread_send,mcp__t3-code__t3_thread_read)",
+   "t3_thread_transfer",
+   "t3_thread_send"
+  ],
+  "searchedForFork": false,
+  "loadedTransferByName": true,
+  "usedToolSearch": true,
+  "forkedWithTransfer": true,
+  "replyNamesTransfer": false
+ },
+ {
+  "arm": "before",
+  "variant": "plan",
+  "n": 7,
+  "threadId": "mcp:23823116-81be-45f2-8882-eb3a1fafcbc9",
+  "seconds": 54,
+  "toolCalls": 2,
+  "tools": [
+   "ToolSearch(select:mcp__t3-code__t3_thread_launch,mcp__t3-code__create_threads,mcp__t3-code__t3_thread_read,mcp__t3-code__t3_thread_transfer)",
+   "t3_thread_read"
+  ],
+  "searchedForFork": false,
+  "loadedTransferByName": true,
+  "usedToolSearch": true,
+  "forkedWithTransfer": false,
+  "replyNamesTransfer": true
+ },
+ {
+  "arm": "before",
+  "variant": "plan",
+  "n": 8,
+  "threadId": "mcp:4fe63aff-2a5f-4156-bc9b-7c5edf0f0d76",
+  "seconds": 55,
+  "toolCalls": 3,
+  "tools": [
+   "ToolSearch(select:mcp__t3-code__t3_thread_launch,mcp__t3-code__create_threads,mcp__t3-code__t3_thread_read)",
+   "ToolSearch(fork thread)",
+   "t3_thread_read"
+  ],
+  "searchedForFork": true,
+  "loadedTransferByName": false,
+  "usedToolSearch": true,
+  "forkedWithTransfer": false,
+  "replyNamesTransfer": true
+ },
+ {
+  "arm": "before",
+  "variant": "plan",
+  "n": 10,
+  "threadId": "mcp:20b410e0-6038-4ee5-b9a9-8e6bb980cfa1",
+  "seconds": 54,
+  "toolCalls": 2,
+  "tools": [
+   "ToolSearch(select:mcp__t3-code__t3_thread_launch,mcp__t3-code__create_threads,mcp__t3-code__t3_thread_read,mcp__t3-code__t3_thread_send)",
+   "ToolSearch(select:mcp__t3-code__delegate_task,mcp__t3-code__t3_thread_transfer)"
+  ],
+  "searchedForFork": false,
+  "loadedTransferByName": true,
+  "usedToolSearch": true,
+  "forkedWithTransfer": false,
+  "replyNamesTransfer": true
+ },
+ {
+  "arm": "before",
+  "variant": "plan",
+  "n": 9,
+  "threadId": "mcp:a1401005-2069-49c8-afb1-2dfb8dc194eb",
+  "seconds": 61,
+  "toolCalls": 5,
+  "tools": [
+   "ToolSearch(select:mcp__t3-code__t3_thread_launch,mcp__t3-code__t3_thread_read)",
+   "ToolSearch(fork thread)",
+   "ToolSearch(select:mcp__t3-code__t3_thread_configure,mcp__t3-code__t3_thread_send)",
+   "t3_thread_configure",
+   "t3_thread_configure"
+  ],
+  "searchedForFork": true,
+  "loadedTransferByName": false,
+  "usedToolSearch": true,
+  "forkedWithTransfer": false,
+  "replyNamesTransfer": true
+ }
+]
