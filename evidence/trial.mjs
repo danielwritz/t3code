@@ -1,10 +1,11 @@
-// One fork-discovery trial on a SEPARATE dev T3 instance (never the user's own T3).
+// One fork-discovery trial on a SEPARATE dev T3 instance (never the user's live T3).
 // Usage: node tools/trials/trial.mjs <arm-label> <trial-number> <variant: act|plan|case>
 // Config: trials.config.json next to this file (T3 home, server folder, project id, thread A and B).
 // Starts a fresh Opus 5.5 thread with a fork task that names no tool, waits for it, then reads
 // every tool call from the Claude Code provider log. Appends one JSON line to results.jsonl.
 import { execFileSync } from "node:child_process";
 import { appendFileSync, readFileSync, existsSync } from "node:fs";
+import { createHash } from "node:crypto";
 
 const here = new URL(".", import.meta.url).pathname.replace(/^\/([A-Z]:)/, "$1");
 const cfg = JSON.parse(readFileSync(`${here}trials.config.json`, "utf8"));
@@ -23,10 +24,24 @@ const PROMPTS = {
   plan: `Two threads answered the same pricing question: "Pricing question: answer A" (${A}) and "Pricing question: answer B" (${B}). I want to repeat our reflection process: take thread B and fork it, then get the fork to read answer A and write one combined answer. Do not start yet. Understood? Tell me the threads this will create and how you will make each one (agent, model).`,
   // The upstream replay case's prompt (tt-fork-thread-uses-transfer), with the two threads named
   // here because a real thread has no synthetic prior turns.
-  case: `Two threads answered the same pricing question: "Pricing question: answer A" (${A}) and "Pricing question: answer B" (${B}). Now fork thread B and have the fork read answer A and write one combined answer. Do not start yet. Tell me the threads this will create and how you will make each one.`,
+  // Set 3: the submitted case's prompt word for word, after one sentence that stands in for the
+  // case's prior turns (which name an Opus thread and a Fable thread).
+  case: `Earlier I asked Opus and Fable the same pricing question in two threads. Opus: "Pricing question: answer A" (${A}). Fable: "Pricing question: answer B" (${B}). I want to repeat our comparison process: take the Fable thread and fork it, then get the fork to read the Opus answer and write one combined answer. Do not start yet. Understood? Tell me the threads this will create and how you will make each one (agent, model).`,
+  // The case's first wording (results-case-wording1.jsonl): it did not reproduce the miss.
+  case1: `Two threads answered the same pricing question: "Pricing question: answer A" (${A}) and "Pricing question: answer B" (${B}). Now fork thread B and have the fork read answer A and write one combined answer. Do not start yet. Tell me the threads this will create and how you will make each one.`,
 };
 const PROMPT = PROMPTS[variant];
 if (!PROMPT) throw new Error(`unknown variant ${variant}`);
+
+// Arm proof, stored in every row: which guidance text the server file has, and when the server
+// started (so a row can be matched to the server run that loaded that text).
+const guidePath = `${cfg.server}/../../packages/provider-core/src/server/orchestrationInstructions.ts`;
+const guide = readFileSync(guidePath, "utf8");
+const serverLog = cfg.serverLog ?? "D:/tmp/allow-forking/server-demo.log";
+const listening = existsSync(serverLog)
+  ? (readFileSync(serverLog, "utf8").match(/\[([0-9:.]+)\][^\n]*Listening on/) ?? [])[1] ?? null
+  : null;
+const armProof = { guidanceSha256: createHash("sha256").update(guide).digest("hex").slice(0, 16), guidanceHasFix: guide.includes("To fork a thread"), serverListening: listening };
 
 const started = Date.now();
 const out = execFileSync("node", ["src/bin.ts", "thread", "start", cfg.project, PROMPT,
@@ -48,7 +63,7 @@ const list = [...calls.values()];
 const searches = list.filter((c) => c.tool === "ToolSearch").map((c) => String(c.input.query ?? ""));
 const reply = run.reply ?? "";
 const result = {
-  arm, variant, n: Number(n), threadId: run.threadId, status: run.status,
+  arm, variant, n: Number(n), ...armProof, threadId: run.threadId, status: run.status,
   seconds: Math.round((Date.now() - started) / 1000),
   toolCalls: list.length,
   forkedWithTransfer: list.some((c) => c.tool === "t3_thread_transfer" && c.input.action === "fork"),

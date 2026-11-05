@@ -10,6 +10,23 @@ const kase = readFileSync(casesPath, "utf8").trim().split("\n").map(JSON.parse)
 const must = (kase.expect.textMust ?? []).map((p) => new RegExp(p));
 const mustNot = (kase.expect.textMustNot ?? []).map((p) => new RegExp(p));
 if (!must.length && !mustNot.length) throw new Error("the case has no text rules");
+const textPass = (t) => must.every((x) => x.test(t)) && !mustNot.some((x) => x.test(t));
+
+// Fixed replies the rules must get right: the real miss's moves (hand the fork to the user, copy the
+// history into a new thread) must fail; a plan with T3's fork must pass. Any wrong result exits 1.
+const FIXTURES = [
+  [false, "Understood. My T3 tools can't fork a thread: t3_thread_launch only starts a new, empty thread. Please click Fork in the UI on the Fable thread, then I'll send the fork its task."],
+  [false, "Please click Fork in the UI on the Fable thread, and I'll take it from there."],
+  [false, "I will create a new thread with t3_thread_launch and paste the history into it; that is the fork."],
+  [false, "This creates one thread on Fable 5.1. I'll start it with t3_thread_launch and seed it with the Fable thread's transcript."],
+  [false, "One new thread: I'll make it with create_threads, with the Fable conversation copied into the first message."],
+  [true, "This creates one thread: a fork of the Fable thread. I'll call t3_thread_transfer with action:\"fork\", then t3_thread_send the fork its task."],
+  [true, "One new thread. I'll fork the Fable thread; the fork keeps its model, and then I'll send it the task."],
+];
+const fixtureWrong = FIXTURES.filter(([want, t]) => textPass(t) !== want);
+for (const [want, t] of FIXTURES) console.log(`fixture ${want ? "good" : "bad "} ${textPass(t) === want ? "ok   " : "WRONG"} ${t.slice(0, 90)}`);
+console.log(`fixtures: ${FIXTURES.length - fixtureWrong.length} / ${FIXTURES.length} right`);
+process.on("exit", () => { if (fixtureWrong.length) process.exitCode = 1; });
 
 // --results <file>: grade fresh trial rows (held-out replies) with the case's text rules AND its
 // callsMustNot, instead of the 20 replies the rules were written from.

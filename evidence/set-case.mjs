@@ -1,12 +1,22 @@
 // Writes the upstream replay case tt-fork-thread-uses-transfer (prompt and text rules) into the clone.
-// Usage: node tools/trials/set-case.mjs   The rules were fitted on 40 real replies; check with case-check.mjs.
+// Usage: node tools/trials/set-case.mjs   The rules were written from the 40 replies of sets 1 and 2;
+// set 3 (results-set3.jsonl) was run after they were fixed, as the out-of-sample check (case-check.mjs).
 import { readFileSync, writeFileSync } from "node:fs";
 const p = "D:/tmp/allow-forking/t3code/evals/mcp-tool-use/cases/threads-vs-tasks.ndjson";
 const lines = readFileSync(p, "utf8").replace(/\n$/, "").split("\n");
 const i = lines.findIndex((l) => l.includes('"tt-fork-thread-uses-transfer"'));
 const c = JSON.parse(lines[i]);
 c.prompt = "I want to repeat our comparison process: take the Fable thread and fork it, then get the fork to read the Opus answer and write one combined answer. Do not start yet. Understood? Tell me the threads this will create and how you will make each one (agent, model).";
+// textMust: the plan names T3's own fork (the tool, its fork action, or "I'll fork thread B").
+c.expect.textMust = [
+  String.raw`t3_thread_transfer|\b(?:I'll|I will|I'd|I would|I can) (?:\w+ )?fork\b|\b[Ff]ork(?:ing)? (?:action|tool)\b|thread-fork action|T3's (?:thread )?transfer`,
+];
 c.expect.textMustNot = [
+  // a plan that hands the fork back to the user, or copies B's history into a new thread
+  String.raw`\b[Cc]lick (?:the )?\W{0,2}Fork`,
+  String.raw`\b(?:past(?:e|es|ing)|seed(?:s|ed|ing)?)\b[^.\n]{0,50}\b(?:conversation|history|transcript)\b`,
+  String.raw`\bseeded with\b`,
+  // a plan that says T3 cannot fork
   String.raw`\b[Nn]o (?:real |true |native |built-in )?fork\b`,
   String.raw`\b(?:has|have) no (?:tool|built-in|way)[^.\n]{0,30}\bfork`,
   String.raw`n.t have an? (?:true |real )?fork\b`,
@@ -16,4 +26,4 @@ c.expect.textMustNot = [
 ];
 lines[i] = JSON.stringify(c);
 writeFileSync(p, lines.join("\n") + "\n");
-for (const s of c.expect.textMustNot) console.log(s, new RegExp(s).test("There's no real fork tool here"));
+console.log(`wrote ${c.expect.textMust.length} textMust and ${c.expect.textMustNot.length} textMustNot rules`);

@@ -12,7 +12,7 @@ const fromAt = process.argv.indexOf("--from");
 let items;
 if (fromAt > 0) {
   items = readFileSync(`${here}${process.argv[fromAt + 1]}`, "utf8").trim().split("\n").map(JSON.parse)
-    .filter((r) => r.variant === "plan").map((r) => ({ threadId: r.threadId, arm: r.arm, n: r.n, reply: r.reply }));
+    .filter((r) => r.variant === "plan" || r.variant === "case").map((r) => ({ threadId: r.threadId, arm: r.arm, variant: r.variant, n: r.n, reply: r.reply }));
 } else {
   const firstKey = JSON.parse(readFileSync(`${here}grading-key.json`, "utf8"));
   const text = {};
@@ -31,5 +31,5 @@ for (let i = items.length - 1; i > 0; i--) { const j = Math.floor(rand() * (i + 
 mkdirSync(outDir, { recursive: true });
 const ids = items.map((_, i) => `R${String(i + 1).padStart(2, "0")}`);
 writeFileSync(`${outDir}/blind-replies.md`, items.map((x, i) => `## ${ids[i]}\n\n${x.reply}\n`).join("\n"));
-writeFileSync(`${outDir}/grading-key.json`, JSON.stringify(items.map((x, i) => ({ id: ids[i], threadId: x.threadId, arm: x.arm, n: x.n })), null, 1) + "\n");
+writeFileSync(`${outDir}/grading-key.json`, JSON.stringify(items.map((x, i) => ({ id: ids[i], threadId: x.threadId, arm: x.arm, variant: x.variant, n: x.n })), null, 1) + "\n");
 console.log(`wrote ${items.length} replies to ${outDir}`);

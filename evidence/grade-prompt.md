@@ -18,3 +18,10 @@ Grade each reply PASS or FAIL with this rule only:
 
 Return exactly 20 lines, one per reply, in order, in this format and nothing else:
 R01 | PASS or FAIL | a short exact quote (under 20 words) from the reply that decides it
+
+---
+
+Set 3 (2026-11-04, `set3/`): the same prompt with two changes, because set 3 holds 30 replies and
+its case-prompt replies call thread B "the Fable thread": "It holds 30 replies, R01 to R30", one
+added sentence "(In some replies thread B is called the Fable thread and answer A the Opus
+answer.)", and "Return exactly 30 lines". The pass rule is word for word the same.
