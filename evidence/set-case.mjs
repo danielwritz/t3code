@@ -1,8 +1,10 @@
 // Writes the upstream replay case tt-fork-thread-uses-transfer (prompt and text rules) into the clone.
 // Usage: node tools/trials/set-case.mjs   The rules were written from the 40 replies of sets 1 and 2;
-// set 3 (results-set3.jsonl) was run after they were fixed, as the out-of-sample check (case-check.mjs).
+// they were fixed before any set-3 reply was read (7 of set 3's 30 trials had already run), so set 3
+// (results-set3.jsonl) is the out-of-sample check (case-check.mjs).
 import { readFileSync, writeFileSync } from "node:fs";
-const p = "D:/tmp/allow-forking/t3code/evals/mcp-tool-use/cases/threads-vs-tasks.ndjson";
+import { AFW } from "../root.mjs";
+const p = `${AFW}/t3code/evals/mcp-tool-use/cases/threads-vs-tasks.ndjson`;
 const lines = readFileSync(p, "utf8").replace(/\n$/, "").split("\n");
 const i = lines.findIndex((l) => l.includes('"tt-fork-thread-uses-transfer"'));
 const c = JSON.parse(lines[i]);
@@ -16,6 +18,10 @@ c.expect.textMustNot = [
   String.raw`\b[Cc]lick (?:the )?\W{0,2}Fork`,
   String.raw`\b(?:past(?:e|es|ing)|seed(?:s|ed|ing)?)\b[^.\n]{0,50}\b(?:conversation|history|transcript)\b`,
   String.raw`\bseeded with\b`,
+  // added after round 3 of the review: a "fork" made as a new thread whose first message holds the
+  // history, even when the reply also says "I'll fork"
+  String.raw`\b(?:conversation|history|transcript)\b[^.\n]{0,60}\bfirst (?:message|prompt)\b|\bfirst (?:message|prompt)\b[^.\n]{0,60}\b(?:conversation|history|transcript)\b`,
+  String.raw`(?<!(?:n't|not|never) )\b(?:creat|start|mak|open|launch)\w* (?:a |one |the )?(?:new |fresh |separate )?thread (?:with|using|via|through) \W?(?:t3_thread_launch|create_threads)\b`,
   // a plan that says T3 cannot fork
   String.raw`\b[Nn]o (?:real |true |native |built-in )?fork\b`,
   String.raw`\b(?:has|have) no (?:tool|built-in|way)[^.\n]{0,30}\bfork`,

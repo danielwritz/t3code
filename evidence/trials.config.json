@@ -1,6 +1,6 @@
 {
-  "base": "D:/tmp/allow-forking/t3home",
-  "server": "D:/tmp/allow-forking/t3code/apps/server",
+  "base": "t3home",
+  "server": "t3code/apps/server",
   "project": "c7469cd7-c3b6-408f-976d-49f7d6d131f6",
   "A": "mcp:3a5f2731-bcfa-4265-8290-a1594c1ed20a",
   "B": "mcp:d26ababf-5dcc-4e74-bc52-1a9d79298a41",

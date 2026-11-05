@@ -1,10 +1,11 @@
 // Recounts every trial from the Claude Code provider logs (the full record of what the agent did),
 // instead of from T3's activity view, which leaves out some calls such as t3_thread_read.
-// Usage: node tools/trials/recount.mjs [T3 home of the trials, default D:/tmp/allow-forking/t3home]
+// Usage: node tools/trials/recount.mjs [T3 home of the trials, default <root>/t3home, root in tools/root.mjs]
 // Writes recount.json next to this file and prints the per-arm table used in docs/TRIALS.md.
 import { readFileSync, writeFileSync, existsSync } from "node:fs";
+import { AFW } from "../root.mjs";
 const here = new URL(".", import.meta.url).pathname.replace(/^\/([A-Z]:)/, "$1");
-const home = process.argv[2] ?? "D:/tmp/allow-forking/t3home";
+const home = process.argv[2] ?? `${AFW}/t3home`;
 const rows = readFileSync(`${here}results.jsonl`, "utf8").trim().split("\n").map(JSON.parse).filter((r) => r.arm !== "dbg");
 
 const out = rows.map((r) => {

@@ -3,8 +3,9 @@
 // blind-replies.md, then compares with the blind grades and the arm in grading-key.json.
 // Usage: node tools/trials/case-check.mjs [path to threads-vs-tasks.ndjson]
 import { readFileSync } from "node:fs";
+import { AFW } from "../root.mjs";
 const here = new URL(".", import.meta.url).pathname.replace(/^\/([A-Z]:)/, "$1");
-const casesPath = (process.argv[2] && !process.argv[2].startsWith("--") ? process.argv[2] : null) ?? "D:/tmp/allow-forking/t3code/evals/mcp-tool-use/cases/threads-vs-tasks.ndjson";
+const casesPath = (process.argv[2] && !process.argv[2].startsWith("--") ? process.argv[2] : null) ?? `${AFW}/t3code/evals/mcp-tool-use/cases/threads-vs-tasks.ndjson`;
 const kase = readFileSync(casesPath, "utf8").trim().split("\n").map(JSON.parse)
   .find((c) => c.id === "tt-fork-thread-uses-transfer");
 const must = (kase.expect.textMust ?? []).map((p) => new RegExp(p));
@@ -20,6 +21,9 @@ const FIXTURES = [
   [false, "I will create a new thread with t3_thread_launch and paste the history into it; that is the fork."],
   [false, "This creates one thread on Fable 5.1. I'll start it with t3_thread_launch and seed it with the Fable thread's transcript."],
   [false, "One new thread: I'll make it with create_threads, with the Fable conversation copied into the first message."],
+  [false, "I'll fork the Fable thread by creating a new thread with t3_thread_launch, with the Fable conversation copied into the first message."],
+  [false, "I'll fork it: I start a new thread whose first message holds the Fable thread's whole history."],
+  [true, "I won't start a new thread with t3_thread_launch. I'll call t3_thread_transfer with action:\"fork\" on the Fable thread; the fork copies its history."],
   [true, "This creates one thread: a fork of the Fable thread. I'll call t3_thread_transfer with action:\"fork\", then t3_thread_send the fork its task."],
   [true, "One new thread. I'll fork the Fable thread; the fork keeps its model, and then I'll send it the task."],
 ];

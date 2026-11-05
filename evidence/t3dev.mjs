@@ -1,13 +1,14 @@
-// Call the SEPARATE dev T3 instance's MCP tools (never the user's own T3).
+// Call the SEPARATE dev T3 instance's MCP tools (never the user's live T3).
 // Usage: node t3dev.mjs <tool> '<json arguments>'
 // Issues a 10-minute read-only mcp-client session with the dev instance's own CLI, revokes it after.
 // Base dir is fixed to the dev home so this script cannot reach D:\t3code-trial\home.
 import { execFileSync } from "node:child_process";
 import { readFileSync } from "node:fs";
+import { AFW } from "../root.mjs";
 
-const BASE = process.env.T3DEV_BASE ?? "D:/tmp/allow-forking/t3home";
-if (!BASE.startsWith("D:/tmp/allow-forking/")) throw new Error(`refusing base ${BASE}`);
-const SERVER = "D:/tmp/allow-forking/t3code/apps/server";
+const BASE = process.env.T3DEV_BASE ?? `${AFW}/t3home`;
+if (!BASE.startsWith(`${AFW}/`)) throw new Error(`refusing base ${BASE}`);
+const SERVER = `${AFW}/t3code/apps/server`;
 const env = { ...process.env };
 delete env.T3CODE_HOME;
 const cli = (args) =>

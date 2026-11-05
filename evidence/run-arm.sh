@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Runs one arm of plan trials on the SEPARATE dev T3 (home D:/tmp/allow-forking/t3home, ports
+# Runs one arm of trials on the SEPARATE dev T3 (home <root>/t3home, root in tools/env.sh; ports
 # 13773 and 5733). Never the user's T3 (port 3773).
 #   bash tools/trials/run-arm.sh before 10   # guidance file from origin/main (no fix line)
 #   bash tools/trials/run-arm.sh after 10    # guidance file from the PR branch (fix line)
@@ -8,11 +8,12 @@
 # another (trial.mjs stores the file's hash and the server start time in every row), 4. stops the
 # stack, 5. puts the branch file back. Rows go to the "results" file in trials.config.json.
 set -euo pipefail
+. "$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)/env.sh"
 ARM="${1:?before|after}"; N="${2:?count}"; FIRST="${3:-1}"; VARIANT="${4:-plan}"
 P=/d/t3code-trial/home/projects/t3code-feature-allow-forking
-CLONE=/d/tmp/allow-forking/t3code
+CLONE="$AFP/t3code"
 F=packages/provider-core/src/server/orchestrationInstructions.ts
-LOG=/d/tmp/allow-forking/server-demo.log
+LOG="$AFP/server-demo.log"
 if netstat -ano | grep LISTENING | grep -qE ":13773 |:5733 "; then echo "port 13773 or 5733 is in use; stop that stack first"; exit 2; fi
 [ -z "$(git -C "$CLONE" status --porcelain -- "$F")" ] || { echo "the guidance file has local changes; restore it first"; exit 2; }
 case "$ARM" in
@@ -25,7 +26,7 @@ echo "arm $ARM: guidance lines with the fix = $HAS"
 { [ "$ARM" = before ] && [ "$HAS" = 0 ]; } || { [ "$ARM" = after ] && [ "$HAS" = 1 ]; } || { git -C "$CLONE" checkout -- "$F"; echo "wrong guidance text for arm $ARM"; exit 2; }
 
 : > "$LOG"
-bash "$P/tools/demo/stack-nowatch.sh" D:/tmp/allow-forking/t3home &
+bash "$P/tools/demo/stack-nowatch.sh" "$AFW/t3home" &
 STACK=$!
 stop() {
   for port in 13773 5733; do

@@ -6,12 +6,15 @@
 import { execFileSync } from "node:child_process";
 import { appendFileSync, readFileSync, existsSync } from "node:fs";
 import { createHash } from "node:crypto";
+import { AFW } from "../root.mjs";
 
 const here = new URL(".", import.meta.url).pathname.replace(/^\/([A-Z]:)/, "$1");
 const cfg = JSON.parse(readFileSync(`${here}trials.config.json`, "utf8"));
+// base and server in the config are relative to the root (tools/root.mjs).
+for (const k of ["base", "server"]) if (!/^[A-Za-z]:/.test(cfg[k])) cfg[k] = `${AFW}/${cfg[k]}`;
 const [arm, n, variant = "act"] = process.argv.slice(2);
 if (!arm || !n) throw new Error("usage: trial.mjs <arm> <n> <act|plan|case>");
-if (!cfg.base.startsWith("D:/tmp/allow-forking/")) throw new Error(`refusing T3 home ${cfg.base}`);
+if (!cfg.base.startsWith(`${AFW}/`)) throw new Error(`refusing T3 home ${cfg.base}`);
 const { A, B } = cfg;
 const env = { ...process.env };
 delete env.T3CODE_HOME;
@@ -27,6 +30,9 @@ const PROMPTS = {
   // Set 3: the submitted case's prompt word for word, after one sentence that stands in for the
   // case's prior turns (which name an Opus thread and a Fable thread).
   case: `Earlier I asked Opus and Fable the same pricing question in two threads. Opus: "Pricing question: answer A" (${A}). Fable: "Pricing question: answer B" (${B}). I want to repeat our comparison process: take the Fable thread and fork it, then get the fork to read the Opus answer and write one combined answer. Do not start yet. Understood? Tell me the threads this will create and how you will make each one (agent, model).`,
+  // Negative control (results-control.jsonl): the user wants a NEW thread, not a fork. With the line,
+  // the agent must still start a new thread and must not fork.
+  newthread: `Start a new thread in this project on Claude Haiku 5.5, titled "Pricing summary", that writes a one-line summary of the pricing question in "Pricing question: answer A" (${A}). Tell me its thread id once it is started.`,
   // The case's first wording (results-case-wording1.jsonl): it did not reproduce the miss.
   case1: `Two threads answered the same pricing question: "Pricing question: answer A" (${A}) and "Pricing question: answer B" (${B}). Now fork thread B and have the fork read answer A and write one combined answer. Do not start yet. Tell me the threads this will create and how you will make each one.`,
 };
@@ -37,7 +43,7 @@ if (!PROMPT) throw new Error(`unknown variant ${variant}`);
 // started (so a row can be matched to the server run that loaded that text).
 const guidePath = `${cfg.server}/../../packages/provider-core/src/server/orchestrationInstructions.ts`;
 const guide = readFileSync(guidePath, "utf8");
-const serverLog = cfg.serverLog ?? "D:/tmp/allow-forking/server-demo.log";
+const serverLog = cfg.serverLog ?? `${AFW}/server-demo.log`;
 const listening = existsSync(serverLog)
   ? (readFileSync(serverLog, "utf8").match(/\[([0-9:.]+)\][^\n]*Listening on/) ?? [])[1] ?? null
   : null;
@@ -47,7 +53,8 @@ const started = Date.now();
 const out = execFileSync("node", ["src/bin.ts", "thread", "start", cfg.project, PROMPT,
   "--title", `Fork trial ${arm} ${variant} ${n}`, "--provider", "claudeAgent", "--model", "claude-opus-5-5",
   "--wait", "--json", "--base-dir", cfg.base], { cwd: cfg.server, env, encoding: "utf8", stdio: ["ignore", "pipe", "pipe"], timeout: 900_000 });
-const run = JSON.parse(out.split("\n").find((l) => l.trim().startsWith("{")));
+// The CLI can print log lines first; some start with "{" (see tools/cli-json.mjs), so look for '{"'.
+const run = JSON.parse(out.slice(out.search(/^\{\s*(?:"|$)/m)));
 
 // Every tool call, from the provider log. Stream events repeat a call, so key by its id.
 const log = `${cfg.base}/userdata/logs/provider/events.${run.threadId.replaceAll(":", "-")}.log`;
@@ -74,5 +81,5 @@ const result = {
   toolNames: list.map((c) => (c.tool === "ToolSearch" ? `ToolSearch(${c.input.query})` : c.tool)),
   reply,
 };
-appendFileSync(`${here}${cfg.results ?? "results.jsonl"}`, JSON.stringify(result) + "\n");
+appendFileSync(`${here}${process.env.TRIAL_RESULTS ?? cfg.results ?? "results.jsonl"}`, JSON.stringify(result) + "\n");
 console.log(JSON.stringify({ ...result, reply: reply.slice(0, 200) }));
