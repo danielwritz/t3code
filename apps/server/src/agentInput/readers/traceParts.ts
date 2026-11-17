@@ -53,29 +53,6 @@ export function makeLayer(input: {
   };
 }
 
-/** Characters of text a model reads: string leaves, without signatures, binary data or keys. */
-export function makeTextLength() {
-  const cache = new WeakMap<object, number>();
-  const textLength = (value: unknown): number => {
-    if (typeof value === "string") return value.length;
-    if (value === null || typeof value !== "object") return 0;
-    const cached = cache.get(value);
-    if (cached !== undefined) return cached;
-    let total = 0;
-    if (Array.isArray(value)) {
-      for (const item of value) total += textLength(item);
-    } else {
-      for (const [key, item] of Object.entries(value)) {
-        if (key === "signature" || key === "data" || key === "encrypted_content") continue;
-        total += textLength(item);
-      }
-    }
-    cache.set(value, total);
-    return total;
-  };
-  return textLength;
-}
-
 export const isRecord = (value: unknown): value is Record<string, unknown> =>
   value !== null && typeof value === "object" && !Array.isArray(value);
 
@@ -95,3 +72,40 @@ export const parseJsonLine = (line: string): unknown => {
 };
 
 export const prettyJson = (value: unknown) => JSON.stringify(value, null, 2);
+
+/**
+ * `prettyJson(value).length` without building the text. Requests share most messages, so each
+ * object's length is cached per depth instead of re-serializing the history for every request.
+ */
+export function makePrettyJsonLength() {
+  const cache = new WeakMap<object, Map<number, number>>();
+  const lengthAt = (value: unknown, depth: number): number | undefined => {
+    if (value === undefined || typeof value === "function" || typeof value === "symbol") {
+      return undefined;
+    }
+    if (value === null || typeof value !== "object") return JSON.stringify(value).length;
+    const cached = cache.get(value)?.get(depth);
+    if (cached !== undefined) return cached;
+    const indent = 2 * (depth + 1);
+    const entries: Array<number> = [];
+    if (Array.isArray(value)) {
+      for (const item of value) entries.push(indent + (lengthAt(item, depth + 1) ?? 4));
+    } else {
+      for (const [key, item] of Object.entries(value)) {
+        const itemLength = lengthAt(item, depth + 1);
+        if (itemLength === undefined) continue;
+        entries.push(indent + JSON.stringify(key).length + 2 + itemLength);
+      }
+    }
+    // Brackets, the newline after the opening one, ",\n" between entries, "\n" and indent before the close.
+    const total =
+      entries.length === 0
+        ? 2
+        : entries.reduce((sum, entry) => sum + entry, 0) + 2 * entries.length + 2 + 2 * depth;
+    const byDepth = cache.get(value) ?? new Map<number, number>();
+    byDepth.set(depth, total);
+    cache.set(value, byDepth);
+    return total;
+  };
+  return (value: unknown) => lengthAt(value, 0) ?? 0;
+}

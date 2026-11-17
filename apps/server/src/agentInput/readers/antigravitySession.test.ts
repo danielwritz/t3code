@@ -57,8 +57,18 @@ describe("readAntigravitySession", () => {
   ].join("\n");
   const trace = readAntigravitySession({
     transcriptLines: [
-      JSON.stringify({ step_index: 0, type: "USER_INPUT", content: userInput }),
-      JSON.stringify({ step_index: 1, type: "PLANNER_RESPONSE", content: "ok" }),
+      JSON.stringify({
+        step_index: 0,
+        type: "USER_INPUT",
+        content: userInput,
+        created_at: "2026-01-01T00:00:00.000Z",
+      }),
+      JSON.stringify({
+        step_index: 1,
+        type: "PLANNER_RESPONSE",
+        content: "ok",
+        created_at: "2026-01-01T00:00:05.000Z",
+      }),
     ],
     mcpTools: [{ server: "t3-code", name: "list", json: '{"name":"list"}' }],
     lastGeneration: generation,
@@ -66,8 +76,8 @@ describe("readAntigravitySession", () => {
 
   it("splits T3's wrapper from the user's words and finds the system prompt", () => {
     expect(trace.layers.map((layer) => [layer.kind, layer.origin, layer.title])).toEqual([
-      ["system-prompt", "harness", "identity"],
-      ["system-prompt", "harness", "mcp_servers"],
+      ["system-prompt", "harness", "Section: identity"],
+      ["system-prompt", "harness", "Section: mcp_servers"],
       ["tools", "mcp-server", "t3-code (1 tools)"],
       ["host-instructions", "t3", "T3 instructions"],
       ["profile", "profile", "Instruction profile"],
@@ -80,5 +90,13 @@ describe("readAntigravitySession", () => {
     expect(trace.notes).toEqual([
       "Antigravity keeps only its latest request, so earlier system prompts are not shown.",
     ]);
+  });
+
+  it("dates the latest request's layers by the newest transcript step", () => {
+    expect(
+      trace.layers
+        .filter((layer) => layer.kind === "system-prompt" || layer.kind === "tools")
+        .map((layer) => layer.at),
+    ).toEqual(["2026-01-01T00:00:05.000Z", "2026-01-01T00:00:05.000Z", "2026-01-01T00:00:05.000Z"]);
   });
 });

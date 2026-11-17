@@ -2173,10 +2173,10 @@ function withClaudeInstructionProfile(
 ): ClaudeAgentSdkQueryOptions {
   if (plan === undefined) return options;
   const extra = plan.settings;
+  // makeClaudeQueryOptions only builds settings objects, so the profile's keys always merge in.
   const current = typeof options.settings === "object" ? options.settings : undefined;
-  // A settings file path cannot take extra keys; launch-argument settings arrive read as objects.
   const settings =
-    extra === undefined || typeof options.settings === "string"
+    extra === undefined
       ? options.settings
       : ({
           ...current,
@@ -2216,7 +2216,8 @@ export function makeClaudeQueryOptions(input: {
   readonly attachmentsDir?: string;
   readonly settings?: ClaudeSettings;
   readonly promptSuggestions?: boolean;
-  readonly sdkSettings?: string | ClaudeSdkSettings;
+  /** Launch-argument settings, read from a JSON string or file before they get here. */
+  readonly sdkSettings?: ClaudeSdkSettings;
   readonly environment?: NodeJS.ProcessEnv;
   readonly mcpServers?: ClaudeQueryOptions["mcpServers"];
   /** The thread's T3 MCP session holds the `device` capability. */
@@ -2274,9 +2275,7 @@ export function makeClaudeQueryOptions(input: {
   const querySettings =
     selectionSettings === undefined
       ? input.sdkSettings
-      : typeof input.sdkSettings === "object" && input.sdkSettings !== null
-        ? ({ ...input.sdkSettings, ...selectionSettings } as ClaudeSdkSettings)
-        : selectionSettings;
+      : ({ ...input.sdkSettings, ...selectionSettings } as ClaudeSdkSettings);
   const autoCompactWindow =
     input.settings?.autoCompactWindow === undefined || input.settings.autoCompactWindow.length === 0
       ? undefined

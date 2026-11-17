@@ -1,9 +1,11 @@
-import type { AgentInputLayer } from "@t3tools/contracts";
+import type { AgentInputLayer, AgentInputProfileUse } from "@t3tools/contracts";
+import { ProviderDriverKind } from "@t3tools/contracts";
 import { describe, expect, it } from "vite-plus/test";
 
 import {
   agentInputFidelitySentence,
   agentInputLayerWhen,
+  agentInputProfileEffectRows,
   agentInputSizeSegments,
   agentInputTextTargetKey,
   formatAgentInputChars,
@@ -129,5 +131,77 @@ describe("agentInputTextTargetKey", () => {
     expect(agentInputTextTargetKey({ type: "request", index: 2, part: "tools" })).toBe(
       "request:2:tools",
     );
+  });
+});
+
+describe("agentInputProfileEffectRows", () => {
+  const use: AgentInputProfileUse = {
+    profileId: "p1",
+    profileName: "Lean",
+    appliedAt: "2026-11-17T10:00:00.000Z",
+    effects: [{ toggle: "skill", name: "pdf", state: "applied", detail: "Hidden." }],
+  };
+
+  it("shows what was asked, the result, the switch and the reason for each entry", () => {
+    const rows = agentInputProfileEffectRows({
+      ...use,
+      driver: ProviderDriverKind.make("codex"),
+      applied: [
+        {
+          kind: "global-instructions",
+          requested: "add",
+          result: "applied",
+          how: "turn additionalContext",
+        },
+        {
+          kind: "agent",
+          name: "reviewer",
+          requested: "off",
+          result: "not-supported",
+          how: "none",
+          reason: "Codex can only turn all agents off.",
+        },
+        { kind: "mcpServer", name: "t3-code", requested: "off", result: "skipped", how: "none" },
+      ],
+    });
+    expect(rows).toEqual([
+      {
+        key: "global-instructions:",
+        item: "Global instructions",
+        asked: "Add",
+        result: "Applied",
+        tone: "success",
+        how: "turn additionalContext",
+      },
+      {
+        key: "agent:reviewer",
+        item: "Agent reviewer",
+        asked: "Turn off",
+        result: "Not supported",
+        tone: "warning",
+        how: "none",
+        reason: "Codex can only turn all agents off.",
+      },
+      {
+        key: "mcpServer:t3-code",
+        item: "MCP server t3-code",
+        asked: "Turn off",
+        result: "Skipped",
+        tone: "secondary",
+        how: "none",
+      },
+    ]);
+  });
+
+  it("falls back to the short effects of an older server", () => {
+    expect(agentInputProfileEffectRows(use)).toEqual([
+      {
+        key: "skill:pdf",
+        item: "Skill pdf",
+        result: "Applied",
+        tone: "success",
+        how: "Hidden.",
+      },
+    ]);
   });
 });

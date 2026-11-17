@@ -22,6 +22,7 @@ import * as SqlClient from "effect/sql/SqlClient";
 import * as SqlSchema from "effect/sql/SqlSchema";
 
 import { PersistenceDecodeError, PersistenceSqlError } from "../persistence/Errors.ts";
+import { NO_PROFILE_ID } from "../persistence/InstructionProfiles.ts";
 
 const sha256Hex = (text: string) => NodeCrypto.createHash("sha256").update(text).digest("hex");
 
@@ -164,7 +165,7 @@ const make = Effect.gen(function* () {
     latestProfileUse: Effect.fn("AgentInputStore.latestProfileUse")(
       function* (threadId) {
         const row = (yield* latestApplication(threadId))[0];
-        if (row === undefined) return undefined;
+        if (row === undefined || row.profileId === NO_PROFILE_ID) return undefined;
         const effects = yield* decodeEffects(row.effectsJson);
         const applied = effects.filter(isItemEffect);
         return yield* decodeProfileUse({

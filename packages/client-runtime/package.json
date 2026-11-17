@@ -339,6 +339,10 @@
       "types": "./src/state/shell.ts",
       "default": "./src/state/shell.ts"
     },
+    "./state/instruction-profiles": {
+      "types": "./src/state/instructionProfiles.ts",
+      "default": "./src/state/instructionProfiles.ts"
+    },
     "./state/issue-trackers": {
       "types": "./src/state/issueTrackers.ts",
       "default": "./src/state/issueTrackers.ts"

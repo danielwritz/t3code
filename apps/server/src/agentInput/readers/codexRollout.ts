@@ -3,7 +3,7 @@ import type { AgentInputLayerKind, AgentInputOrigin } from "@t3tools/contracts";
 import {
   isRecord,
   makeLayer,
-  makeTextLength,
+  makePrettyJsonLength,
   parseJsonLine,
   prettyJson,
   stringField,
@@ -33,15 +33,16 @@ function classifyDeveloperText(text: string): {
   if (tag === "skills_instructions") return { kind: "skills", origin: "harness", title: "Skills" };
   if (tag.startsWith("t3_code_instruction_profile"))
     return { kind: "profile", origin: "profile", title: "Instruction profile" };
-  if (tag.startsWith("t3_code_")) return { kind: "host-instructions", origin: "t3", title: tag };
+  if (tag.startsWith("t3_code_"))
+    return { kind: "host-instructions", origin: "t3", title: `Section: ${tag}` };
   if (
     HARNESS_DEVELOPER_TAGS.some(
       (known) => tag === known || (known.endsWith("_") && tag.startsWith(known)),
     )
   ) {
-    return { kind: "system-prompt", origin: "harness", title: tag };
+    return { kind: "system-prompt", origin: "harness", title: `Section: ${tag}` };
   }
-  return { kind: "other", origin: "harness", title: tag };
+  return { kind: "other", origin: "harness", title: `Section: ${tag}` };
 }
 
 const partsOf = (content: unknown) =>
@@ -217,7 +218,7 @@ export function makeCodexRolloutReader() {
   };
 
   const finish = (): HarnessTrace => {
-    const textLength = makeTextLength();
+    const prettyLength = makePrettyJsonLength();
     const requestPoints = sawUsageRecord
       ? snapshots
       : turnEnds.length > 0
@@ -237,8 +238,8 @@ export function makeCodexRolloutReader() {
     const requests: Array<TraceRequest> = requestPoints.map((point, index) => {
       const messages = items.slice(0, point.itemCount);
       const systemChars = systemTextOf(point).length;
-      const toolChars = textLength(point.tools);
-      const messageChars = messages.reduce<number>((total, item) => total + textLength(item), 0);
+      const toolChars = prettyLength(point.tools);
+      const messageChars = prettyLength(messages);
       return {
         index,
         ...(point.at === undefined ? {} : { at: point.at }),

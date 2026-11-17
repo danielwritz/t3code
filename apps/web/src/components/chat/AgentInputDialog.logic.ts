@@ -2,14 +2,19 @@ import type {
   AgentInputFidelity,
   AgentInputLayer,
   AgentInputLayerKind,
+  AgentInputProfileUse,
   AgentInputTextTarget,
+  InstructionProfileEffectKind,
+  InstructionProfileItemEffect,
 } from "@t3tools/contracts";
+
+import { instructionProfileItemLabel } from "../settings/InstructionProfilesSettings.logic";
 
 // Roughly the order the model reads them in.
 const KIND_LABELS: Readonly<Record<AgentInputLayerKind, string>> = {
   "system-prompt": "System prompt",
   "host-instructions": "T3 instructions",
-  profile: "Profile",
+  profile: "Instruction profile",
   "instruction-file": "Instruction files",
   memory: "Memory",
   skills: "Skills",
@@ -115,4 +120,64 @@ export function agentInputTextTargetKey(target: AgentInputTextTarget): string {
   return target.type === "layer"
     ? `layer:${target.layerId}`
     : `request:${target.index}:${target.part}`;
+}
+
+interface AgentInputProfileEffectRow {
+  readonly key: string;
+  readonly item: string;
+  /** Absent for servers that recorded only the short effects. */
+  readonly asked?: string;
+  readonly result: string;
+  readonly tone: "success" | "warning" | "secondary";
+  readonly how: string;
+  readonly reason?: string;
+}
+
+const ASKED_LABEL: Readonly<Record<InstructionProfileItemEffect["requested"], string>> = {
+  on: "Turn on",
+  off: "Turn off",
+  add: "Add",
+};
+
+const RESULT_LABEL = {
+  applied: { label: "Applied", tone: "success" },
+  "not-supported": { label: "Not supported", tone: "warning" },
+  skipped: { label: "Skipped", tone: "secondary" },
+  unchanged: { label: "Unchanged", tone: "secondary" },
+} as const;
+
+const TOGGLE_KIND: Readonly<
+  Record<AgentInputProfileUse["effects"][number]["toggle"], InstructionProfileEffectKind>
+> = {
+  globalInstructions: "global-instructions",
+  skill: "skill",
+  agent: "agent",
+  mcpServer: "mcpServer",
+};
+
+/** One row per profile entry: what was asked, what happened, the switch used and why not. */
+export function agentInputProfileEffectRows(
+  profile: AgentInputProfileUse,
+): ReadonlyArray<AgentInputProfileEffectRow> {
+  if (profile.applied !== undefined) {
+    return profile.applied.map((effect) => ({
+      key: `${effect.kind}:${effect.name ?? ""}`,
+      item: instructionProfileItemLabel(effect.kind, effect.name),
+      asked: ASKED_LABEL[effect.requested],
+      result: RESULT_LABEL[effect.result].label,
+      tone: RESULT_LABEL[effect.result].tone,
+      how: effect.how,
+      ...(effect.reason === undefined ? {} : { reason: effect.reason }),
+    }));
+  }
+  return profile.effects.map((effect) => {
+    const kind = TOGGLE_KIND[effect.toggle];
+    return {
+      key: `${kind}:${effect.name ?? ""}`,
+      item: instructionProfileItemLabel(kind, effect.name),
+      result: RESULT_LABEL[effect.state].label,
+      tone: RESULT_LABEL[effect.state].tone,
+      how: effect.detail,
+    };
+  });
 }

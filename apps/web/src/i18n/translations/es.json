@@ -37,12 +37,6 @@
   "3fc130f1e8170073": "El modo mantener también sale con dos pulsaciones rápidas.",
   "72c7fda6ae301e6d": "Del sistema usa el idioma de tu navegador o sistema operativo.",
   "b9ebecdb8db71466": "Del sistema usa el formato de hora de tu navegador o sistema operativo.",
-  "425f7ce2f24cb248": "Secciones de ajustes",
-  "ee3e8bd8b7918aec": "Buscar",
-  "858561b97fdd72f2": "Buscar ajustes",
-  "fed2d32de2b0c566": "Borrar búsqueda de ajustes",
-  "833639e235c97484": "Resultados de búsqueda de ajustes",
-  "be82bbfef472ab44": "No se encontraron ajustes",
   "cc84bfe0ee5d0174": "Proyectos",
   "81d0d1e78b196630": "General",
   "fa19046edd6cfbd4": "Apariencia",
@@ -52,6 +46,7 @@
   "1a6679bbe62703b2": "SnapShots",
   "2f77cc3105ddd7f8": "Proveedores",
   "6d9bf91f0d4b7ba3": "Hilos",
+  "30e258413c82de9d": "Perfiles de instrucciones",
   "795854feef8d2f52": "Navegador",
   "9cc48e5c9ee46026": "Dispositivos",
   "2ab325baee3ec9a3": "Tareas programadas",
@@ -75,5 +70,11 @@
   "1d5052cbe70d0b28": "Confirmación al archivar",
   "d5dd27a4eb853248": "Confirmación al eliminar",
   "5503ef439beb8d42": "Confirmación al cerrar terminales",
-  "86b43caa9ff41ea2": "Atajo para salir"
+  "86b43caa9ff41ea2": "Atajo para salir",
+  "425f7ce2f24cb248": "Secciones de ajustes",
+  "ee3e8bd8b7918aec": "Buscar",
+  "858561b97fdd72f2": "Buscar ajustes",
+  "fed2d32de2b0c566": "Borrar búsqueda de ajustes",
+  "833639e235c97484": "Resultados de búsqueda de ajustes",
+  "be82bbfef472ab44": "No se encontraron ajustes"
 }

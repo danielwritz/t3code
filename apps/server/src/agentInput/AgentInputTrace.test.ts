@@ -134,7 +134,7 @@ it.layer(
         expect(result.source).toBe("Codex session file");
         expect(result.layers.map((layer) => [layer.kind, layer.title])).toEqual([
           ["system-prompt", "Base instructions"],
-          ["host-instructions", "t3_code_runtime"],
+          ["host-instructions", "Section: t3_code_runtime"],
           ["user-prompt", "User message"],
           ["host-instructions", "Extra"],
         ]);

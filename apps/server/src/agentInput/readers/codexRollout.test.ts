@@ -58,10 +58,10 @@ describe("readCodexRolloutLines", () => {
       ["system-prompt", "harness", "Base instructions", 0],
       ["tools", "harness", "Tools (2)", 0],
       ["skills", "harness", "Skills", 0],
-      ["system-prompt", "harness", "permissions", 0],
+      ["system-prompt", "harness", "Section: permissions", 0],
       ["instruction-file", "user-file", "AGENTS.md", 0],
       ["environment", "harness", "Environment", 0],
-      ["host-instructions", "t3", "t3_code_runtime", 0],
+      ["host-instructions", "t3", "Section: t3_code_runtime", 0],
       ["profile", "profile", "Instruction profile", 0],
       ["user-prompt", "user", "User message", 0],
       ["user-prompt", "user", "User message", 1],
@@ -77,5 +77,12 @@ describe("readCodexRolloutLines", () => {
     expect(trace.requests[0]!.toolCount).toBe(2);
     expect(trace.requests[1]!.partText("messages")).toContain("Thanks.");
     expect(trace.fidelity).toBe("harness-record");
+    for (const request of trace.requests) {
+      expect([request.systemChars, request.toolChars, request.messageChars]).toEqual([
+        request.partText("system").length,
+        request.partText("tools").length,
+        request.partText("messages").length,
+      ]);
+    }
   });
 });

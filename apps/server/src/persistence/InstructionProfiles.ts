@@ -41,6 +41,8 @@ const encodeEffects = Schema.encodeEffect(
 
 const DEFAULT_SCOPE = "default";
 const PROJECT_SCOPE_PREFIX = "project:";
+/** `profile_id` of an application row for a launch without a profile. */
+export const NO_PROFILE_ID = "";
 
 export interface InstructionProfileScopes {
   readonly defaultProfileId: string | null;
@@ -91,6 +93,12 @@ export class InstructionProfilesRepository extends Context.Service<
       readonly profileName: string;
       readonly driver: ProviderDriverKind;
       readonly effects: ReadonlyArray<InstructionProfileItemEffect>;
+      readonly now: string;
+    }) => Effect.Effect<void, InstructionProfilesRepositoryError>;
+    /** Writes a no-profile row only when the thread's latest row named a profile. */
+    readonly recordNoProfile: (input: {
+      readonly threadId: ThreadId;
+      readonly driver: ProviderDriverKind;
       readonly now: string;
     }) => Effect.Effect<void, InstructionProfilesRepositoryError>;
   }
@@ -265,6 +273,22 @@ const make = Effect.gen(function* () {
         `;
       },
       Effect.mapError(toRepositoryError("recordInstructionProfileApplication")),
+    ),
+    recordNoProfile: Effect.fn("InstructionProfilesRepository.recordNoProfile")(
+      function* (input) {
+        yield* sql`
+          INSERT INTO instruction_profile_applications
+            (thread_id, profile_id, profile_name, driver, effects_json, applied_at)
+          SELECT ${input.threadId}, ${NO_PROFILE_ID}, '', ${input.driver}, '[]', ${input.now}
+          WHERE (
+            SELECT profile_id FROM instruction_profile_applications
+            WHERE thread_id = ${input.threadId}
+            ORDER BY id DESC
+            LIMIT 1
+          ) <> ${NO_PROFILE_ID}
+        `;
+      },
+      Effect.mapError(toRepositoryError("recordNoInstructionProfile")),
     ),
   });
 });

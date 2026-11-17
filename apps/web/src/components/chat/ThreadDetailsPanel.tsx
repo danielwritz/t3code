@@ -39,6 +39,7 @@ import { ThreadDetailsThreadPrRows } from "./ThreadDetailsPrRows";
 import { cn } from "../../lib/utils";
 import { LayersIcon, SlidersHorizontalIcon } from "lucide-react";
 import { openAgentInputDialog } from "./AgentInputDialog";
+import { ThreadInstructionProfileControl } from "./ThreadInstructionProfileControl";
 import { ThreadDetailsControl } from "./ThreadDetailsControl";
 import {
   THREAD_DETAILS_PANEL_ICON_CLASS,
@@ -285,25 +286,36 @@ export function ThreadDetailsPanel(props: ThreadDetailsPanelProps) {
                 />
               ) : null}
 
-              {!props.draftId && props.isServerThread && visible.agentInput ? (
+              {!props.draftId &&
+              props.isServerThread &&
+              (visible.agentInput || visible.instructionProfile) ? (
                 <ThreadDetailsSection
                   headingId="thread-details-agent-input-heading"
                   title="Agent input"
                   showHeading={false}
                 >
                   <div className="flex flex-col">
-                    <ThreadDetailsControl
-                      size="xs"
-                      variant="ghost"
-                      part="row"
-                      panel
-                      onClick={() => openAgentInputDialog(activeThreadRef)}
-                    >
-                      <LayersIcon className={THREAD_DETAILS_PANEL_ICON_CLASS} aria-hidden />
-                      <span className={cn("ml-0.5", THREAD_DETAILS_PANEL_LABEL_CLASS)}>
-                        Agent input
-                      </span>
-                    </ThreadDetailsControl>
+                    {visible.instructionProfile ? (
+                      <ThreadInstructionProfileControl
+                        environmentId={props.environmentId}
+                        threadId={props.threadId}
+                        projectId={props.projectId}
+                      />
+                    ) : null}
+                    {visible.agentInput ? (
+                      <ThreadDetailsControl
+                        size="xs"
+                        variant="ghost"
+                        part="row"
+                        panel
+                        onClick={() => openAgentInputDialog(activeThreadRef)}
+                      >
+                        <LayersIcon className={THREAD_DETAILS_PANEL_ICON_CLASS} aria-hidden />
+                        <span className={cn("ml-0.5", THREAD_DETAILS_PANEL_LABEL_CLASS)}>
+                          Agent input
+                        </span>
+                      </ThreadDetailsControl>
+                    ) : null}
                   </div>
                 </ThreadDetailsSection>
               ) : null}

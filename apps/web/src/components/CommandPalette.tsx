@@ -68,6 +68,7 @@ import {
   FolderIcon,
   FolderPlusIcon,
   LayersIcon,
+  ScrollTextIcon,
   MessageSquareDashedIcon,
   LinkIcon,
   MessageSquareIcon,
@@ -1475,6 +1476,17 @@ function OpenCommandPaletteDialog(props: {
       },
     });
   }
+
+  actionItems.push({
+    kind: "action",
+    value: "action:instruction-profiles",
+    searchTerms: ["instruction profile", "global instructions", "skills", "agents", "mcp"],
+    title: "Manage instruction profiles",
+    icon: <ScrollTextIcon className={ITEM_ICON_CLASS} />,
+    run: async () => {
+      void navigate({ to: "/settings/instruction-profiles" });
+    },
+  });
 
   if (
     activeThread !== null &&

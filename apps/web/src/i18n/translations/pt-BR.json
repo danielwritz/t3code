@@ -37,12 +37,6 @@
   "3fc130f1e8170073": "O modo \"Manter pressionado\" também sai ao pressionar duas vezes rapidamente.",
   "72c7fda6ae301e6d": "\"Padrão do sistema\" usa o idioma do navegador ou do sistema operacional.",
   "b9ebecdb8db71466": "\"Padrão do sistema\" usa o formato de hora do navegador ou do sistema operacional.",
-  "425f7ce2f24cb248": "Seções de configurações",
-  "ee3e8bd8b7918aec": "Pesquisar",
-  "858561b97fdd72f2": "Pesquisar configurações",
-  "fed2d32de2b0c566": "Limpar pesquisa de configurações",
-  "833639e235c97484": "Resultados da pesquisa de configurações",
-  "be82bbfef472ab44": "Nenhuma configuração encontrada",
   "cc84bfe0ee5d0174": "Projetos",
   "81d0d1e78b196630": "Geral",
   "fa19046edd6cfbd4": "Aparência",
@@ -52,6 +46,7 @@
   "1a6679bbe62703b2": "SnapShots",
   "2f77cc3105ddd7f8": "Provedores",
   "6d9bf91f0d4b7ba3": "Conversas",
+  "30e258413c82de9d": "Perfis de instruções",
   "795854feef8d2f52": "Navegador",
   "9cc48e5c9ee46026": "Dispositivos",
   "2ab325baee3ec9a3": "Tarefas agendadas",
@@ -75,5 +70,11 @@
   "1d5052cbe70d0b28": "Confirmação ao arquivar",
   "d5dd27a4eb853248": "Confirmação ao excluir",
   "5503ef439beb8d42": "Confirmação ao fechar terminais",
-  "86b43caa9ff41ea2": "Atalho de saída"
+  "86b43caa9ff41ea2": "Atalho de saída",
+  "425f7ce2f24cb248": "Seções de configurações",
+  "ee3e8bd8b7918aec": "Pesquisar",
+  "858561b97fdd72f2": "Pesquisar configurações",
+  "fed2d32de2b0c566": "Limpar pesquisa de configurações",
+  "833639e235c97484": "Resultados da pesquisa de configurações",
+  "be82bbfef472ab44": "Nenhuma configuração encontrada"
 }

@@ -28,6 +28,7 @@ export type SettingsPath =
   | "/settings/snap-shot"
   | "/settings/providers"
   | "/settings/threads"
+  | "/settings/instruction-profiles"
   | "/settings/browser"
   | "/settings/devices"
   | "/settings/scheduled-tasks"
@@ -103,6 +104,7 @@ export const SETTINGS_SECTION_LABELS: Readonly<Record<SettingsPath, string>> = {
   "/settings/snap-shot": msg("SnapShots"),
   "/settings/providers": msg("Providers"),
   "/settings/threads": msg("Threads"),
+  "/settings/instruction-profiles": msg("Instruction profiles"),
   "/settings/browser": msg("Browser"),
   "/settings/devices": msg("Devices"),
   "/settings/scheduled-tasks": msg("Scheduled tasks"),
@@ -142,6 +144,7 @@ export const SETTINGS_NAV_GROUPS: ReadonlyArray<{
     paths: [
       "/settings/providers",
       "/settings/threads",
+      "/settings/instruction-profiles",
       "/settings/browser",
       "/settings/devices",
       "/settings/scheduled-tasks",
@@ -1023,6 +1026,24 @@ export const SETTINGS_SEARCH_ITEMS = [
     to: "/settings/scheduled-tasks",
   },
   {
+    id: "instruction-profiles",
+    title: "Instruction profiles",
+    to: "/settings/instruction-profiles",
+    searchTerms: ["global instructions system prompt skills agents mcp servers switch off profile"],
+  },
+  {
+    id: "default-instruction-profile",
+    title: "Default instruction profile",
+    to: "/settings/instruction-profiles",
+    searchTerms: ["profile every thread project choice"],
+  },
+  {
+    id: "instruction-profile-support",
+    title: "What each agent supports",
+    to: "/settings/instruction-profiles",
+    searchTerms: ["instruction profile support claude codex antigravity switch"],
+  },
+  {
     id: "agent-browser-access",
     title: "Agent browser access",
     to: "/settings/browser",
@@ -1406,6 +1427,7 @@ const SETTINGS_CATEGORY_SCOPES: Readonly<Record<SettingsPath, SettingsSearchScop
   "/settings/keybindings": null,
   "/settings/providers": null,
   "/settings/threads": null,
+  "/settings/instruction-profiles": null,
   "/settings/browser": null,
   "/settings/devices": null,
   "/settings/source-control": "environment-defaults",

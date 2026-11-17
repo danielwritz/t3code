@@ -11,6 +11,7 @@ import * as Effect from "effect/Effect";
 import * as FileSystem from "effect/FileSystem";
 import * as Layer from "effect/Layer";
 import * as Path from "effect/Path";
+import * as SqlClient from "effect/sql/SqlClient";
 
 import * as AgentInputStore from "../agentInput/AgentInputStore.ts";
 import * as ProjectionStore from "../orchestration-v2/ProjectionStore.ts";
@@ -49,7 +50,7 @@ const withService = <A, E>(
   use: Effect.Effect<
     A,
     E,
-    InstructionProfiles.InstructionProfiles | AgentInputStore.AgentInputStore
+    InstructionProfiles.InstructionProfiles | AgentInputStore.AgentInputStore | SqlClient.SqlClient
   >,
 ) =>
   Effect.gen(function* () {
@@ -198,6 +199,24 @@ it.layer(Layer.mergeAll(NodeServices.layer, SqlitePersistence.layerMemory))(
             ["mcpServer", "applied"],
             ["mcpServer", "not-supported"],
           ]);
+
+          // A launch with no profile hides the last one; a thread that never had one gets no row.
+          yield* service.recordLaunch({ threadId: thread, driver, launch: undefined });
+          expect(yield* store.latestProfileUse(thread)).toBeUndefined();
+          yield* service.recordLaunch({ threadId: otherThread, driver, launch: undefined });
+          const sql = yield* SqlClient.SqlClient;
+          const rows = yield* sql<{ readonly threadId: string; readonly profileId: string }>`
+            SELECT thread_id AS "threadId", profile_id AS "profileId"
+            FROM instruction_profile_applications ORDER BY id
+          `;
+          expect(rows.map((row) => [row.threadId, row.profileId])).toEqual([
+            [thread, profile.id],
+            [thread, ""],
+          ]);
+          yield* service.recordLaunch({ threadId: thread, driver, launch: undefined });
+          expect((yield* sql`SELECT id FROM instruction_profile_applications`).length).toBe(2);
+          yield* service.recordLaunch({ threadId: thread, driver, launch: launch! });
+          expect((yield* store.latestProfileUse(thread))?.profileName).toBe("Quiet");
         }),
       ),
     );

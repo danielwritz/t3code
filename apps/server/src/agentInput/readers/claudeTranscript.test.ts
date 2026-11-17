@@ -120,6 +120,20 @@ describe("readClaudeTranscriptLines", () => {
     expect(trace.notes).toContain("1 of 2 requests could not be checked against their digest.");
   });
 
+  it("sizes each request part as the text it returns", () => {
+    for (const request of trace.requests) {
+      const system = request.partText("system").length;
+      const tools = request.partText("tools").length;
+      const messages = request.partText("messages").length;
+      expect([request.systemChars, request.toolChars, request.messageChars]).toEqual([
+        system,
+        tools,
+        messages,
+      ]);
+      expect(request.totalChars).toBe(system + tools + messages);
+    }
+  });
+
   it("splits the agent's input into labelled layers", () => {
     expect(
       trace.layers.map((layer) => [layer.kind, layer.origin, layer.title, layer.requestIndex]),

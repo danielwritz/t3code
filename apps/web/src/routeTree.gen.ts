@@ -39,6 +39,7 @@ import { Route as ChatSettingsMaintenanceRouteImport } from './routes/_chat.sett
 import { Route as ChatSettingsLabsRouteImport } from './routes/_chat.settings.labs'
 import { Route as ChatSettingsKeybindingsRouteImport } from './routes/_chat.settings.keybindings'
 import { Route as ChatSettingsIntegrationsRouteImport } from './routes/_chat.settings.integrations'
+import { Route as ChatSettingsInstructionProfilesRouteImport } from './routes/_chat.settings.instruction-profiles'
 import { Route as ChatSettingsGeneralRouteImport } from './routes/_chat.settings.general'
 import { Route as ChatSettingsDiffsRouteImport } from './routes/_chat.settings.diffs'
 import { Route as ChatSettingsDiagnosticsRouteImport } from './routes/_chat.settings.diagnostics'
@@ -208,6 +209,12 @@ const ChatSettingsIntegrationsRoute =
     path: '/integrations',
     getParentRoute: () => ChatSettingsRoute,
   } as any)
+const ChatSettingsInstructionProfilesRoute =
+  ChatSettingsInstructionProfilesRouteImport.update({
+    id: '/instruction-profiles',
+    path: '/instruction-profiles',
+    getParentRoute: () => ChatSettingsRoute,
+  } as any)
 const ChatSettingsGeneralRoute = ChatSettingsGeneralRouteImport.update({
   id: '/general',
   path: '/general',
@@ -308,6 +315,7 @@ export interface FileRoutesByFullPath {
   '/settings/diagnostics': typeof ChatSettingsDiagnosticsRoute
   '/settings/diffs': typeof ChatSettingsDiffsRoute
   '/settings/general': typeof ChatSettingsGeneralRoute
+  '/settings/instruction-profiles': typeof ChatSettingsInstructionProfilesRoute
   '/settings/integrations': typeof ChatSettingsIntegrationsRoute
   '/settings/keybindings': typeof ChatSettingsKeybindingsRoute
   '/settings/labs': typeof ChatSettingsLabsRoute
@@ -353,6 +361,7 @@ export interface FileRoutesByTo {
   '/settings/diagnostics': typeof ChatSettingsDiagnosticsRoute
   '/settings/diffs': typeof ChatSettingsDiffsRoute
   '/settings/general': typeof ChatSettingsGeneralRoute
+  '/settings/instruction-profiles': typeof ChatSettingsInstructionProfilesRoute
   '/settings/integrations': typeof ChatSettingsIntegrationsRoute
   '/settings/keybindings': typeof ChatSettingsKeybindingsRoute
   '/settings/labs': typeof ChatSettingsLabsRoute
@@ -400,6 +409,7 @@ export interface FileRoutesById {
   '/_chat/settings/diagnostics': typeof ChatSettingsDiagnosticsRoute
   '/_chat/settings/diffs': typeof ChatSettingsDiffsRoute
   '/_chat/settings/general': typeof ChatSettingsGeneralRoute
+  '/_chat/settings/instruction-profiles': typeof ChatSettingsInstructionProfilesRoute
   '/_chat/settings/integrations': typeof ChatSettingsIntegrationsRoute
   '/_chat/settings/keybindings': typeof ChatSettingsKeybindingsRoute
   '/_chat/settings/labs': typeof ChatSettingsLabsRoute
@@ -447,6 +457,7 @@ export interface FileRouteTypes {
     | '/settings/diagnostics'
     | '/settings/diffs'
     | '/settings/general'
+    | '/settings/instruction-profiles'
     | '/settings/integrations'
     | '/settings/keybindings'
     | '/settings/labs'
@@ -492,6 +503,7 @@ export interface FileRouteTypes {
     | '/settings/diagnostics'
     | '/settings/diffs'
     | '/settings/general'
+    | '/settings/instruction-profiles'
     | '/settings/integrations'
     | '/settings/keybindings'
     | '/settings/labs'
@@ -538,6 +550,7 @@ export interface FileRouteTypes {
     | '/_chat/settings/diagnostics'
     | '/_chat/settings/diffs'
     | '/_chat/settings/general'
+    | '/_chat/settings/instruction-profiles'
     | '/_chat/settings/integrations'
     | '/_chat/settings/keybindings'
     | '/_chat/settings/labs'
@@ -780,6 +793,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ChatSettingsIntegrationsRouteImport
       parentRoute: typeof ChatSettingsRoute
     }
+    '/_chat/settings/instruction-profiles': {
+      id: '/_chat/settings/instruction-profiles'
+      path: '/instruction-profiles'
+      fullPath: '/settings/instruction-profiles'
+      preLoaderRoute: typeof ChatSettingsInstructionProfilesRouteImport
+      parentRoute: typeof ChatSettingsRoute
+    }
     '/_chat/settings/general': {
       id: '/_chat/settings/general'
       path: '/general'
@@ -894,6 +914,7 @@ interface ChatSettingsRouteChildren {
   ChatSettingsDiagnosticsRoute: typeof ChatSettingsDiagnosticsRoute
   ChatSettingsDiffsRoute: typeof ChatSettingsDiffsRoute
   ChatSettingsGeneralRoute: typeof ChatSettingsGeneralRoute
+  ChatSettingsInstructionProfilesRoute: typeof ChatSettingsInstructionProfilesRoute
   ChatSettingsIntegrationsRoute: typeof ChatSettingsIntegrationsRoute
   ChatSettingsKeybindingsRoute: typeof ChatSettingsKeybindingsRoute
   ChatSettingsLabsRoute: typeof ChatSettingsLabsRoute
@@ -924,6 +945,7 @@ const ChatSettingsRouteChildren: ChatSettingsRouteChildren = {
   ChatSettingsDiagnosticsRoute: ChatSettingsDiagnosticsRoute,
   ChatSettingsDiffsRoute: ChatSettingsDiffsRoute,
   ChatSettingsGeneralRoute: ChatSettingsGeneralRoute,
+  ChatSettingsInstructionProfilesRoute: ChatSettingsInstructionProfilesRoute,
   ChatSettingsIntegrationsRoute: ChatSettingsIntegrationsRoute,
   ChatSettingsKeybindingsRoute: ChatSettingsKeybindingsRoute,
   ChatSettingsLabsRoute: ChatSettingsLabsRoute,

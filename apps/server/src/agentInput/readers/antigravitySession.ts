@@ -110,7 +110,10 @@ function splitSections(text: string): Array<{ readonly title: string; readonly t
     const end = text.indexOf(close, match.index);
     if (end < 0) continue;
     pushLoose(match.index);
-    sections.push({ title: match[1]!, text: text.slice(match.index, end + close.length) });
+    sections.push({
+      title: `Section: ${match[1]!}`,
+      text: text.slice(match.index, end + close.length),
+    });
     cursor = end + close.length;
   }
   pushLoose(text.length);
@@ -198,6 +201,15 @@ export interface AntigravitySessionFiles {
 
 export function readAntigravitySession(files: AntigravitySessionFiles): HarnessTrace {
   const layers: Array<TraceLayer> = [];
+  const steps = Array.from(files.transcriptLines, (line) => parseJsonLine(line));
+  // The stored request is the latest one, made after the newest step began.
+  const latestRequestAt = steps
+    .map((step) => stringField(step, "created_at"))
+    .filter((at): at is string => at !== undefined)
+    .reduce<string | undefined>(
+      (latest, at) => (latest === undefined || at > latest ? at : latest),
+      undefined,
+    );
   const notes = [
     "Antigravity keeps only its latest request, so earlier system prompts are not shown.",
   ];
@@ -217,6 +229,7 @@ export function readAntigravitySession(files: AntigravitySessionFiles): HarnessT
             title: section.title,
             text: section.text,
             role: "system",
+            at: latestRequestAt,
           }),
         );
       });
@@ -240,14 +253,14 @@ export function readAntigravitySession(files: AntigravitySessionFiles): HarnessT
         origin: "mcp-server",
         title: `${server} (${tools.length} tools)`,
         text: prettyJson(tools),
+        at: latestRequestAt,
       }),
     );
   }
 
   let lineCount = 0;
-  for (const line of files.transcriptLines) {
+  for (const step of steps) {
     lineCount++;
-    const step = parseJsonLine(line);
     if (!isRecord(step) || step.type !== "USER_INPUT") continue;
     const content = stringField(step, "content");
     if (content === undefined) continue;

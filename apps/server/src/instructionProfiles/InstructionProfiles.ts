@@ -66,10 +66,11 @@ export class InstructionProfiles extends Context.Service<
       readonly driver: ProviderDriverKind;
       readonly instanceId: ProviderInstanceId;
     }) => Effect.Effect<InstructionProfileLaunch | undefined, ProfileError>;
+    /** Undefined records a launch without a profile, so the trace stops showing the last one. */
     readonly recordLaunch: (input: {
       readonly threadId: ThreadId;
       readonly driver: ProviderDriverKind;
-      readonly launch: InstructionProfileLaunch;
+      readonly launch: InstructionProfileLaunch | undefined;
     }) => Effect.Effect<void, ProfileError>;
   }
 >()("t3/instructionProfiles/InstructionProfiles") {}
@@ -234,6 +235,12 @@ const make = Effect.gen(function* () {
       } satisfies InstructionProfileLaunch;
     }),
     recordLaunch: Effect.fn("InstructionProfiles.recordLaunch")(function* (input) {
+      if (input.launch === undefined) {
+        yield* repository
+          .recordNoProfile({ threadId: input.threadId, driver: input.driver, now: yield* now })
+          .pipe(Effect.mapError(storeError("recorded")));
+        return;
+      }
       yield* repository
         .recordApplication({
           threadId: input.threadId,

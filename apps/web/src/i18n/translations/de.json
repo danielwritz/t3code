@@ -37,12 +37,6 @@
   "3fc130f1e8170073": "Bei „Gedrückt halten“ beendet auch zweimaliges schnelles Drücken die App.",
   "72c7fda6ae301e6d": "Systemstandard folgt der Sprache deines Browsers oder Betriebssystems.",
   "b9ebecdb8db71466": "Systemstandard folgt dem Uhrzeitformat deines Browsers oder Betriebssystems.",
-  "425f7ce2f24cb248": "Einstellungsbereiche",
-  "ee3e8bd8b7918aec": "Suchen",
-  "858561b97fdd72f2": "Einstellungen durchsuchen",
-  "fed2d32de2b0c566": "Einstellungssuche leeren",
-  "833639e235c97484": "Suchergebnisse in den Einstellungen",
-  "be82bbfef472ab44": "Keine Einstellungen gefunden",
   "cc84bfe0ee5d0174": "Projekte",
   "81d0d1e78b196630": "Allgemein",
   "fa19046edd6cfbd4": "Darstellung",
@@ -52,6 +46,7 @@
   "1a6679bbe62703b2": "SnapShots",
   "2f77cc3105ddd7f8": "Anbieter",
   "6d9bf91f0d4b7ba3": "Threads",
+  "30e258413c82de9d": "Anweisungsprofile",
   "795854feef8d2f52": "Browser",
   "9cc48e5c9ee46026": "Geräte",
   "2ab325baee3ec9a3": "Geplante Aufgaben",
@@ -75,5 +70,11 @@
   "1d5052cbe70d0b28": "Archivieren bestätigen",
   "d5dd27a4eb853248": "Löschen bestätigen",
   "5503ef439beb8d42": "Bestätigung beim Schließen von Terminals",
-  "86b43caa9ff41ea2": "Tastenkürzel zum Beenden"
+  "86b43caa9ff41ea2": "Tastenkürzel zum Beenden",
+  "425f7ce2f24cb248": "Einstellungsbereiche",
+  "ee3e8bd8b7918aec": "Suchen",
+  "858561b97fdd72f2": "Einstellungen durchsuchen",
+  "fed2d32de2b0c566": "Einstellungssuche leeren",
+  "833639e235c97484": "Suchergebnisse in den Einstellungen",
+  "be82bbfef472ab44": "Keine Einstellungen gefunden"
 }

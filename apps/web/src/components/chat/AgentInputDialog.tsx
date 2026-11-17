@@ -34,6 +34,7 @@ import { MessageCopyButton } from "./MessageCopyButton";
 import {
   agentInputFidelitySentence,
   agentInputLayerWhen,
+  agentInputProfileEffectRows,
   agentInputRequestLabel,
   agentInputSizeSegments,
   agentInputTextTargetKey,
@@ -52,6 +53,8 @@ export function openAgentInputDialog(threadRef: ScopedThreadRef): void {
   appAtomRegistry.set(agentInputDialogThreadAtom, threadRef);
 }
 
+const PROFILE_KIND: AgentInputLayerKind = "profile";
+
 const KIND_SWATCH: Readonly<Record<AgentInputLayerKind, string>> = {
   "system-prompt": "bg-sky-500",
   "host-instructions": "bg-violet-500",
@@ -66,14 +69,6 @@ const KIND_SWATCH: Readonly<Record<AgentInputLayerKind, string>> = {
   "hook-output": "bg-red-600",
   "user-prompt": "bg-indigo-500",
   other: "bg-zinc-500",
-};
-
-const PROFILE_STATE_LABEL: Readonly<
-  Record<AgentInputProfileUse["effects"][number]["state"], string>
-> = {
-  applied: "Applied",
-  "not-supported": "Not supported",
-  unchanged: "Unchanged",
 };
 
 const PART_LABEL: Readonly<Record<AgentInputRequestPart, string>> = {
@@ -225,40 +220,47 @@ function AgentInputSummary(props: {
 
 function AgentInputProfileStrip(props: { readonly profile: AgentInputProfileUse }) {
   const { profile } = props;
+  const rows = agentInputProfileEffectRows(profile);
   return (
     <section aria-label="Instruction profile" className="rounded-lg border p-3">
-      <p className="text-sm">
-        <span className="text-muted-foreground">Profile: </span>
+      <p className="flex flex-wrap items-center gap-x-2 text-sm">
+        <span className={cn("size-2 shrink-0 rounded-sm", KIND_SWATCH[PROFILE_KIND])} aria-hidden />
+        <span className="text-muted-foreground">Instruction profile:</span>
         <span className="font-medium">{profile.profileName}</span>
         <span className="text-xs text-muted-foreground">
-          {" "}
-          · applied {new Date(profile.appliedAt).toLocaleString()}
+          applied {new Date(profile.appliedAt).toLocaleString()}
+          {profile.driver === undefined ? "" : ` for ${profile.driver}`}
         </span>
       </p>
-      {profile.effects.length === 0 ? null : (
-        <ul className="mt-2 flex list-none flex-col gap-1 p-0">
-          {profile.effects.map((effect) => (
-            <li
-              key={`${effect.toggle}:${effect.name ?? ""}`}
-              className="flex min-w-0 items-baseline gap-2 text-xs"
-            >
-              <Badge
-                size="sm"
-                variant={
-                  effect.state === "applied"
-                    ? "success"
-                    : effect.state === "not-supported"
-                      ? "warning"
-                      : "secondary"
-                }
-              >
-                {PROFILE_STATE_LABEL[effect.state]}
-              </Badge>
-              <span className="font-medium">{effect.name ?? effect.toggle}</span>
-              <span className="min-w-0 text-muted-foreground">{effect.detail}</span>
-            </li>
-          ))}
-        </ul>
+      {rows.length === 0 ? null : (
+        <table className="mt-2 w-full table-fixed border-collapse text-xs">
+          <thead>
+            <tr className="text-left text-muted-foreground">
+              <th className="pb-1 font-medium">Item</th>
+              <th className="w-16 pb-1 font-medium">Asked</th>
+              <th className="w-24 pb-1 font-medium">Result</th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((row) => (
+              <tr key={row.key} className="border-t align-top">
+                <td className="py-1 pe-2">
+                  <span className="block font-medium">{row.item}</span>
+                  <span className="block text-muted-foreground">{row.how}</span>
+                  {row.reason === undefined ? null : (
+                    <span className="block text-warning-foreground">{row.reason}</span>
+                  )}
+                </td>
+                <td className="py-1 text-muted-foreground">{row.asked ?? ""}</td>
+                <td className="py-1">
+                  <Badge size="sm" variant={row.tone}>
+                    {row.result}
+                  </Badge>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
       )}
     </section>
   );

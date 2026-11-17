@@ -37,12 +37,6 @@
   "3fc130f1e8170073": "En mode Appui long, un double appui rapide quitte aussi l'app.",
   "72c7fda6ae301e6d": "L'option Système suit la langue de votre navigateur ou de votre OS.",
   "b9ebecdb8db71466": "L'option Système suit le format de l'heure de votre navigateur ou de votre OS.",
-  "425f7ce2f24cb248": "Sections des paramètres",
-  "ee3e8bd8b7918aec": "Rechercher",
-  "858561b97fdd72f2": "Rechercher dans les paramètres",
-  "fed2d32de2b0c566": "Effacer la recherche dans les paramètres",
-  "833639e235c97484": "Résultats de la recherche dans les paramètres",
-  "be82bbfef472ab44": "Aucun paramètre trouvé",
   "cc84bfe0ee5d0174": "Projets",
   "81d0d1e78b196630": "Général",
   "fa19046edd6cfbd4": "Apparence",
@@ -52,6 +46,7 @@
   "1a6679bbe62703b2": "SnapShots",
   "2f77cc3105ddd7f8": "Fournisseurs",
   "6d9bf91f0d4b7ba3": "Fils",
+  "30e258413c82de9d": "Profils d'instructions",
   "795854feef8d2f52": "Navigateur",
   "9cc48e5c9ee46026": "Appareils",
   "2ab325baee3ec9a3": "Tâches planifiées",
@@ -75,5 +70,11 @@
   "1d5052cbe70d0b28": "Confirmation de l'archivage",
   "d5dd27a4eb853248": "Confirmation de la suppression",
   "5503ef439beb8d42": "Confirmation de la fermeture des terminaux",
-  "86b43caa9ff41ea2": "Raccourci Quitter"
+  "86b43caa9ff41ea2": "Raccourci Quitter",
+  "425f7ce2f24cb248": "Sections des paramètres",
+  "ee3e8bd8b7918aec": "Rechercher",
+  "858561b97fdd72f2": "Rechercher dans les paramètres",
+  "fed2d32de2b0c566": "Effacer la recherche dans les paramètres",
+  "833639e235c97484": "Résultats de la recherche dans les paramètres",
+  "be82bbfef472ab44": "Aucun paramètre trouvé"
 }

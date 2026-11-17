@@ -1268,7 +1268,11 @@ describe("ClaudeAdapterV2 Auto-accept edits", () => {
 });
 
 describe("ClaudeAdapterV2 append-system-prompt-file launch argument", () => {
-  const startTurnWithLaunchArgs = Effect.fnUntraced(function* (launchArgs: string, cwd: string) {
+  const startTurnWithLaunchArgs = Effect.fnUntraced(function* (
+    launchArgs: string,
+    cwd: string,
+    instructionProfile?: ProviderAdapter.ProviderAdapterV2TurnInput["instructionProfile"],
+  ) {
     const fileSystem = yield* FileSystem.FileSystem;
     const opened: Array<ClaudeAdapterV2.ClaudeAgentSdkQueryOptions> = [];
     const adapter = yield* ClaudeAdapterV2.makeClaudeAdapterV2({
@@ -1326,8 +1330,8 @@ describe("ClaudeAdapterV2 append-system-prompt-file launch argument", () => {
       runtimePolicy,
     });
     const exit = yield* runtime
-      .startTurn(
-        makeClaudeTestTurnInput({
+      .startTurn({
+        ...makeClaudeTestTurnInput({
           threadId,
           providerThread,
           now: yield* DateTime.now,
@@ -1336,7 +1340,8 @@ describe("ClaudeAdapterV2 append-system-prompt-file launch argument", () => {
           attachments: [],
           runtimePolicy,
         }),
-      )
+        ...(instructionProfile === undefined ? {} : { instructionProfile }),
+      })
       .pipe(Effect.exit);
     return { exit, opened };
   });
@@ -1417,10 +1422,24 @@ describe("ClaudeAdapterV2 append-system-prompt-file launch argument", () => {
         NodePath.join(cwd, "user-settings.json"),
         '{"skillOverrides":{"lint":"off"},"showThinkingSummaries":false}',
       );
-      const { exit, opened } = yield* startTurnWithLaunchArgs(launchArgs, cwd);
+      // A profile's settings keys merge into launch settings given inline or as a file path.
+      const { exit, opened } = yield* startTurnWithLaunchArgs(launchArgs, cwd, {
+        profileId: "lean",
+        profileName: "Lean",
+        plan: {
+          effects: [],
+          claude: {
+            settings: {
+              skillOverrides: { pdf: "off" },
+              deniedMcpServers: [{ serverName: "github" }],
+            },
+          },
+        },
+      });
       assert.isTrue(Exit.isSuccess(exit));
       assert.deepInclude(opened[0]!.settings, {
-        skillOverrides: { lint: "off" },
+        skillOverrides: { lint: "off", pdf: "off" },
+        deniedMcpServers: [{ serverName: "github" }],
         showThinkingSummaries: true,
       });
       assert.isUndefined(opened[0]!.extraArgs?.["settings"]);

@@ -37,12 +37,6 @@
   "3fc130f1e8170073": "Hold mode also quits on two quick presses.",
   "72c7fda6ae301e6d": "System default follows your browser or OS language.",
   "b9ebecdb8db71466": "System default follows your browser or OS clock preference.",
-  "425f7ce2f24cb248": "Settings sections",
-  "ee3e8bd8b7918aec": "Search",
-  "858561b97fdd72f2": "Search settings",
-  "fed2d32de2b0c566": "Clear settings search",
-  "833639e235c97484": "Settings search results",
-  "be82bbfef472ab44": "No settings found",
   "cc84bfe0ee5d0174": "Projects",
   "81d0d1e78b196630": "General",
   "fa19046edd6cfbd4": "Appearance",
@@ -52,6 +46,7 @@
   "1a6679bbe62703b2": "SnapShots",
   "2f77cc3105ddd7f8": "Providers",
   "6d9bf91f0d4b7ba3": "Threads",
+  "30e258413c82de9d": "Instruction profiles",
   "795854feef8d2f52": "Browser",
   "9cc48e5c9ee46026": "Devices",
   "2ab325baee3ec9a3": "Scheduled tasks",
@@ -75,5 +70,11 @@
   "1d5052cbe70d0b28": "Archive confirmation",
   "d5dd27a4eb853248": "Delete confirmation",
   "5503ef439beb8d42": "Terminal close confirmation",
-  "86b43caa9ff41ea2": "Quit shortcut"
+  "86b43caa9ff41ea2": "Quit shortcut",
+  "425f7ce2f24cb248": "Settings sections",
+  "ee3e8bd8b7918aec": "Search",
+  "858561b97fdd72f2": "Search settings",
+  "fed2d32de2b0c566": "Clear settings search",
+  "833639e235c97484": "Settings search results",
+  "be82bbfef472ab44": "No settings found"
 }

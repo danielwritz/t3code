@@ -481,11 +481,8 @@ export const layerWithOptions = (
           })
           .pipe(
             Effect.tap((launch) => {
-              if (launch === undefined) {
-                recordedProfilePlans.delete(key);
-                return Effect.void;
-              }
-              const planKey = JSON.stringify([launch.profileId, launch.plan]);
+              const planKey =
+                launch === undefined ? "" : JSON.stringify([launch.profileId, launch.plan]);
               if (recordedProfilePlans.get(key) === planKey) return Effect.void;
               recordedProfilePlans.set(key, planKey);
               return service.recordLaunch({

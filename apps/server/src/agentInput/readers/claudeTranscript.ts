@@ -6,7 +6,7 @@ import type { AgentInputLayerKind, AgentInputOrigin } from "@t3tools/contracts";
 import {
   isRecord,
   makeLayer,
-  makeTextLength,
+  makePrettyJsonLength,
   parseJsonLine,
   prettyJson,
   stringField,
@@ -582,7 +582,7 @@ export function makeClaudeTranscriptReader() {
     if (sidechain) {
       notes.push("Subagent requests are not shown yet; this trace covers the main thread.");
     }
-    const textLength = makeTextLength();
+    const prettyLength = makePrettyJsonLength();
     const byId = new Map(requests.map((request) => [request.id, request]));
     const messagesById = new Map<string, Array<Json> | null>();
     const messagesOf = (request: ApiRequestRecord): Array<Json> | null => {
@@ -647,9 +647,10 @@ export function makeClaudeTranscriptReader() {
         rebuilt.applied &&
         request.requestDigest !== undefined &&
         hash(rebuilt.body) === request.requestDigest;
-      const systemChars = textLength(shape?.system);
-      const toolChars = textLength(shape?.tools);
-      const messageChars = textLength(messages);
+      // Sized as the text partText returns, so the list and the opened part agree.
+      const systemChars = textOfBlocks(rebuilt?.body.system ?? shape?.system).length;
+      const toolChars = prettyLength(rebuilt?.body.tools ?? shape?.tools ?? []);
+      const messageChars = prettyLength(messages);
       const model = request.params.model;
       return {
         index,
