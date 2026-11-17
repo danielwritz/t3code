@@ -198,6 +198,19 @@ export function createOrchestrationEnvironmentAtoms<R, E>(
       staleTimeMs: 0,
       idleTtlMs: 0,
     }),
+    // Mounted only while the agent input dialog is open; the harness record grows every turn.
+    agentInput: createEnvironmentRpcQueryAtomFamily(runtime, {
+      label: "environment-data:orchestration:agent-input",
+      tag: ORCHESTRATION_V2_WS_METHODS.getThreadAgentInput,
+      staleTimeMs: 0,
+      idleTtlMs: 0,
+    }),
+    agentInputText: createEnvironmentRpcQueryAtomFamily(runtime, {
+      label: "environment-data:orchestration:agent-input-text",
+      tag: ORCHESTRATION_V2_WS_METHODS.getThreadAgentInputText,
+      staleTimeMs: 0,
+      idleTtlMs: 0,
+    }),
     stopWorkflow: createEnvironmentRpcCommand(runtime, {
       label: "environment-data:orchestration:stop-workflow",
       tag: ORCHESTRATION_V2_WS_METHODS.stopWorkflow,

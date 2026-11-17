@@ -37,7 +37,8 @@ import { useClientSettings } from "../../hooks/useSettings";
 import { useProject, useServerConfigs } from "../../state/entities";
 import { ThreadDetailsThreadPrRows } from "./ThreadDetailsPrRows";
 import { cn } from "../../lib/utils";
-import { SlidersHorizontalIcon } from "lucide-react";
+import { LayersIcon, SlidersHorizontalIcon } from "lucide-react";
+import { openAgentInputDialog } from "./AgentInputDialog";
 import { ThreadDetailsControl } from "./ThreadDetailsControl";
 import {
   THREAD_DETAILS_PANEL_ICON_CLASS,
@@ -282,6 +283,29 @@ export function ThreadDetailsPanel(props: ThreadDetailsPanelProps) {
                   showLineage={visible.lineage}
                   showSideChats={visible.sideChats}
                 />
+              ) : null}
+
+              {!props.draftId && props.isServerThread && visible.agentInput ? (
+                <ThreadDetailsSection
+                  headingId="thread-details-agent-input-heading"
+                  title="Agent input"
+                  showHeading={false}
+                >
+                  <div className="flex flex-col">
+                    <ThreadDetailsControl
+                      size="xs"
+                      variant="ghost"
+                      part="row"
+                      panel
+                      onClick={() => openAgentInputDialog(activeThreadRef)}
+                    >
+                      <LayersIcon className={THREAD_DETAILS_PANEL_ICON_CLASS} aria-hidden />
+                      <span className={cn("ml-0.5", THREAD_DETAILS_PANEL_LABEL_CLASS)}>
+                        Agent input
+                      </span>
+                    </ThreadDetailsControl>
+                  </div>
+                </ThreadDetailsSection>
               ) : null}
 
               {visible.usage ? <ThreadDetailsUsage {...props.usage} /> : null}
