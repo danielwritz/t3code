@@ -15,6 +15,10 @@ import {
   type CodexTurnTokenUsageState,
 } from "../../provider/CodexTurnTokenUsage.ts";
 import type { ManagedServerProvider } from "@t3tools/provider-core/server/snapshot";
+import type {
+  CodexInstructionProfilePlan,
+  InstructionProfileLaunch,
+} from "@t3tools/provider-core/server/instructionProfilePlan";
 import type { CodexEffectiveRuntime } from "../../provider/CodexManagedRuntime.ts";
 import { classifyCodexManagedError } from "../../provider/CodexManagedErrors.ts";
 import {
@@ -808,6 +812,7 @@ export const buildCodexTurnStartParams = Effect.fn("CodexAdapterV2.buildCodexTur
     /** ChatGPT token sharing does not accept service tiers. */
     readonly omitServiceTier?: boolean;
     readonly appContext?: ProviderAdapter.ProviderAdapterV2TurnInput["appContext"];
+    readonly instructionProfileContext?: CodexInstructionProfilePlan["additionalContext"];
     /** Set only for a model that offers Cyber Access; custom models never do. */
     readonly cyberAccess?: { readonly defaultProgram: string | undefined } | undefined;
     /** The user's `model_reasoning_summary` from the Codex config, when set. */
@@ -856,10 +861,19 @@ export const buildCodexTurnStartParams = Effect.fn("CodexAdapterV2.buildCodexTur
             },
           )
         : undefined;
+    // A profile's text is the user's own instruction, so it rides as application context.
+    const profileContext = Object.fromEntries(
+      (input.instructionProfileContext ?? []).map((entry) => [
+        entry.key,
+        { kind: "application" as const, value: entry.value },
+      ]),
+    );
     const additionalContext =
-      t3Context === undefined && Object.keys(appContext).length === 0
+      t3Context === undefined &&
+      Object.keys(profileContext).length === 0 &&
+      Object.keys(appContext).length === 0
         ? undefined
-        : { ...t3Context, ...appContext };
+        : { ...t3Context, ...profileContext, ...appContext };
     return yield* decodeCodexTurnStartParams({
       threadId: input.nativeThreadId,
       input: input.codexInput,
@@ -1509,6 +1523,7 @@ function codexThreadRuntimeParams(input: {
   readonly mcpSession: McpProviderSession.McpProviderSessionConfig | undefined;
   readonly modelSelection?: { readonly model: string };
   readonly runtimePolicy?: ProviderAdapter.ProviderAdapterV2RuntimePolicy;
+  readonly instructionProfileConfig?: CodexInstructionProfilePlan["config"];
 }): {
   readonly cwd?: string;
   readonly model?: string;
@@ -1528,6 +1543,8 @@ function codexThreadRuntimeParams(input: {
     ...(input.modelSelection === undefined ? {} : { model: input.modelSelection.model }),
     config: {
       ...CODEX_THREAD_CONFIG,
+      // The planner never names T3's own servers, so T3's keys below keep winning.
+      ...(input.instructionProfileConfig as Readonly<Record<string, Schema.Json>> | undefined),
       // One app-server serves many threads, so the id goes in per-thread shell config, not its env.
       ...(input.threadId === null
         ? {}
@@ -1953,6 +1970,24 @@ export const makeCodexAdapterV2 = Effect.fn("makeCodexAdapterV2")(function* (
           new Map<string, NonNullable<CodexTurnStartParams["additionalContext"]>>(),
         );
         const threadsAwaitingContextRestore = yield* Ref.make(new Set<string>());
+        // One app-server serves many threads, so each thread keeps its own profile switches.
+        const profileConfigByThread = new Map<string, CodexInstructionProfilePlan["config"]>();
+        const rememberInstructionProfile = (
+          threadId: string,
+          launch: InstructionProfileLaunch | undefined,
+        ) => {
+          const config = launch?.plan.codex?.config;
+          if (config === undefined) profileConfigByThread.delete(threadId);
+          else profileConfigByThread.set(threadId, config);
+        };
+        rememberInstructionProfile(input.threadId, input.instructionProfile);
+        const threadRuntimeParams = (params: Parameters<typeof codexThreadRuntimeParams>[0]) => {
+          const config =
+            params.threadId === null ? undefined : profileConfigByThread.get(params.threadId);
+          return codexThreadRuntimeParams(
+            config === undefined ? params : { ...params, instructionProfileConfig: config },
+          );
+        };
         // Codex drops client developer messages during compaction but only resends additionalContext
         // when it changes. Restore after turn/completed: items injected mid-turn make the turn sample again.
         const restoreAdditionalContext = Effect.fn("CodexAdapterV2.restoreAdditionalContext")(
@@ -7545,6 +7580,7 @@ export const makeCodexAdapterV2 = Effect.fn("makeCodexAdapterV2")(function* (
             codexInput: ReadonlyArray<CodexSchema.V2TurnStartParams__UserInput>,
           ) {
             const threadId = yield* getNativeThreadId(turnInput.providerThread);
+            rememberInstructionProfile(turnInput.threadId, turnInput.instructionProfile);
             const mcpSession = yield* mcpSessions.read(turnInput.threadId);
             const models = adapterOptions.models === undefined ? [] : yield* adapterOptions.models;
             const configuredReasoningSummary = yield* client
@@ -7566,6 +7602,12 @@ export const makeCodexAdapterV2 = Effect.fn("makeCodexAdapterV2")(function* (
               deviceToolsAvailable: mcpSession?.capabilities?.has("device") ?? false,
               omitServiceTier: adapterOptions.resolveRuntime !== undefined,
               ...(turnInput.appContext === undefined ? {} : { appContext: turnInput.appContext }),
+              ...(turnInput.instructionProfile?.plan.codex?.additionalContext === undefined
+                ? {}
+                : {
+                    instructionProfileContext:
+                      turnInput.instructionProfile.plan.codex.additionalContext,
+                  }),
               ...(configuredReasoningSummary === undefined ? {} : { configuredReasoningSummary }),
             });
             yield* Ref.update(pendingRootTurns, (current) => {
@@ -7777,7 +7819,7 @@ export const makeCodexAdapterV2 = Effect.fn("makeCodexAdapterV2")(function* (
                 Effect.flatMap((mcpSession) =>
                   resumeNativeThread(threadId, {
                     excludeTurns: true,
-                    ...codexThreadRuntimeParams({
+                    ...threadRuntimeParams({
                       threadId: providerThread.appThreadId,
                       mcpSession,
                       modelSelection: input.modelSelection,
@@ -7945,10 +7987,15 @@ export const makeCodexAdapterV2 = Effect.fn("makeCodexAdapterV2")(function* (
           }),
           ensureThread: (threadInput) =>
             ensureInitialized.pipe(
+              Effect.tap(() =>
+                Effect.sync(() =>
+                  rememberInstructionProfile(threadInput.threadId, threadInput.instructionProfile),
+                ),
+              ),
               Effect.andThen(mcpSessions.read(threadInput.threadId)),
               Effect.flatMap((mcpSession) =>
                 client.request("thread/start", {
-                  ...codexThreadRuntimeParams({
+                  ...threadRuntimeParams({
                     threadId: threadInput.threadId,
                     mcpSession,
                     modelSelection: threadInput.modelSelection,
@@ -7985,7 +8032,7 @@ export const makeCodexAdapterV2 = Effect.fn("makeCodexAdapterV2")(function* (
               const appThreadId = threadInput.threadId ?? threadInput.providerThread.appThreadId;
               const resume = resumeNativeThread(nativeThreadId, {
                 excludeTurns: true,
-                ...codexThreadRuntimeParams({
+                ...threadRuntimeParams({
                   threadId: appThreadId,
                   mcpSession: yield* readMcpSession(appThreadId),
                   ...(threadInput.modelSelection === undefined
@@ -8827,7 +8874,7 @@ export const makeCodexAdapterV2 = Effect.fn("makeCodexAdapterV2")(function* (
               if (!loaded) {
                 yield* resumeNativeThread(threadId, {
                   excludeTurns: true,
-                  ...codexThreadRuntimeParams({
+                  ...threadRuntimeParams({
                     threadId: threadInput.providerThread.appThreadId,
                     mcpSession: yield* readMcpSession(threadInput.providerThread.appThreadId),
                     modelSelection: input.modelSelection,
@@ -8877,7 +8924,7 @@ export const makeCodexAdapterV2 = Effect.fn("makeCodexAdapterV2")(function* (
                 threadId,
                 excludeTurns: true,
                 ...(boundary.lastTurnId === undefined ? {} : { lastTurnId: boundary.lastTurnId }),
-                ...codexThreadRuntimeParams({
+                ...threadRuntimeParams({
                   threadId: threadInput.targetThreadId,
                   mcpSession: yield* mcpSessions.read(threadInput.targetThreadId),
                   ...(threadInput.modelSelection === undefined

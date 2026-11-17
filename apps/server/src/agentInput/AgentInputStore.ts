@@ -6,6 +6,7 @@ import {
   AgentInputOrigin,
   AgentInputProfileUse,
   InstructionProfileEffect,
+  InstructionProfileItemEffect,
   type ThreadId,
 } from "@t3tools/contracts";
 import {
@@ -39,12 +40,34 @@ export type AgentInputRecordRow = typeof RecordRow.Type;
 const ProfileApplicationRow = Schema.Struct({
   profileId: Schema.String,
   profileName: Schema.String,
+  driver: Schema.String,
   appliedAt: Schema.String,
   effectsJson: Schema.String,
 });
+// Rows written before the planner hold the short effect shape.
 const decodeEffects = Schema.decodeUnknownEffect(
-  Schema.fromJsonString(Schema.Array(InstructionProfileEffect)),
+  Schema.fromJsonString(
+    Schema.Union([
+      Schema.Array(InstructionProfileItemEffect),
+      Schema.Array(InstructionProfileEffect),
+    ]),
+  ),
 );
+const isItemEffect = Schema.is(InstructionProfileItemEffect);
+
+const TOGGLE_OF = {
+  "global-instructions": "globalInstructions",
+  skill: "skill",
+  agent: "agent",
+  mcpServer: "mcpServer",
+} as const;
+
+const shortEffect = (effect: InstructionProfileItemEffect): InstructionProfileEffect => ({
+  toggle: TOGGLE_OF[effect.kind],
+  ...(effect.name === undefined ? {} : { name: effect.name }),
+  state: effect.result === "skipped" ? "unchanged" : effect.result,
+  detail: effect.reason === undefined ? effect.how : `${effect.how}; ${effect.reason}`,
+});
 const decodeProfileUse = Schema.decodeUnknownEffect(AgentInputProfileUse);
 
 type AgentInputStoreError = PersistenceSqlError | PersistenceDecodeError;
@@ -89,7 +112,7 @@ const make = Effect.gen(function* () {
     Request: Schema.String,
     Result: ProfileApplicationRow,
     execute: (threadId) => sql`
-      SELECT profile_id AS "profileId", profile_name AS "profileName",
+      SELECT profile_id AS "profileId", profile_name AS "profileName", driver,
         applied_at AS "appliedAt", effects_json AS "effectsJson"
       FROM instruction_profile_applications
       WHERE thread_id = ${threadId}
@@ -142,11 +165,15 @@ const make = Effect.gen(function* () {
       function* (threadId) {
         const row = (yield* latestApplication(threadId))[0];
         if (row === undefined) return undefined;
+        const effects = yield* decodeEffects(row.effectsJson);
+        const applied = effects.filter(isItemEffect);
         return yield* decodeProfileUse({
           profileId: row.profileId,
           profileName: row.profileName,
           appliedAt: row.appliedAt,
-          effects: yield* decodeEffects(row.effectsJson),
+          driver: row.driver,
+          effects: effects.map((effect) => (isItemEffect(effect) ? shortEffect(effect) : effect)),
+          ...(applied.length === 0 && effects.length > 0 ? {} : { applied }),
         });
       },
       Effect.mapError(toStoreError("readInstructionProfileUse")),

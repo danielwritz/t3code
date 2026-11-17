@@ -1,3 +1,5 @@
+import type { AgentInputLayerKind, AgentInputOrigin } from "@t3tools/contracts";
+
 import {
   isRecord,
   makeLayer,
@@ -116,6 +118,7 @@ function splitSections(text: string): Array<{ readonly title: string; readonly t
 }
 
 const T3_INSTRUCTIONS = /^\s*(<t3_code_instructions>[\s\S]*?<\/t3_code_instructions>)/;
+const PROFILE_BLOCK = /^\s*(<instruction_profile[\s>][\s\S]*?<\/instruction_profile>)/;
 const TRAILING_T3_BLOCK = /(<(runtime_info|pull_request_linking)>[\s\S]*?<\/\2>)\s*$/;
 const unwrap = (text: string, tag: string) => {
   const match = new RegExp(`^\\s*<${tag}>\\n?([\\s\\S]*?)\\n?</${tag}>\\s*$`).exec(text);
@@ -133,7 +136,7 @@ function splitAntigravityUserInput(content: string) {
   }
   rest = unwrap(rest.trim(), "USER_REQUEST");
   const parts: Array<{
-    readonly part: "t3" | "user" | "metadata";
+    readonly part: "t3" | "profile" | "user" | "metadata";
     readonly title: string;
     readonly text: string;
   }> = [];
@@ -141,6 +144,11 @@ function splitAntigravityUserInput(content: string) {
   if (instructions !== null) {
     parts.push({ part: "t3", title: "T3 instructions", text: instructions[1]! });
     rest = rest.slice(instructions[0].length);
+  }
+  const profile = PROFILE_BLOCK.exec(rest);
+  if (profile !== null) {
+    parts.push({ part: "profile", title: "Instruction profile", text: profile[1]! });
+    rest = rest.slice(profile[0].length);
   }
   const trailing: Array<{ part: "t3"; title: string; text: string }> = [];
   for (
@@ -162,6 +170,20 @@ function splitAntigravityUserInput(content: string) {
     parts.push({ part: "metadata", title: "Additional metadata", text: metadata });
   return parts;
 }
+
+type UserInputPart = ReturnType<typeof splitAntigravityUserInput>[number]["part"];
+const PART_KIND = {
+  t3: "host-instructions",
+  profile: "profile",
+  user: "user-prompt",
+  metadata: "environment",
+} as const satisfies Record<UserInputPart, AgentInputLayerKind>;
+const PART_ORIGIN = {
+  t3: "t3",
+  profile: "profile",
+  user: "user",
+  metadata: "harness",
+} as const satisfies Record<UserInputPart, AgentInputOrigin>;
 
 export interface AntigravitySessionFiles {
   readonly transcriptLines: Iterable<string>;
@@ -235,13 +257,8 @@ export function readAntigravitySession(files: AntigravitySessionFiles): HarnessT
       layers.push(
         makeLayer({
           id: `step:${stepId}:${index}`,
-          kind:
-            part.part === "t3"
-              ? "host-instructions"
-              : part.part === "user"
-                ? "user-prompt"
-                : "environment",
-          origin: part.part === "t3" ? "t3" : part.part === "user" ? "user" : "harness",
+          kind: PART_KIND[part.part],
+          origin: PART_ORIGIN[part.part],
           title: part.title,
           text: part.text,
           role: "user",

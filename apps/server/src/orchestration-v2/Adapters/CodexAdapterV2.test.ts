@@ -295,6 +295,19 @@ describe("CodexAdapterV2 runtime policy", () => {
         value: "Filtered to overdue",
       });
       assert.isDefined(withT3.additionalContext?.["t3_code_runtime"]);
+      const withProfile = yield* CodexAdapterV2.buildCodexTurnStartParams({
+        nativeThreadId: "native-app-context",
+        codexInput: [{ type: "text", text: "what's on my list?" }],
+        runtimePolicy: policy,
+        modelSelection,
+        hasT3Mcp: true,
+        instructionProfileContext: [{ key: "t3_code_instruction_profile", value: "Be brief." }],
+      });
+      assert.deepEqual(withProfile.additionalContext?.["t3_code_instruction_profile"], {
+        kind: "application",
+        value: "Be brief.",
+      });
+      assert.isDefined(withProfile.additionalContext?.["t3_code_runtime"]);
     }),
   );
 });

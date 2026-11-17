@@ -114,6 +114,7 @@ import { RpcGroup, RpcSerialization, RpcServer } from "effect/rpc";
 import * as CheckpointDiffQuery from "./checkpointing/CheckpointDiffQuery.ts";
 import * as NativeChildWorkQuery from "./orchestration-v2/NativeChildWorkQuery.ts";
 import * as AgentInputTrace from "./agentInput/AgentInputTrace.ts";
+import * as InstructionProfiles from "./instructionProfiles/InstructionProfiles.ts";
 import * as ServerConfig from "./config.ts";
 import * as EnvironmentTheme from "./environmentTheme.ts";
 import * as Keybindings from "./keybindings.ts";
@@ -1523,6 +1524,7 @@ export const layerWsRpc = (
       const checkpointDiffQuery = yield* CheckpointDiffQuery.CheckpointDiffQuery;
       const nativeChildWork = yield* NativeChildWorkQuery.NativeChildWorkQuery;
       const agentInputTrace = yield* AgentInputTrace.AgentInputTrace;
+      const instructionProfiles = yield* InstructionProfiles.InstructionProfiles;
       const keybindings = yield* Keybindings.Keybindings;
       const environmentTheme = yield* EnvironmentTheme.EnvironmentThemeService;
       const externalLauncher = yield* ExternalLauncher.ExternalLauncher;
@@ -2049,6 +2051,23 @@ export const layerWsRpc = (
           agentInputTrace.getThreadAgentInput(input),
         [ORCHESTRATION_V2_WS_METHODS.getThreadAgentInputText]: (input) =>
           agentInputTrace.getThreadAgentInputText(input),
+        [ORCHESTRATION_V2_WS_METHODS.listInstructionProfiles]: () => instructionProfiles.list,
+        [ORCHESTRATION_V2_WS_METHODS.saveInstructionProfile]: (input) =>
+          instructionProfiles.save(input),
+        [ORCHESTRATION_V2_WS_METHODS.deleteInstructionProfile]: (input) =>
+          instructionProfiles.remove(input.id),
+        [ORCHESTRATION_V2_WS_METHODS.getThreadInstructionProfile]: (input) =>
+          instructionProfiles.getThreadProfile(input.threadId),
+        [ORCHESTRATION_V2_WS_METHODS.setThreadInstructionProfile]: (input) =>
+          instructionProfiles.setThreadProfile(input),
+        [ORCHESTRATION_V2_WS_METHODS.getInstructionProfileDefaults]: () =>
+          instructionProfiles.getDefaults,
+        [ORCHESTRATION_V2_WS_METHODS.setDefaultInstructionProfile]: (input) =>
+          instructionProfiles.setDefault(input),
+        [ORCHESTRATION_V2_WS_METHODS.setProjectInstructionProfile]: (input) =>
+          instructionProfiles.setProject(input),
+        [ORCHESTRATION_V2_WS_METHODS.getInstructionProfileSupport]: () =>
+          Effect.succeed(instructionProfiles.support),
         [ORCHESTRATION_V2_WS_METHODS.getTurnItem]: (input) =>
           threadManagement.getTurnItem(input).pipe(
             Effect.mapError(

@@ -101,6 +101,8 @@ function setCacheControl(
 }
 
 const T3_SYSTEM_TAGS = ["<runtime_info>", "<pull_request_linking>", "<t3_code_"];
+const INSTRUCTION_PROFILE_BLOCK =
+  /<instruction_profile(?: name="([^"]*)")?>[\s\S]*?<\/instruction_profile>/;
 
 const firstT3Tag = (text: string) => {
   const indexes = T3_SYSTEM_TAGS.map((tag) => text.indexOf(tag)).filter((index) => index >= 0);
@@ -316,11 +318,29 @@ const systemLayers = (
   requestIndex: number | undefined,
 ): Array<TraceLayer> =>
   (Array.isArray(blocks) ? blocks : [blocks]).flatMap((block, index) => {
-    const text = typeof block === "string" ? block : (stringField(block, "text") ?? "");
-    if (text.length === 0) return [];
+    const blockText = typeof block === "string" ? block : (stringField(block, "text") ?? "");
+    if (blockText.length === 0) return [];
     const title = `${titlePrefix} ${index + 1}`;
-    const split = firstT3Tag(text);
     const common = { role: "system" as const, requestIndex };
+    const profile = INSTRUCTION_PROFILE_BLOCK.exec(blockText);
+    const text =
+      profile === null
+        ? blockText
+        : `${blockText.slice(0, profile.index)}${blockText.slice(profile.index + profile[0].length)}`.trimEnd();
+    const profileLayers =
+      profile === null
+        ? []
+        : [
+            makeLayer({
+              ...common,
+              id: `${idPrefix}:${index}:profile`,
+              kind: "profile",
+              origin: "profile",
+              title: `${title}: instruction profile${profile[1] === undefined ? "" : ` ${profile[1]}`}`,
+              text: profile[0],
+            }),
+          ];
+    const split = firstT3Tag(text);
     const harnessPart = split < 0 ? text : text.slice(0, split).trimEnd();
     return [
       ...(harnessPart.length > 0
@@ -347,6 +367,7 @@ const systemLayers = (
               text: text.slice(split),
             }),
           ]),
+      ...profileLayers,
     ];
   });
 

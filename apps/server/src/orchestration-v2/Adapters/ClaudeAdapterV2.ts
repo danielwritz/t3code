@@ -218,6 +218,7 @@ import {
   T3_CODE_ORCHESTRATION_INSTRUCTIONS,
 } from "@t3tools/provider-core/server/orchestrationInstructions";
 import { buildRuntimeInstructions } from "@t3tools/provider-core/server/runtimeInstructions";
+import type { ClaudeInstructionProfilePlan } from "@t3tools/provider-core/server/instructionProfilePlan";
 import {
   mcpToolPresentation,
   normalizeMcpText,
@@ -2165,6 +2166,45 @@ const subagentDeviceInstructions: HookCallback = () =>
     },
   });
 
+/** Adds a profile's switches on top of T3's own options; existing flag settings are kept. */
+function withClaudeInstructionProfile(
+  options: ClaudeAgentSdkQueryOptions,
+  plan: ClaudeInstructionProfilePlan | undefined,
+): ClaudeAgentSdkQueryOptions {
+  if (plan === undefined) return options;
+  const extra = plan.settings;
+  const current = typeof options.settings === "object" ? options.settings : undefined;
+  // A settings file path cannot take extra keys; launch-argument settings arrive read as objects.
+  const settings =
+    extra === undefined || typeof options.settings === "string"
+      ? options.settings
+      : ({
+          ...current,
+          ...(extra.skillOverrides === undefined
+            ? {}
+            : { skillOverrides: { ...current?.skillOverrides, ...extra.skillOverrides } }),
+          ...(extra.permissionsDeny === undefined
+            ? {}
+            : {
+                permissions: {
+                  ...current?.permissions,
+                  deny: [...(current?.permissions?.deny ?? []), ...extra.permissionsDeny],
+                },
+              }),
+          ...(extra.deniedMcpServers === undefined
+            ? {}
+            : {
+                deniedMcpServers: [...(current?.deniedMcpServers ?? []), ...extra.deniedMcpServers],
+              }),
+        } as ClaudeSdkSettings);
+  return {
+    ...options,
+    ...(settings === undefined ? {} : { settings }),
+    ...(plan.skills === undefined ? {} : { skills: [...plan.skills] }),
+    ...(plan.strictMcpConfig === true ? { strictMcpConfig: true } : {}),
+  };
+}
+
 export function makeClaudeQueryOptions(input: {
   readonly modelSelection: ModelSelection;
   readonly modelCatalog?: ClaudeModelCatalog;
@@ -2194,6 +2234,7 @@ export function makeClaudeQueryOptions(input: {
   readonly appendSystemPromptFileText?: string;
   // Flag settings, because a user's settings.json env beats the process env in Claude Code.
   readonly toolSearchOverride?: "true";
+  readonly instructionProfile?: ClaudeInstructionProfilePlan;
 }): ClaudeAgentSdkQueryOptions {
   const compiledSelection = compileClaudeModelSelection(input.modelSelection, input.modelCatalog);
   const {
@@ -2341,6 +2382,9 @@ export function makeClaudeQueryOptions(input: {
                 ? `\n${T3_CODE_DEVICE_TOOL_INSTRUCTIONS_WITH_TOOL_SEARCH}\n`
                 : "")),
         ...launchAppendSystemPrompt,
+        ...(input.instructionProfile?.appendSystemPrompt === undefined
+          ? []
+          : [input.instructionProfile.appendSystemPrompt]),
       ].join("\n\n"),
     },
     ...(deviceInstructions || input.onStop !== undefined
@@ -2360,8 +2404,9 @@ export function makeClaudeQueryOptions(input: {
     ...(input.attachmentsDir === undefined ? [] : [input.attachmentsDir]),
     ...claudeLaunchArgDirectories(input.settings?.launchArgs),
   ];
+  const profiled = withClaudeInstructionProfile(options, input.instructionProfile);
   const withDirectories =
-    additionalDirectories.length === 0 ? options : { ...options, additionalDirectories };
+    additionalDirectories.length === 0 ? profiled : { ...profiled, additionalDirectories };
   return input.cwd === null ? withDirectories : { ...withDirectories, cwd: input.cwd };
 }
 
@@ -3508,6 +3553,7 @@ export function claudeEffectiveQueryPolicyKey(
     readonly allowedTools?: ReadonlyArray<string>;
     readonly mcpServers?: ClaudeQueryOptions["mcpServers"];
   },
+  instructionProfile?: ClaudeInstructionProfilePlan,
 ): string {
   return JSON.stringify({
     runtimePolicy: claudeRuntimeQueryPolicyKey({
@@ -3517,6 +3563,8 @@ export function claudeEffectiveQueryPolicyKey(
         : { allowedTools: mcpOverrides.allowedTools }),
     }),
     mcpServers: mcpOverrides.mcpServers,
+    // A changed profile reopens the query, as a changed policy does.
+    ...(instructionProfile === undefined ? {} : { instructionProfile }),
   });
 }
 
@@ -12702,7 +12750,12 @@ export const makeClaudeAdapterV2 = Effect.fn("makeClaudeAdapterV2")(function* (
               ? {}
               : { allowedTools: queryPolicy.allowedTools }),
           });
-          const queryPolicyKey = claudeEffectiveQueryPolicyKey(queryPolicy, mcpOverrides);
+          const profilePlan = turnInput.instructionProfile?.plan.claude;
+          const queryPolicyKey = claudeEffectiveQueryPolicyKey(
+            queryPolicy,
+            mcpOverrides,
+            profilePlan,
+          );
           const resumeSessionAt = yield* getNativeConversationHeadId(turnInput.providerThread);
           const existing = yield* Ref.get(queryContext);
           // Continuations drain existing output without prompting; retain the live process regardless of selection.
@@ -12872,6 +12925,7 @@ export const makeClaudeAdapterV2 = Effect.fn("makeClaudeAdapterV2")(function* (
             supportedDialogKinds: ["resume_return"],
             ...(appendSystemPromptFileText === undefined ? {} : { appendSystemPromptFileText }),
             ...(toolSearchOverride === undefined ? {} : { toolSearchOverride }),
+            ...(profilePlan === undefined ? {} : { instructionProfile: profilePlan }),
           });
           const resolvedTurnCwd = yield* fileSystem
             .realPath(turnInput.runtimePolicy.cwd ?? ".")

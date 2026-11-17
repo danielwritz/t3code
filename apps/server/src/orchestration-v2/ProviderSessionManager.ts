@@ -16,6 +16,7 @@ import {
   ProviderSessionId,
   ThreadId,
   type OrchestrationV2TurnItem,
+  type ProviderDriverKind,
   type ProviderThreadId,
   type ProviderTurnId,
   type RunId,
@@ -53,6 +54,7 @@ import * as ProviderInstallationGate from "../provider/ProviderInstallationGate.
 import * as ProjectService from "../project/ProjectService.ts";
 import * as McpProviderSessions from "@t3tools/provider-core/server/McpProviderSessions";
 import * as ServerSettings from "../serverSettings.ts";
+import * as InstructionProfiles from "../instructionProfiles/InstructionProfiles.ts";
 import * as McpSessionRegistry from "../mcp/McpSessionRegistry.ts";
 import * as EventSink from "./EventSink.ts";
 import * as CommandOutputHub from "./CommandOutputHub.ts";
@@ -60,6 +62,7 @@ import * as IdAllocator from "@t3tools/provider-core/server/IdAllocator";
 import * as ProviderEventIngestor from "./ProviderEventIngestor.ts";
 import * as ProviderAdapter from "@t3tools/provider-core/server/ProviderAdapter";
 import { currentProviderInputRecorder } from "@t3tools/provider-core/server/ProviderInputRecorder";
+import type { InstructionProfileLaunch } from "@t3tools/provider-core/server/instructionProfilePlan";
 import { makeProviderFailure } from "@t3tools/provider-core/server/failure";
 import {
   endOrphanedNativeSubagent,
@@ -448,6 +451,60 @@ export const layerWithOptions = (
               title: "User message",
               text: input.message.text,
             });
+      const instructionProfiles = yield* Effect.serviceOption(
+        InstructionProfiles.InstructionProfiles,
+      );
+      // One application row per thread per session, and again when the plan changes.
+      const recordedProfilePlans = new Map<string, string>();
+      const forgetRecordedProfilePlans = (providerSessionId: ProviderSessionId) => {
+        for (const key of recordedProfilePlans.keys()) {
+          if (key.startsWith(`${providerSessionId}\0`)) recordedProfilePlans.delete(key);
+        }
+      };
+      /** Resolves thread -> project -> default; a failure only drops the profile, never the turn. */
+      const withInstructionProfile = <Input extends { readonly threadId: ThreadId }>(
+        runtime: {
+          readonly driver: ProviderDriverKind;
+          readonly instanceId: ProviderInstanceId;
+          readonly providerSessionId: ProviderSessionId;
+        },
+        input: Input,
+      ): Effect.Effect<Input & { readonly instructionProfile?: InstructionProfileLaunch }> => {
+        if (Option.isNone(instructionProfiles)) return Effect.succeed(input);
+        const service = instructionProfiles.value;
+        const key = `${runtime.providerSessionId}\0${input.threadId}`;
+        return service
+          .launchFor({
+            threadId: input.threadId,
+            driver: runtime.driver,
+            instanceId: runtime.instanceId,
+          })
+          .pipe(
+            Effect.tap((launch) => {
+              if (launch === undefined) {
+                recordedProfilePlans.delete(key);
+                return Effect.void;
+              }
+              const planKey = JSON.stringify([launch.profileId, launch.plan]);
+              if (recordedProfilePlans.get(key) === planKey) return Effect.void;
+              recordedProfilePlans.set(key, planKey);
+              return service.recordLaunch({
+                threadId: input.threadId,
+                driver: runtime.driver,
+                launch,
+              });
+            }),
+            Effect.map((launch) =>
+              launch === undefined ? input : { ...input, instructionProfile: launch },
+            ),
+            Effect.catch((error) =>
+              Effect.logWarning("Could not apply the thread's instruction profile.", {
+                threadId: input.threadId,
+                error: error._tag,
+              }).pipe(Effect.as(input)),
+            ),
+          );
+      };
       const projectService = yield* Effect.serviceOption(ProjectService.ProjectService);
       const eventSink = yield* EventSink.EventSinkV2;
       const commandOutput = yield* CommandOutputHub.CommandOutputHub;
@@ -2367,7 +2424,8 @@ export const layerWithOptions = (
                 providerInstanceId: runtime.instanceId,
               }),
             ).pipe(
-              Effect.andThen(loadNatively(runtime.ensureThread(input))),
+              Effect.andThen(withInstructionProfile(runtime, input)),
+              Effect.flatMap((profiled) => loadNatively(runtime.ensureThread(profiled))),
               Effect.tap(({ loaded: providerThread, linkedEnvironments }) =>
                 markProviderThreadLoaded({
                   providerSessionId,
@@ -2478,74 +2536,91 @@ export const layerWithOptions = (
               ),
               Effect.map(({ loaded }) => loaded),
             ),
-          startTurn: (input) =>
-            observeActivity(
-              providerSessionId,
-              ensureThreadAttached({
-                providerSessionId,
-                threadId: input.threadId,
-                providerInstanceId: runtime.instanceId,
+          ...(runtime.resumeTurn === undefined
+            ? {}
+            : {
+                resumeTurn: (input: ProviderAdapter.ProviderAdapterV2ResumeTurnInput) =>
+                  withInstructionProfile(runtime, input).pipe(
+                    Effect.flatMap((profiled) => runtime.resumeTurn!(profiled)),
+                  ),
               }),
-            ).pipe(
-              // Failed or stopped starts may omit turn.terminal; clear their turns so sessions can idle.
-              Effect.andThen(
-                holdThreadLoaded({
+          startTurn: (unprofiledInput) =>
+            withInstructionProfile(runtime, unprofiledInput).pipe(
+              Effect.flatMap((input) =>
+                observeActivity(
                   providerSessionId,
-                  threadId: input.threadId,
-                  providerThread: input.providerThread,
-                }),
-              ),
-              Effect.andThen(
-                Effect.acquireUseRelease(
-                  markBusy(
+                  ensureThreadAttached({
                     providerSessionId,
-                    busyTurnKey(input.providerThread.id, input.runOrdinal),
-                    runtime,
-                  ).pipe(
-                    Effect.catchCause((cause) =>
-                      Effect.logWarning("orchestration-v2.driver-session.activity-failed", {
+                    threadId: input.threadId,
+                    providerInstanceId: runtime.instanceId,
+                  }),
+                ).pipe(
+                  // Failed or stopped starts may omit turn.terminal; clear their turns so sessions can idle.
+                  Effect.andThen(
+                    holdThreadLoaded({
+                      providerSessionId,
+                      threadId: input.threadId,
+                      providerThread: input.providerThread,
+                    }),
+                  ),
+                  Effect.andThen(
+                    Effect.acquireUseRelease(
+                      markBusy(
                         providerSessionId,
-                        cause,
-                      }).pipe(Effect.as(true)),
-                    ),
-                    // A release between attach and markBusy leaves nothing to mark: fail the
-                    // start instead of running it on a runtime being torn down.
-                    Effect.flatMap((marked) =>
-                      marked
-                        ? Effect.void
-                        : Effect.fail(
-                            new ProviderAdapter.ProviderAdapterTurnStartError({
-                              driver: runtime.driver,
-                              threadId: input.threadId,
-                              providerThreadId: input.providerThread.id,
-                              runId: input.runId,
-                              cause: "The provider session was released while the turn started.",
-                            }),
-                          ),
+                        busyTurnKey(input.providerThread.id, input.runOrdinal),
+                        runtime,
+                      ).pipe(
+                        Effect.catchCause((cause) =>
+                          Effect.logWarning("orchestration-v2.driver-session.activity-failed", {
+                            providerSessionId,
+                            cause,
+                          }).pipe(Effect.as(true)),
+                        ),
+                        // A release between attach and markBusy leaves nothing to mark: fail the
+                        // start instead of running it on a runtime being torn down.
+                        Effect.flatMap((marked) =>
+                          marked
+                            ? Effect.void
+                            : Effect.fail(
+                                new ProviderAdapter.ProviderAdapterTurnStartError({
+                                  driver: runtime.driver,
+                                  threadId: input.threadId,
+                                  providerThreadId: input.providerThread.id,
+                                  runId: input.runId,
+                                  cause:
+                                    "The provider session was released while the turn started.",
+                                }),
+                              ),
+                        ),
+                      ),
+                      () =>
+                        recordUserPrompt(input).pipe(
+                          Effect.andThen(runtime.startTurn(input)),
+                          turnMetrics("send", input.modelSelection.model),
+                        ),
+                      (_, exit) =>
+                        Exit.isFailure(exit)
+                          ? observeActivity(
+                              providerSessionId,
+                              markIdle(
+                                providerSessionId,
+                                input.providerThread.id,
+                                input.runOrdinal,
+                              ),
+                            ).pipe(
+                              // A failed start can leave its native thread gone (Claude rejecting a
+                              // resume), so the next start must ask the adapter to resume it again.
+                              Effect.andThen(
+                                forgetProviderThreadLoaded({
+                                  providerSessionId,
+                                  threadId: input.threadId,
+                                  runtime,
+                                }),
+                              ),
+                            )
+                          : Effect.void,
                     ),
                   ),
-                  () =>
-                    recordUserPrompt(input).pipe(
-                      Effect.andThen(runtime.startTurn(input)),
-                      turnMetrics("send", input.modelSelection.model),
-                    ),
-                  (_, exit) =>
-                    Exit.isFailure(exit)
-                      ? observeActivity(
-                          providerSessionId,
-                          markIdle(providerSessionId, input.providerThread.id, input.runOrdinal),
-                        ).pipe(
-                          // A failed start can leave its native thread gone (Claude rejecting a
-                          // resume), so the next start must ask the adapter to resume it again.
-                          Effect.andThen(
-                            forgetProviderThreadLoaded({
-                              providerSessionId,
-                              threadId: input.threadId,
-                              runtime,
-                            }),
-                          ),
-                        )
-                      : Effect.void,
                 ),
               ),
             ),
@@ -3066,10 +3141,22 @@ export const layerWithOptions = (
               });
               const sessionScope = yield* Scope.fork(sessionScopes);
               yield* agentScope.clear(input.threadId);
+              forgetRecordedProfilePlans(input.providerSessionId);
+              const profiled = yield* withInstructionProfile(
+                {
+                  driver: adapter.driver,
+                  instanceId: adapter.instanceId,
+                  providerSessionId: input.providerSessionId,
+                },
+                { threadId: input.threadId },
+              );
               const runtime = yield* installationGate
                 .execute(
                   input.modelSelection.instanceId,
                   adapter.openSession({
+                    ...(profiled.instructionProfile === undefined
+                      ? {}
+                      : { instructionProfile: profiled.instructionProfile }),
                     threadId: input.threadId,
                     providerSessionId: input.providerSessionId,
                     modelSelection: input.modelSelection,

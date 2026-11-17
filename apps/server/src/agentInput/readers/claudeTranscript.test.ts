@@ -23,7 +23,10 @@ const digest = (value: unknown) =>
 
 const system = [
   { type: "text", text: "You are a test harness." },
-  { type: "text", text: "Harness rules.\n\n<runtime_info>Running in T3 Code.</runtime_info>" },
+  {
+    type: "text",
+    text: 'Harness rules.\n\n<runtime_info>Running in T3 Code.</runtime_info>\n\n<instruction_profile name="Lean">\nBe brief.\n</instruction_profile>',
+  },
 ];
 const tools = [{ name: "Read", description: "Reads a file.", input_schema: { type: "object" } }];
 const shapeHash = digest({ system, tools });
@@ -124,6 +127,7 @@ describe("readClaudeTranscriptLines", () => {
       ["system-prompt", "harness", "System block 1", 0],
       ["system-prompt", "harness", "System block 2", 0],
       ["host-instructions", "t3", "System block 2: T3 Code", 0],
+      ["profile", "profile", "System block 2: instruction profile Lean", 0],
       ["tools", "harness", "Tools (1)", 0],
       ["user-prompt", "user", "User message", 0],
       ["instruction-file", "user-file", "CLAUDE.md (Project)", 0],

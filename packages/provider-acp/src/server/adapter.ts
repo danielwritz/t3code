@@ -2106,6 +2106,8 @@ export const makeAcpAdapterV2 = Effect.fn("makeAcpAdapterV2")(function* (
         >(null);
         const promptInstructionStates = yield* Ref.make(new Map<string, T3AcpInstructionState>());
         const promptRuntimeInstructions = yield* Ref.make(new Map<string, string>());
+        // The instruction profile block each session last received.
+        const promptProfileBlocks = yield* Ref.make(new Map<string, string>());
         // Unique markers keep delayed prompt completions from clearing later compactions.
         const compactionMarkers = yield* Ref.make(new Map<string, symbol>());
         // ACP may patch a completed compaction again; each compaction id marks its session once.
@@ -7516,6 +7518,7 @@ export const makeAcpAdapterV2 = Effect.fn("makeAcpAdapterV2")(function* (
             yield* Ref.set(activeInteractionMode, null);
             yield* Ref.set(promptInstructionStates, new Map());
             yield* Ref.set(promptRuntimeInstructions, new Map());
+            yield* Ref.set(promptProfileBlocks, new Map());
             yield* Ref.set(compactionMarkers, new Map());
             yield* Ref.set(completedCompactionIds, new Set());
             yield* Ref.set(providerTurns, new Map());
@@ -8475,13 +8478,27 @@ export const makeAcpAdapterV2 = Effect.fn("makeAcpAdapterV2")(function* (
           // while the prompt is prepared still resends the notes in this prompt.
           const previousInstructionState = (yield* Ref.get(promptInstructionStates)).get(sessionId);
           const compactionMarker = (yield* Ref.get(compactionMarkers)).get(sessionId);
-          const text = t3AcpPromptWithInstructions({
+          const t3Text = t3AcpPromptWithInstructions({
             prompt: messageText,
             state: instructionState,
             ...(previousInstructionState === undefined || compactionMarker !== undefined
               ? {}
               : { previousState: previousInstructionState }),
           });
+          const t3InstructionsAdded = t3Text !== messageText;
+          // The profile rides with T3's notes, and alone when only the profile changed.
+          const profileBlock = isNativeSlashCommand
+            ? undefined
+            : turnInput.instructionProfile?.plan.acp?.promptPrefix;
+          const sendProfileBlock =
+            profileBlock !== undefined &&
+            (t3InstructionsAdded ||
+              (yield* Ref.get(promptProfileBlocks)).get(sessionId) !== profileBlock);
+          const text = !sendProfileBlock
+            ? t3Text
+            : t3InstructionsAdded
+              ? t3Text.replace(T3_INSTRUCTIONS_END, `${T3_INSTRUCTIONS_END}\n\n${profileBlock}`)
+              : `${profileBlock}\n\n${t3Text}`;
           const sessionSetup = yield* Ref.get(activeSessionSetup);
           const runtimeInstructions = buildRuntimeInstructions({
             harness: flavor.runtimeHarness ?? driver,
@@ -8508,10 +8525,9 @@ export const makeAcpAdapterV2 = Effect.fn("makeAcpAdapterV2")(function* (
           if (sendRuntimeInstructions) {
             prompt.push({ type: "text", text: runtimeInstructions });
           }
-          const addedInstructions =
-            text === messageText
-              ? undefined
-              : text.slice(0, text.indexOf(T3_INSTRUCTIONS_END) + T3_INSTRUCTIONS_END.length);
+          const addedInstructions = t3InstructionsAdded
+            ? t3Text.slice(0, t3Text.indexOf(T3_INSTRUCTIONS_END) + T3_INSTRUCTIONS_END.length)
+            : undefined;
           for (const added of [
             { title: "T3 instructions", text: addedInstructions?.trim() },
             {
@@ -8529,10 +8545,21 @@ export const makeAcpAdapterV2 = Effect.fn("makeAcpAdapterV2")(function* (
               text: added.text,
             });
           }
+          if (sendProfileBlock && profileBlock !== undefined) {
+            yield* inputRecorder.record({
+              threadId: turnInput.threadId,
+              runId: turnInput.runId,
+              kind: "profile",
+              origin: "profile",
+              title: `Instruction profile: ${turnInput.instructionProfile?.profileName ?? ""}`,
+              text: profileBlock,
+            });
+          }
           return {
             prompt,
-            instructionState: text === messageText ? undefined : instructionState,
+            instructionState: t3InstructionsAdded ? instructionState : undefined,
             runtimeInstructions: sendRuntimeInstructions ? runtimeInstructions : undefined,
+            profileBlock: sendProfileBlock ? profileBlock : undefined,
             compactionMarker,
           };
         });
@@ -8551,6 +8578,7 @@ export const makeAcpAdapterV2 = Effect.fn("makeAcpAdapterV2")(function* (
           // A failed prompt may have been dropped, so the fresh runtime sends T3's notes again.
           yield* Ref.set(promptInstructionStates, new Map());
           yield* Ref.set(promptRuntimeInstructions, new Map());
+          yield* Ref.set(promptProfileBlocks, new Map());
           yield* Ref.set(compactionMarkers, new Map());
           yield* Ref.set(completedCompactionIds, new Set());
           yield* Ref.set(snapshot, emptySnapshotState());
@@ -8947,6 +8975,12 @@ export const makeAcpAdapterV2 = Effect.fn("makeAcpAdapterV2")(function* (
                         if (promptParts?.runtimeInstructions === undefined) return current;
                         const updated = new Map(current);
                         updated.set(requestedSessionId, promptParts.runtimeInstructions);
+                        return updated;
+                      });
+                      yield* Ref.update(promptProfileBlocks, (current) => {
+                        if (promptParts?.profileBlock === undefined) return current;
+                        const updated = new Map(current);
+                        updated.set(requestedSessionId, promptParts.profileBlock);
                         return updated;
                       });
                       yield* Ref.update(compactionMarkers, (current) => {

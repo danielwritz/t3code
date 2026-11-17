@@ -31,6 +31,8 @@ function classifyDeveloperText(text: string): {
   if (tag === undefined)
     return { kind: "system-prompt", origin: "harness", title: "Developer message" };
   if (tag === "skills_instructions") return { kind: "skills", origin: "harness", title: "Skills" };
+  if (tag.startsWith("t3_code_instruction_profile"))
+    return { kind: "profile", origin: "profile", title: "Instruction profile" };
   if (tag.startsWith("t3_code_")) return { kind: "host-instructions", origin: "t3", title: tag };
   if (
     HARNESS_DEVELOPER_TAGS.some(

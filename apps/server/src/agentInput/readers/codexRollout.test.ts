@@ -35,7 +35,11 @@ const lines = [
   ),
   { type: "world_state", payload: { state: { agents_md: { directory: "/repo" } } } },
   { type: "turn_context", payload: { model: "gpt-test" } },
-  message("developer", "<t3_code_runtime>Running in T3 Code.</t3_code_runtime>"),
+  message(
+    "developer",
+    "<t3_code_runtime>Running in T3 Code.</t3_code_runtime>",
+    "<t3_code_instruction_profile>Be brief.</t3_code_instruction_profile>",
+  ),
   message("user", "Fix the bug."),
   { type: "token_usage_record", timestamp: "2026-01-01T00:00:01.000Z", payload: {} },
   message("assistant", "Done."),
@@ -58,6 +62,7 @@ describe("readCodexRolloutLines", () => {
       ["instruction-file", "user-file", "AGENTS.md", 0],
       ["environment", "harness", "Environment", 0],
       ["host-instructions", "t3", "t3_code_runtime", 0],
+      ["profile", "profile", "Instruction profile", 0],
       ["user-prompt", "user", "User message", 0],
       ["user-prompt", "user", "User message", 1],
     ]);

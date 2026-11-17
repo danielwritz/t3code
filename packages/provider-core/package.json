@@ -123,6 +123,10 @@
       "types": "./src/server/ProviderInputRecorder.ts",
       "import": "./src/server/ProviderInputRecorder.ts"
     },
+    "./server/instructionProfilePlan": {
+      "types": "./src/server/instructionProfilePlan.ts",
+      "import": "./src/server/instructionProfilePlan.ts"
+    },
     "./server/ProviderHost": {
       "types": "./src/server/ProviderHost.ts",
       "import": "./src/server/ProviderHost.ts"

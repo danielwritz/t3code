@@ -40,6 +40,7 @@ import type * as Effect from "effect/Effect";
 import type * as Scope from "effect/Scope";
 import type * as Stream from "effect/Stream";
 
+import type { InstructionProfileLaunch } from "./instructionProfilePlan.ts";
 import type {
   ProviderSelectionTransitionInput,
   ProviderSelectionTransitionPlan,
@@ -529,6 +530,8 @@ export interface ProviderAdapterV2OpenSessionInput {
   readonly resumeFromSession?: OrchestrationV2ProviderSession;
   readonly initialNativeThreadId?: string;
   readonly initialProviderItemIdentityVersion?: 2;
+  /** The thread's instruction profile planned for this driver; absent when none applies. */
+  readonly instructionProfile?: InstructionProfileLaunch;
 }
 
 export interface ProviderAdapterV2EnsureThreadInput {
@@ -539,6 +542,8 @@ export interface ProviderAdapterV2EnsureThreadInput {
   readonly providerSessionId?: ProviderSessionId;
   readonly existingProviderThread?: OrchestrationV2ProviderThread;
   readonly forceNewNativeThread?: boolean;
+  /** The thread's instruction profile planned for this driver; absent when none applies. */
+  readonly instructionProfile?: InstructionProfileLaunch;
 }
 
 export interface ProviderAdapterV2TurnInput {
@@ -559,6 +564,8 @@ export interface ProviderAdapterV2TurnInput {
   readonly modelSelection: ModelSelection;
   readonly runtimePolicy: ProviderAdapterV2RuntimePolicy;
   readonly appContext?: ReadonlyArray<{ readonly key: string; readonly text: string }>;
+  /** The thread's instruction profile planned for this driver; absent when none applies. */
+  readonly instructionProfile?: InstructionProfileLaunch;
 }
 
 export type ProviderAdapterV2ResumeTurnInput = Omit<

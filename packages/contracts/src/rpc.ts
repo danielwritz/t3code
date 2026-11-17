@@ -14,6 +14,20 @@ import {
   ThreadAgentInput,
 } from "./agentInput.ts";
 import {
+  DeleteInstructionProfileInput,
+  GetThreadInstructionProfileInput,
+  InstructionProfile,
+  InstructionProfileDefaults,
+  InstructionProfileError,
+  InstructionProfileSupportResult,
+  ListInstructionProfilesResult,
+  SaveInstructionProfileInput,
+  SetDefaultInstructionProfileInput,
+  SetProjectInstructionProfileInput,
+  SetThreadInstructionProfileInput,
+  ThreadInstructionProfile,
+} from "./instructionProfile.ts";
+import {
   McpAppCallToolInput,
   McpAppCallToolResult,
   McpAppReadResourceInput,
@@ -2098,6 +2112,86 @@ const WsOrchestrationV2GetThreadAgentInputTextRpc = Rpc.make(
   },
 );
 
+const InstructionProfileRpcError = Schema.Union([
+  InstructionProfileError,
+  EnvironmentAuthorizationError,
+]);
+
+const WsListInstructionProfilesRpc = Rpc.make(ORCHESTRATION_V2_WS_METHODS.listInstructionProfiles, {
+  payload: Schema.Struct({}),
+  success: ListInstructionProfilesResult,
+  error: InstructionProfileRpcError,
+});
+
+const WsSaveInstructionProfileRpc = Rpc.make(ORCHESTRATION_V2_WS_METHODS.saveInstructionProfile, {
+  payload: SaveInstructionProfileInput,
+  success: InstructionProfile,
+  error: InstructionProfileRpcError,
+});
+
+const WsDeleteInstructionProfileRpc = Rpc.make(
+  ORCHESTRATION_V2_WS_METHODS.deleteInstructionProfile,
+  {
+    payload: DeleteInstructionProfileInput,
+    success: Schema.Void,
+    error: InstructionProfileRpcError,
+  },
+);
+
+const WsGetThreadInstructionProfileRpc = Rpc.make(
+  ORCHESTRATION_V2_WS_METHODS.getThreadInstructionProfile,
+  {
+    payload: GetThreadInstructionProfileInput,
+    success: ThreadInstructionProfile,
+    error: InstructionProfileRpcError,
+  },
+);
+
+const WsSetThreadInstructionProfileRpc = Rpc.make(
+  ORCHESTRATION_V2_WS_METHODS.setThreadInstructionProfile,
+  {
+    payload: SetThreadInstructionProfileInput,
+    success: ThreadInstructionProfile,
+    error: InstructionProfileRpcError,
+  },
+);
+
+const WsGetInstructionProfileDefaultsRpc = Rpc.make(
+  ORCHESTRATION_V2_WS_METHODS.getInstructionProfileDefaults,
+  {
+    payload: Schema.Struct({}),
+    success: InstructionProfileDefaults,
+    error: InstructionProfileRpcError,
+  },
+);
+
+const WsSetDefaultInstructionProfileRpc = Rpc.make(
+  ORCHESTRATION_V2_WS_METHODS.setDefaultInstructionProfile,
+  {
+    payload: SetDefaultInstructionProfileInput,
+    success: InstructionProfileDefaults,
+    error: InstructionProfileRpcError,
+  },
+);
+
+const WsSetProjectInstructionProfileRpc = Rpc.make(
+  ORCHESTRATION_V2_WS_METHODS.setProjectInstructionProfile,
+  {
+    payload: SetProjectInstructionProfileInput,
+    success: InstructionProfileDefaults,
+    error: InstructionProfileRpcError,
+  },
+);
+
+const WsGetInstructionProfileSupportRpc = Rpc.make(
+  ORCHESTRATION_V2_WS_METHODS.getInstructionProfileSupport,
+  {
+    payload: Schema.Struct({}),
+    success: InstructionProfileSupportResult,
+    error: EnvironmentAuthorizationError,
+  },
+);
+
 const WsOrchestrationV2GetTurnItemRpc = Rpc.make(ORCHESTRATION_V2_WS_METHODS.getTurnItem, {
   payload: OrchestrationV2RpcSchemas.getTurnItem.input,
   success: OrchestrationV2RpcSchemas.getTurnItem.output,
@@ -2487,6 +2581,15 @@ export const WsRpcGroup = RpcGroup.make(
   WsOrchestrationV2GetNativeChildWorkRpc,
   WsOrchestrationV2GetThreadAgentInputRpc,
   WsOrchestrationV2GetThreadAgentInputTextRpc,
+  WsListInstructionProfilesRpc,
+  WsSaveInstructionProfileRpc,
+  WsDeleteInstructionProfileRpc,
+  WsGetThreadInstructionProfileRpc,
+  WsSetThreadInstructionProfileRpc,
+  WsGetInstructionProfileDefaultsRpc,
+  WsSetDefaultInstructionProfileRpc,
+  WsSetProjectInstructionProfileRpc,
+  WsGetInstructionProfileSupportRpc,
   WsOrchestrationV2StopWorkflowRpc,
   WsOrchestrationV2ForceStopThreadRpc,
   WsOrchestrationV2GetTurnItemRpc,

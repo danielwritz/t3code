@@ -77,6 +77,7 @@ import {
 } from "@t3tools/provider-grok/testing";
 import * as IdAllocator from "@t3tools/provider-core/server/IdAllocator";
 import * as ProviderAdapter from "@t3tools/provider-core/server/ProviderAdapter";
+import type { InstructionProfileLaunch } from "@t3tools/provider-core/server/instructionProfilePlan";
 import { makeTurnInput } from "./AcpAdapterV2.testkit.ts";
 import type * as ProviderContinuationRequests from "@t3tools/provider-core/server/ProviderContinuationRequests";
 import {
@@ -2406,9 +2407,10 @@ describe("AcpAdapterV2", () => {
           runtimePolicy: ProviderAdapter.ProviderAdapterV2RuntimePolicy,
           messageText: string,
           turnModelSelection: ModelSelection = modelSelection,
+          instructionProfile?: InstructionProfileLaunch,
         ) {
-          yield* runtime.startTurn(
-            makeTurnInput({
+          yield* runtime.startTurn({
+            ...makeTurnInput({
               threadId,
               providerThread,
               instanceId,
@@ -2418,7 +2420,8 @@ describe("AcpAdapterV2", () => {
               messageText,
               modelSelection: turnModelSelection,
             }),
-          );
+            ...(instructionProfile === undefined ? {} : { instructionProfile }),
+          });
           yield* runtime.events.pipe(
             Stream.takeUntil((event) => event.type === "turn.terminal"),
             Stream.runDrain,
@@ -2449,16 +2452,43 @@ describe("AcpAdapterV2", () => {
           }
         });
 
-        const command = yield* runTurn(0, defaultPolicy, "/compact");
+        const profileLaunch = (name: string): InstructionProfileLaunch => ({
+          profileId: name,
+          profileName: name,
+          plan: {
+            effects: [],
+            acp: {
+              promptPrefix: `<instruction_profile name="${name}">\nBe brief.\n</instruction_profile>`,
+            },
+          },
+        });
+        const lean = profileLaunch("Lean");
+        const command = yield* runTurn(0, defaultPolicy, "/compact", modelSelection, lean);
         assert.isTrue(command.prompt.startsWith("/compact"));
         assert.notInclude(command.prompt, "<t3_code_instructions>");
         assert.equal(command.textBlockCount, 1);
-        const whitespaceCommand = yield* runTurn(1, defaultPolicy, "  /repro-skill");
+        const whitespaceCommand = yield* runTurn(
+          1,
+          defaultPolicy,
+          "  /repro-skill",
+          modelSelection,
+          lean,
+        );
         assert.equal(whitespaceCommand.prompt, "  /repro-skill");
         assert.equal(whitespaceCommand.textBlockCount, 1);
         assert.notInclude(whitespaceCommand.prompt, "<t3_code_instructions>");
-        const firstDefault = yield* runTurn(2, defaultPolicy, "First default request.");
+        const firstDefault = yield* runTurn(
+          2,
+          defaultPolicy,
+          "First default request.",
+          modelSelection,
+          lean,
+        );
         assert.equal(firstDefault.textBlockCount, 2);
+        assert.include(
+          firstDefault.prompt,
+          `</t3_code_instructions>\n\n${lean.plan.acp?.promptPrefix}\n\n<user_request>`,
+        );
         assert.include(firstDefault.prompt, "T3 Code interaction mode: Default");
         assert.include(firstDefault.prompt, "## T3 Code browser");
         assert.include(firstDefault.prompt, "T3 Code orchestration");
@@ -2468,7 +2498,13 @@ describe("AcpAdapterV2", () => {
           "session/set_config_option",
           "Build should preserve the agent's advertised mode default",
         );
-        const secondDefault = yield* runTurn(3, defaultPolicy, "Second default request.");
+        const secondDefault = yield* runTurn(
+          3,
+          defaultPolicy,
+          "Second default request.",
+          modelSelection,
+          lean,
+        );
         assert.equal(secondDefault.prompt, "Second default request.");
         assert.equal(secondDefault.textBlockCount, 1);
 
@@ -2493,6 +2529,20 @@ describe("AcpAdapterV2", () => {
         });
         assert.equal(switchedModel.textBlockCount, 2);
         assert.include(switchedModel.prompt, "as composer-2");
+        const strict = profileLaunch("Strict");
+        const changedProfile = yield* runTurn(
+          8,
+          defaultPolicy,
+          "Use the new profile.",
+          { instanceId, model: "composer-2" },
+          strict,
+        );
+        assert.isTrue(
+          changedProfile.prompt.startsWith(
+            `${strict.plan.acp?.promptPrefix}\n\nUse the new profile.`,
+          ),
+        );
+        assert.notInclude(changedProfile.prompt, "<t3_code_instructions>");
       }).pipe(Effect.provide(layerTest)),
   );
 

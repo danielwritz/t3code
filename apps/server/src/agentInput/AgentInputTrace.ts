@@ -343,7 +343,7 @@ const make = Effect.gen(function* () {
     }
     const recorded: Array<TraceLayer> = [];
     for (const row of rows) {
-      if (harness.trace !== undefined && row.origin !== "t3") continue;
+      if (harness.trace !== undefined && row.origin !== "t3" && row.origin !== "profile") continue;
       const text = (yield* store.readText(row.sha256).pipe(Effect.mapError(storeError))) ?? "";
       const key = normalized(text);
       if (key.length === 0 || known.has(key) || joinedByKind.get(row.kind)?.includes(key)) continue;

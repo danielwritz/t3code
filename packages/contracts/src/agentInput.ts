@@ -1,6 +1,7 @@
 import * as Schema from "effect/Schema";
 
 import { IsoDateTime, NonNegativeInt, ThreadId, TrimmedNonEmptyString } from "./baseSchemas.ts";
+import { InstructionProfileItemEffect } from "./instructionProfile.ts";
 import { ProviderDriverKind, ProviderInstanceId } from "./providerInstance.ts";
 
 /** What a piece of the agent's input is. */
@@ -100,7 +101,11 @@ export const AgentInputProfileUse = Schema.Struct({
   profileId: TrimmedNonEmptyString,
   profileName: Schema.String,
   appliedAt: IsoDateTime,
+  /** A short view of `applied`, kept for clients built before it. */
   effects: Schema.Array(InstructionProfileEffect),
+  driver: Schema.optional(ProviderDriverKind),
+  /** Each profile entry with the switch used, or why it was not applied. */
+  applied: Schema.optional(Schema.Array(InstructionProfileItemEffect)),
 });
 export type AgentInputProfileUse = typeof AgentInputProfileUse.Type;
 

@@ -79,6 +79,8 @@ import * as AcpRegistrySupport from "@t3tools/provider-acp-registry/server/AcpRe
 import * as CheckpointDiffQuery from "./checkpointing/CheckpointDiffQuery.ts";
 import * as NativeChildWorkQuery from "./orchestration-v2/NativeChildWorkQuery.ts";
 import * as AgentInputStore from "./agentInput/AgentInputStore.ts";
+import * as InstructionProfiles from "./instructionProfiles/InstructionProfiles.ts";
+import * as InstructionProfilesRepository from "./persistence/InstructionProfiles.ts";
 import * as AgentInputTrace from "./agentInput/AgentInputTrace.ts";
 import * as CheckpointStore from "./checkpointing/CheckpointStore.ts";
 import * as SourceControlBuiltInDrivers from "./sourceControl/builtInDrivers.ts";
@@ -776,6 +778,11 @@ const layerRuntimeCoreDependencies = layerRuntimeCoreDependenciesBase.pipe(
       // Layers memoize by reference, so this is the same database as the rest of the server.
       AgentInputStore.layerProviderInputRecorder.pipe(
         Layer.provideMerge(AgentInputStore.layer),
+        Layer.provide(layerPersistence),
+      ),
+      InstructionProfiles.layer.pipe(
+        Layer.provide(InstructionProfilesRepository.layer),
+        Layer.provide(ProjectionStoreV2.layer),
         Layer.provide(layerPersistence),
       ),
       ModelManifest.layerModelCatalog.pipe(Layer.provideMerge(ModelManifest.layer)),

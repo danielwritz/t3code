@@ -380,6 +380,45 @@ describe("ClaudeAdapterV2 runtime query policy", () => {
     assert.isUndefined(options.extraArgs?.["dangerously-skip-permissions"]);
   });
 
+  it("adds an instruction profile after T3's text and keeps T3's flag settings", () => {
+    const options = ClaudeAdapterV2.makeClaudeQueryOptions({
+      modelSelection: CLAUDE_TEST_MODEL_SELECTION,
+      nativeThreadId: "native-profile",
+      resume: false,
+      cwd: "/workspace",
+      sdkSettings: {
+        permissions: { deny: ["Bash(rm:*)"] },
+        skillOverrides: { kept: "name-only" },
+      },
+      toolSearchOverride: "true",
+      instructionProfile: {
+        appendSystemPrompt: '<instruction_profile name="Lean">\nBe brief.\n</instruction_profile>',
+        skills: ["docx"],
+        strictMcpConfig: true,
+        settings: {
+          skillOverrides: { pdf: "off" },
+          permissionsDeny: ["Agent(reviewer)"],
+          deniedMcpServers: [{ serverName: "github" }],
+        },
+      },
+    });
+    const systemPrompt = options.systemPrompt;
+    const append =
+      typeof systemPrompt === "object" && "append" in systemPrompt ? systemPrompt.append : "";
+    assert.isTrue(
+      append?.endsWith('\n\n<instruction_profile name="Lean">\nBe brief.\n</instruction_profile>'),
+    );
+    assert.isAbove(append?.indexOf("<instruction_profile") ?? -1, 0);
+    assert.deepEqual(options.skills, ["docx"]);
+    assert.isTrue(options.strictMcpConfig);
+    const settings = options.settings as Record<string, unknown>;
+    assert.deepEqual(settings.permissions, { deny: ["Bash(rm:*)", "Agent(reviewer)"] });
+    assert.deepEqual(settings.skillOverrides, { kept: "name-only", pdf: "off" });
+    assert.deepEqual(settings.deniedMcpServers, [{ serverName: "github" }]);
+    assert.deepEqual(settings.env, { ENABLE_TOOL_SEARCH: "true" });
+    assert.isTrue(settings.showThinkingSummaries);
+  });
+
   it("passes every --add-dir launch directory to Claude", () => {
     const options = ClaudeAdapterV2.makeClaudeQueryOptions({
       modelSelection: CLAUDE_TEST_MODEL_SELECTION,
