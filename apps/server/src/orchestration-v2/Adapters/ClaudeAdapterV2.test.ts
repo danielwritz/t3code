@@ -409,6 +409,15 @@ describe("ClaudeAdapterV2 runtime query policy", () => {
       append?.endsWith('\n\n<instruction_profile name="Lean">\nBe brief.\n</instruction_profile>'),
     );
     assert.isAbove(append?.indexOf("<instruction_profile") ?? -1, 0);
+    // A recorded system prompt would hide a profile chosen after the session's first request.
+    assert.deepInclude(systemPrompt, { snapshot: false });
+    const withoutProfile = ClaudeAdapterV2.makeClaudeQueryOptions({
+      modelSelection: CLAUDE_TEST_MODEL_SELECTION,
+      nativeThreadId: "native-profile",
+      resume: true,
+      cwd: "/workspace",
+    }).systemPrompt;
+    assert.notProperty(withoutProfile, "snapshot");
     assert.deepEqual(options.skills, ["docx"]);
     assert.isTrue(options.strictMcpConfig);
     const settings = options.settings as Record<string, unknown>;

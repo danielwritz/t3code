@@ -151,6 +151,10 @@ const groupOf = (
 
 const isAll = (item: InstructionProfileItem) => item.name === INSTRUCTION_PROFILE_ALL_ITEMS;
 
+/** Claude Code adds to the skill list it already sent and never takes a skill out of it. */
+const SKILL_LIST_TIMING =
+  "; the Skill tool refuses it from the next turn, and it leaves the skill list from the next new thread";
+
 function planClaude(profile: InstructionProfile, effects: Array<Effect>): InstructionProfilePlan {
   const items = profile.items;
   const skills = groupOf(items, "skill");
@@ -171,7 +175,7 @@ function planClaude(profile: InstructionProfile, effects: Array<Effect>): Instru
             : itemEffect(
                 item,
                 "applied",
-                `SDK option skills=[${allowedSkills.join(", ")}] (allow list)`,
+                `SDK option skills=[${allowedSkills.join(", ")}] (allow list)${SKILL_LIST_TIMING}`,
               ),
         );
       } else if (item.enabled) {
@@ -185,7 +189,11 @@ function planClaude(profile: InstructionProfile, effects: Array<Effect>): Instru
       } else {
         skillOverrides[item.name] = "off";
         effects.push(
-          itemEffect(item, "applied", `flag settings skillOverrides["${item.name}"]="off"`),
+          itemEffect(
+            item,
+            "applied",
+            `flag settings skillOverrides["${item.name}"]="off"${SKILL_LIST_TIMING}`,
+          ),
         );
       }
     } else if (item.kind === "agent") {
@@ -267,6 +275,10 @@ function planClaude(profile: InstructionProfile, effects: Array<Effect>): Instru
   };
   return { effects, ...(Object.keys(claude).length === 0 ? {} : { claude }) };
 }
+
+/** Codex reads the thread `config` map only in `thread/start`, `thread/resume` and `thread/fork`. */
+const CODEX_CONFIG_TIMING =
+  "; Codex reads it when it starts or resumes this thread (a new thread, a server restart, or after the idle thread unloads), not while the thread stays loaded";
 
 const PLUGIN_SERVER_REASON = "plugin server: Codex rejects this key and the session fails to open";
 
@@ -420,7 +432,12 @@ function planCodex(
     ...(additionalContext.length === 0 ? {} : { additionalContext }),
     ...(Object.keys(config).length === 0 ? {} : { config }),
   };
-  return { effects, ...(Object.keys(codex).length === 0 ? {} : { codex }) };
+  const timed = effects.map((effect) =>
+    effect.result === "applied" && effect.how.startsWith("config ")
+      ? { ...effect, how: `${effect.how}${CODEX_CONFIG_TIMING}` }
+      : effect,
+  );
+  return { effects: timed, ...(Object.keys(codex).length === 0 ? {} : { codex }) };
 }
 
 const KIND_PLURAL: Record<InstructionProfileItemKind, string> = {
@@ -496,16 +513,21 @@ type SupportRow = Record<SupportKind, string | undefined>;
 
 const SUPPORT_HOW: Record<"claude" | "codex" | "acp", SupportRow> = {
   claude: {
-    "global-instructions": "system prompt append, after T3 Code's own text",
-    skill: "flag settings skillOverrides (one skill) or the SDK skills allow list (all skills)",
+    "global-instructions":
+      "system prompt append after T3 Code's own text, sent fresh on each request (snapshot off), so a change applies from the next turn",
+    skill:
+      "flag settings skillOverrides (one skill) or the SDK skills allow list (all skills); calls are refused from the next turn, the skill list changes from the next new thread",
     agent: 'flag settings permissions.deny "Agent(name)" or "Agent" (all agents)',
     mcpServer: "flag settings deniedMcpServers, or strictMcpConfig for all servers",
   },
   codex: {
     "global-instructions": "turn additionalContext entry t3_code_instruction_profile",
-    skill: "config skills.config per skill, or skills.include_instructions=false for all",
-    agent: "config agents.enabled=false for all agents; one agent cannot be switched off",
-    mcpServer: "config mcp_servers.<name>.enabled=false, only for servers in config.toml",
+    skill:
+      "config skills.config per skill, or skills.include_instructions=false for all; applies when Codex starts or resumes the thread",
+    agent:
+      "config agents.enabled=false for all agents; one agent cannot be switched off; applies when Codex starts or resumes the thread",
+    mcpServer:
+      "config mcp_servers.<name>.enabled=false, only for servers in config.toml; applies when Codex starts or resumes the thread",
   },
   acp: {
     "global-instructions": "block added to the first prompt beside T3 Code's instructions",

@@ -157,6 +157,37 @@ describe("readClaudeTranscriptLines", () => {
     );
   });
 
+  it("takes the system layers from the latest request's system prompt", () => {
+    const later = [system[0], { type: "text", text: "Harness rules, version 2." }];
+    const laterHash = digest({ system: later, tools });
+    const changed = readClaudeTranscriptLines([
+      ...lines.slice(0, 7),
+      JSON.stringify({
+        type: "api-request-shape",
+        shapeHash: laterHash,
+        shape: { system: later, tools },
+      }),
+      JSON.stringify({
+        type: "api-request",
+        id: "r2",
+        keep: 0,
+        tail: [],
+        shapeHash: laterHash,
+        params,
+      }),
+    ]);
+    expect(
+      changed.layers
+        .filter((layer) => layer.kind !== "user-prompt" && layer.requestIndex === 1)
+        .map((layer) => [layer.kind, layer.title]),
+    ).toEqual([
+      ["system-prompt", "System block 1"],
+      ["system-prompt", "System block 2"],
+      ["tools", "Tools (1)"],
+    ]);
+    expect(changed.layers.some((layer) => layer.kind === "profile")).toBe(false);
+  });
+
   it("falls back to the attachments when no request was recorded", () => {
     const attachmentsOnly = readClaudeTranscriptLines(lines.slice(0, 4));
     expect(attachmentsOnly.fidelity).toBe("harness-record");

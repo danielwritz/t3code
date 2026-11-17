@@ -199,6 +199,10 @@ describe("planInstructionProfile", () => {
         ["mcpServer", "*", "applied"],
         ["mcpServer", "linear", "skipped"],
       ]);
+      // Codex reads thread config only at thread start or resume, never on a loaded thread.
+      for (const effect of plan.effects.filter((entry) => entry.result === "applied")) {
+        assert.match(effect.how, /starts or resumes this thread/);
+      }
     });
 
     it("never emits a key for a name it cannot address", () => {

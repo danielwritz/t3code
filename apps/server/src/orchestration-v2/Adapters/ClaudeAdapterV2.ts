@@ -2385,6 +2385,9 @@ export function makeClaudeQueryOptions(input: {
           ? []
           : [input.instructionProfile.appendSystemPrompt]),
       ].join("\n\n"),
+      // Claude Code otherwise reuses the session's first system prompt on every resume, so a
+      // profile chosen later would never reach the model.
+      ...(input.instructionProfile?.appendSystemPrompt === undefined ? {} : { snapshot: false }),
     },
     ...(deviceInstructions || input.onStop !== undefined
       ? {

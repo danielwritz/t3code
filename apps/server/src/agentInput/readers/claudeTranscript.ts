@@ -680,14 +680,16 @@ export function makeClaudeTranscriptReader() {
     }
 
     const layers: Array<TraceLayer> = [];
-    const firstShape = requests
-      .map((request) =>
-        request.shapeHash === undefined ? undefined : shapes.get(request.shapeHash),
-      )
-      .find((shape) => shape !== undefined);
-    if (firstShape !== undefined) {
-      layers.push(...systemLayers(firstShape.system, "system", "System block", 0));
-      const tools = Array.isArray(firstShape.tools) ? firstShape.tools : [];
+    // The system prompt can change mid-session (an instruction profile chosen later), so the
+    // layers show what the latest request carried.
+    const latestHash = requests.findLast(
+      (request) => request.shapeHash !== undefined && shapes.has(request.shapeHash),
+    )?.shapeHash;
+    const latestShape = latestHash === undefined ? undefined : shapes.get(latestHash);
+    const shapeIndex = requests.findIndex((request) => request.shapeHash === latestHash);
+    if (latestShape !== undefined) {
+      layers.push(...systemLayers(latestShape.system, "system", "System block", shapeIndex));
+      const tools = Array.isArray(latestShape.tools) ? latestShape.tools : [];
       layers.push(
         makeLayer({
           id: "tools",
@@ -695,7 +697,7 @@ export function makeClaudeTranscriptReader() {
           origin: "harness",
           title: `Tools (${tools.length})`,
           text: prettyJson(tools),
-          requestIndex: 0,
+          requestIndex: shapeIndex,
         }),
       );
     } else if (promptSnapshot !== undefined) {
