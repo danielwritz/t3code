@@ -45,6 +45,7 @@ import * as GitManager from "./git/GitManager.ts";
 import * as GitWorkflowService from "./git/GitWorkflowService.ts";
 import * as ProjectStore from "./orchestration-v2/ProjectStore.ts";
 import { scratchFolderRoot } from "./project/ManagedProjectFolders.ts";
+import { purgeDeletedThreadAgentInput } from "./agentInput/AgentInputStore.ts";
 import * as Orchestrator from "./orchestration-v2/Orchestrator.ts";
 import * as ProjectionStore from "./orchestration-v2/ProjectionStore.ts";
 import * as ProviderSessionManager from "./orchestration-v2/ProviderSessionManager.ts";
@@ -1774,6 +1775,12 @@ const make = Effect.gen(function* () {
     const entries: StorageCleanupReportEntry[] = [];
     yield* cleanCheckpointRefs().pipe(
       Effect.catch((cause) => Effect.logWarning("checkpoint ref cleanup failed", { cause })),
+    );
+    yield* purgeDeletedThreadAgentInput().pipe(
+      Effect.provideService(SqlClient.SqlClient, sql),
+      Effect.catch((error) =>
+        Effect.logWarning("agent input cleanup failed", { error: error._tag }),
+      ),
     );
     const deletedWorktrees = yield* cleanWorktrees(serverSettings, now, entries).pipe(
       Effect.catch((error) =>

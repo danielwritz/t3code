@@ -78,6 +78,8 @@ import * as DocumentText from "./provider/DocumentText.ts";
 import * as AcpRegistrySupport from "@t3tools/provider-acp-registry/server/AcpRegistrySupport";
 import * as CheckpointDiffQuery from "./checkpointing/CheckpointDiffQuery.ts";
 import * as NativeChildWorkQuery from "./orchestration-v2/NativeChildWorkQuery.ts";
+import * as AgentInputStore from "./agentInput/AgentInputStore.ts";
+import * as AgentInputTrace from "./agentInput/AgentInputTrace.ts";
 import * as CheckpointStore from "./checkpointing/CheckpointStore.ts";
 import * as SourceControlBuiltInDrivers from "./sourceControl/builtInDrivers.ts";
 import * as SourceControlSignIn from "./sourceControl/SourceControlSignIn.ts";
@@ -622,9 +624,10 @@ const layerOrchestrationV2Runtime = RuntimeLayer.layerProduction.pipe(
   ),
 );
 
-const layerOrchestrationApplication = Layer.merge(
+const layerOrchestrationApplication = Layer.mergeAll(
   CheckpointDiffQuery.layer,
   NativeChildWorkQuery.layer,
+  AgentInputTrace.layer,
 ).pipe(Layer.provideMerge(layerCheckpointStore), Layer.provideMerge(layerOrchestrationV2Runtime));
 
 const layerThreadSettlementWorker = Layer.effectDiscard(
@@ -770,6 +773,11 @@ const layerRuntimeCoreDependencies = layerRuntimeCoreDependenciesBase.pipe(
   Layer.provideMerge(
     Layer.mergeAll(
       layerProviderEventLoggers,
+      // Layers memoize by reference, so this is the same database as the rest of the server.
+      AgentInputStore.layerProviderInputRecorder.pipe(
+        Layer.provideMerge(AgentInputStore.layer),
+        Layer.provide(layerPersistence),
+      ),
       ModelManifest.layerModelCatalog.pipe(Layer.provideMerge(ModelManifest.layer)),
       ResetCreditCoordinator.layer,
       ProviderLatestVersions.layer,

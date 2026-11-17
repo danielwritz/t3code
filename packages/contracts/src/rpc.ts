@@ -7,6 +7,13 @@ import {
 } from "./orchestrationV2.ts";
 import { OrchestrationDispatchCommandError } from "./orchestrationDispatch.ts";
 import {
+  AgentInputError,
+  AgentInputText,
+  GetThreadAgentInputInput,
+  GetThreadAgentInputTextInput,
+  ThreadAgentInput,
+} from "./agentInput.ts";
+import {
   McpAppCallToolInput,
   McpAppCallToolResult,
   McpAppReadResourceInput,
@@ -2073,6 +2080,24 @@ const WsOrchestrationV2GetNativeChildWorkRpc = Rpc.make(
   },
 );
 
+const WsOrchestrationV2GetThreadAgentInputRpc = Rpc.make(
+  ORCHESTRATION_V2_WS_METHODS.getThreadAgentInput,
+  {
+    payload: GetThreadAgentInputInput,
+    success: ThreadAgentInput,
+    error: Schema.Union([AgentInputError, EnvironmentAuthorizationError]),
+  },
+);
+
+const WsOrchestrationV2GetThreadAgentInputTextRpc = Rpc.make(
+  ORCHESTRATION_V2_WS_METHODS.getThreadAgentInputText,
+  {
+    payload: GetThreadAgentInputTextInput,
+    success: AgentInputText,
+    error: Schema.Union([AgentInputError, EnvironmentAuthorizationError]),
+  },
+);
+
 const WsOrchestrationV2GetTurnItemRpc = Rpc.make(ORCHESTRATION_V2_WS_METHODS.getTurnItem, {
   payload: OrchestrationV2RpcSchemas.getTurnItem.input,
   success: OrchestrationV2RpcSchemas.getTurnItem.output,
@@ -2460,6 +2485,8 @@ export const WsRpcGroup = RpcGroup.make(
   WsOrchestrationV2DispatchCommandRpc,
   WsOrchestrationV2GetWorkflowScriptRpc,
   WsOrchestrationV2GetNativeChildWorkRpc,
+  WsOrchestrationV2GetThreadAgentInputRpc,
+  WsOrchestrationV2GetThreadAgentInputTextRpc,
   WsOrchestrationV2StopWorkflowRpc,
   WsOrchestrationV2ForceStopThreadRpc,
   WsOrchestrationV2GetTurnItemRpc,

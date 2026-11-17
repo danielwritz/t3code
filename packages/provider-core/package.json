@@ -119,6 +119,10 @@
       "types": "./src/server/ProviderEventLoggers.ts",
       "import": "./src/server/ProviderEventLoggers.ts"
     },
+    "./server/ProviderInputRecorder": {
+      "types": "./src/server/ProviderInputRecorder.ts",
+      "import": "./src/server/ProviderInputRecorder.ts"
+    },
     "./server/ProviderHost": {
       "types": "./src/server/ProviderHost.ts",
       "import": "./src/server/ProviderHost.ts"

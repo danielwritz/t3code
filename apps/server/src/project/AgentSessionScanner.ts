@@ -158,6 +158,44 @@ const CodexSessionIndexEntry = Schema.Struct({
 
 const decodeClaudeSettings = Schema.decodeUnknownOption(ClaudeSettings);
 const decodeCodexSettings = Schema.decodeUnknownOption(CodexSettings);
+
+/**
+ * The home a Claude or Codex provider instance reads and writes its sessions in: the configured
+ * home path, else the instance or host CLAUDE_CONFIG_DIR / CODEX_HOME, else the default folder.
+ * Undefined when the instance settings do not decode.
+ */
+export const resolveAgentHarnessHome = Effect.fn("AgentSessionScanner.resolveAgentHarnessHome")(
+  function* (source: "claudeAgent" | "codex", instance: ProviderInstanceConfig) {
+    const path = yield* Path.Path;
+    const hostEnvironment = yield* HostProcess.Environment;
+    const homeDir = yield* HostProcess.HomeDirectory;
+    const environmentHome = (name: "CLAUDE_CONFIG_DIR" | "CODEX_HOME") => {
+      const configured = instance.environment?.findLast(
+        (variable) => variable.name === name,
+      )?.value;
+      return typeof configured === "string" ? configured : hostEnvironment[name];
+    };
+    if (source === "claudeAgent") {
+      const config = decodeClaudeSettings(instance.config ?? {});
+      if (Option.isNone(config)) return undefined;
+      const configured = config.value.homePath.trim();
+      if (configured.length > 0) return path.resolve(expandHomePath(configured, homeDir));
+      const fromEnvironment = environmentHome("CLAUDE_CONFIG_DIR")?.trim() ?? "";
+      if (fromEnvironment.length > 0) return path.resolve(expandHomePath(fromEnvironment, homeDir));
+      return path.join(homeDir, ".claude");
+    }
+    const config = decodeCodexSettings(instance.config ?? {});
+    if (Option.isNone(config)) return undefined;
+    const codexHome = environmentHome("CODEX_HOME");
+    const codexSettings =
+      config.value.homePath.trim().length === 0 &&
+      config.value.shadowHomePath.trim().length === 0 &&
+      codexHome?.trim()
+        ? { ...config.value, homePath: codexHome }
+        : config.value;
+    return (yield* resolveCodexHomeLayout(codexSettings)).sharedHomePath;
+  },
+);
 const decodeTranscriptRecord = Schema.decodeUnknownOption(Schema.fromJsonString(TranscriptRecord));
 const decodeTranscriptValue = Schema.decodeUnknownOption(TranscriptRecord);
 const decodePiEntryLinks = Schema.decodeUnknownOption(
@@ -1373,18 +1411,6 @@ export const make = Effect.gen(function* () {
     ).pipe(Effect.orElseSucceed((): ReadonlyMap<string, string> => new Map()));
   });
 
-  const resolveClaudeConfigDir = (homePath: string, environmentHome?: string): string => {
-    const configured = homePath.trim();
-    if (configured.length > 0) {
-      return path.resolve(expandHomePath(configured, homeDir));
-    }
-    const fromEnvironment = environmentHome?.trim() ?? "";
-    if (fromEnvironment.length > 0) {
-      return path.resolve(expandHomePath(fromEnvironment, homeDir));
-    }
-    return path.join(homeDir, ".claude");
-  };
-
   const discoverClaudeTranscripts = Effect.fn("AgentSessionScanner.discoverClaudeTranscripts")(
     function* (homePath: string, providerInstanceId: ProviderInstanceId, operationBudget: number) {
       const projectsDir = path.join(homePath, "projects");
@@ -1757,13 +1783,6 @@ export const make = Effect.gen(function* () {
       const homes: Array<{ homePath: string; providerInstanceId: ProviderInstanceId }> = [];
       const seenHomes = new Set<string>();
       for (const { instanceId, config: instance } of instances) {
-        const environmentHome = (name: "CLAUDE_CONFIG_DIR" | "CODEX_HOME") => {
-          const configured = instance.environment?.findLast(
-            (variable) => variable.name === name,
-          )?.value;
-          return typeof configured === "string" ? configured : hostEnvironment[name];
-        };
-
         let homePath: string;
         if (source === "pi") {
           const environment = yield* mergeProviderInstanceEnvironment(
@@ -1775,27 +1794,14 @@ export const make = Effect.gen(function* () {
             piHome(environment, homeDir, platform),
             path,
           );
-        } else if (source === "claudeAgent") {
-          const config = decodeClaudeSettings(instance.config ?? {});
-          if (Option.isNone(config)) continue;
-          homePath = resolveClaudeConfigDir(
-            config.value.homePath,
-            environmentHome("CLAUDE_CONFIG_DIR"),
-          );
         } else {
-          const config = decodeCodexSettings(instance.config ?? {});
-          if (Option.isNone(config)) continue;
-          const codexHome = environmentHome("CODEX_HOME");
-          const codexSettings =
-            config.value.homePath.trim().length === 0 &&
-            config.value.shadowHomePath.trim().length === 0 &&
-            codexHome?.trim()
-              ? { ...config.value, homePath: codexHome }
-              : config.value;
-          const layout = yield* resolveCodexHomeLayout(codexSettings).pipe(
+          const resolved = yield* resolveAgentHarnessHome(source, instance).pipe(
             Effect.provideService(Path.Path, path),
+            Effect.provideService(HostProcess.Environment, hostEnvironment),
+            Effect.provideService(HostProcess.HomeDirectory, homeDir),
           );
-          homePath = layout.sharedHomePath;
+          if (resolved === undefined) continue;
+          homePath = resolved;
         }
 
         const homeKey = `${source}\0${yield* directoryIdentity(homePath)}`;

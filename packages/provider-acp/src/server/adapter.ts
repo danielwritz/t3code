@@ -71,6 +71,7 @@ import type * as EffectAcpSchema from "effect-acp/compat";
 
 import { formatReadToolLabel, formatSearchToolLabel } from "@t3tools/shared/toolActivity";
 import * as ProviderHost from "@t3tools/provider-core/server/ProviderHost";
+import { currentProviderInputRecorder } from "@t3tools/provider-core/server/ProviderInputRecorder";
 import { makeAcpMcpOverAcpBridge, type AcpMcpOverAcpBridge } from "./mcpOverAcpBridge.ts";
 import { mcpToolPresentation } from "@t3tools/provider-core/server/mcpToolPresentation";
 import * as McpProviderSessions from "@t3tools/provider-core/server/McpProviderSessions";
@@ -179,6 +180,7 @@ function sendPromptWhenIdle<A>(
  * This avoids quadratic output; scheduled flushes can run late under host load.
  */
 const ACP_TEXT_FLUSH_INTERVAL: Duration.Input = "50 millis";
+const T3_INSTRUCTIONS_END = "</t3_code_instructions>";
 // Subagent messages are stored as finished, so they skip the server's paragraph
 // throttle and every snapshot is persisted. Match that throttle's 400 ms cadence.
 const ACP_SUBAGENT_TEXT_FLUSH_INTERVAL: Duration.Input = "400 millis";
@@ -1829,6 +1831,7 @@ export const makeAcpAdapterV2 = Effect.fn("makeAcpAdapterV2")(function* (
   const idAllocator = yield* IdAllocator.IdAllocatorV2;
   const host = yield* ProviderHost.ProviderHost;
   const mcpSessions = yield* McpProviderSessions.McpProviderSessions;
+  const inputRecorder = yield* currentProviderInputRecorder;
   const { flavor, selfInvocation: self } = options;
   const readMcpContext = (threadId: ThreadId | null) =>
     threadId === null
@@ -8504,6 +8507,27 @@ export const makeAcpAdapterV2 = Effect.fn("makeAcpAdapterV2")(function* (
           }
           if (sendRuntimeInstructions) {
             prompt.push({ type: "text", text: runtimeInstructions });
+          }
+          const addedInstructions =
+            text === messageText
+              ? undefined
+              : text.slice(0, text.indexOf(T3_INSTRUCTIONS_END) + T3_INSTRUCTIONS_END.length);
+          for (const added of [
+            { title: "T3 instructions", text: addedInstructions?.trim() },
+            {
+              title: "Runtime info",
+              text: sendRuntimeInstructions ? runtimeInstructions : undefined,
+            },
+          ]) {
+            if (!added.text) continue;
+            yield* inputRecorder.record({
+              threadId: turnInput.threadId,
+              runId: turnInput.runId,
+              kind: "host-instructions",
+              origin: "t3",
+              title: added.title,
+              text: added.text,
+            });
           }
           return {
             prompt,

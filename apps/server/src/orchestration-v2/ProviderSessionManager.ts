@@ -18,6 +18,7 @@ import {
   type OrchestrationV2TurnItem,
   type ProviderThreadId,
   type ProviderTurnId,
+  type RunId,
 } from "@t3tools/contracts";
 import * as Cause from "effect/Cause";
 import * as Clock from "effect/Clock";
@@ -58,6 +59,7 @@ import * as CommandOutputHub from "./CommandOutputHub.ts";
 import * as IdAllocator from "@t3tools/provider-core/server/IdAllocator";
 import * as ProviderEventIngestor from "./ProviderEventIngestor.ts";
 import * as ProviderAdapter from "@t3tools/provider-core/server/ProviderAdapter";
+import { currentProviderInputRecorder } from "@t3tools/provider-core/server/ProviderInputRecorder";
 import { makeProviderFailure } from "@t3tools/provider-core/server/failure";
 import {
   endOrphanedNativeSubagent,
@@ -430,6 +432,22 @@ export const layerWithOptions = (
       const mcpSessions = yield* McpProviderSessions.McpProviderSessions;
       /** Unreadable settings must preserve explicit browser-access opt-outs. */
       const serverSettings = yield* Effect.serviceOption(ServerSettings.ServerSettingsService);
+      const inputRecorder = yield* currentProviderInputRecorder;
+      const recordUserPrompt = (input: {
+        readonly threadId: ThreadId;
+        readonly runId: RunId;
+        readonly message: { readonly text: string };
+      }) =>
+        input.message.text.length === 0
+          ? Effect.void
+          : inputRecorder.record({
+              threadId: input.threadId,
+              runId: input.runId,
+              kind: "user-prompt",
+              origin: "user",
+              title: "User message",
+              text: input.message.text,
+            });
       const projectService = yield* Effect.serviceOption(ProjectService.ProjectService);
       const eventSink = yield* EventSink.EventSinkV2;
       const commandOutput = yield* CommandOutputHub.CommandOutputHub;
@@ -2507,7 +2525,10 @@ export const layerWithOptions = (
                     ),
                   ),
                   () =>
-                    runtime.startTurn(input).pipe(turnMetrics("send", input.modelSelection.model)),
+                    recordUserPrompt(input).pipe(
+                      Effect.andThen(runtime.startTurn(input)),
+                      turnMetrics("send", input.modelSelection.model),
+                    ),
                   (_, exit) =>
                     Exit.isFailure(exit)
                       ? observeActivity(
@@ -2530,6 +2551,7 @@ export const layerWithOptions = (
             ),
           steerTurn: (input) =>
             observeActivity(providerSessionId, touchActivity(providerSessionId)).pipe(
+              Effect.andThen(recordUserPrompt(input)),
               Effect.andThen(runtime.steerTurn(input).pipe(turnMetrics("steer"))),
             ),
           // A provider starved of memory can stop answering, so no caller may wait on it unbounded.
