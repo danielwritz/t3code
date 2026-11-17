@@ -30,13 +30,18 @@ const findThread = (threadId: ThreadId) =>
     threadId === missingThread ? null : ({ id: threadId, projectId: project } as never),
   );
 
-const serviceLayer = (codexHome: string) =>
+const serviceLayer = (codexHome: string, threadLookups: Array<ThreadId>) =>
   InstructionProfiles.layer.pipe(
     Layer.provideMerge(InstructionProfilesRepository.layer),
     Layer.provideMerge(AgentInputStore.layer),
     Layer.provide(
       Layer.mergeAll(
-        Layer.mock(ProjectionStore.ProjectionStoreV2)({ findThread }),
+        Layer.mock(ProjectionStore.ProjectionStoreV2)({
+          findThread: (threadId) =>
+            Effect.sync(() => threadLookups.push(threadId)).pipe(
+              Effect.andThen(findThread(threadId)),
+            ),
+        }),
         Layer.mock(ServerSettings.ServerSettingsService)({
           getSettings: Effect.succeed({
             providerInstances: { codex: { driver: "codex", config: { homePath: codexHome } } },
@@ -52,6 +57,7 @@ const withService = <A, E>(
     E,
     InstructionProfiles.InstructionProfiles | AgentInputStore.AgentInputStore | SqlClient.SqlClient
   >,
+  threadLookups: Array<ThreadId> = [],
 ) =>
   Effect.gen(function* () {
     const fileSystem = yield* FileSystem.FileSystem;
@@ -61,7 +67,7 @@ const withService = <A, E>(
       path.join(home, "config.toml"),
       '[mcp_servers.github]\ncommand = "gh"\n',
     );
-    return yield* use.pipe(Effect.provide(serviceLayer(home)));
+    return yield* use.pipe(Effect.provide(serviceLayer(home, threadLookups)));
   }).pipe(Effect.scoped);
 
 const item = (
@@ -158,19 +164,24 @@ it.layer(Layer.mergeAll(NodeServices.layer, SqlitePersistence.layerMemory))(
       ),
     );
 
+    const threadLookups: Array<ThreadId> = [];
     it.effect("plans Codex with config.toml servers and records what was applied", () =>
       withService(
         Effect.gen(function* () {
           const service = yield* InstructionProfiles.InstructionProfiles;
           const store = yield* AgentInputStore.AgentInputStore;
           const driver = ProviderDriverKind.make("codex");
-          expect(
-            yield* service.launchFor({
-              threadId: thread,
-              driver,
-              instanceId: ProviderInstanceId.make("codex"),
-            }),
-          ).toBeUndefined();
+          // With no profile saved, a turn start reads nothing about the thread.
+          for (let turn = 0; turn < 2; turn++) {
+            expect(
+              yield* service.launchFor({
+                threadId: thread,
+                driver,
+                instanceId: ProviderInstanceId.make("codex"),
+              }),
+            ).toBeUndefined();
+          }
+          expect(threadLookups).toEqual([]);
 
           const profile = yield* service.save({
             name: "Quiet",
@@ -217,7 +228,19 @@ it.layer(Layer.mergeAll(NodeServices.layer, SqlitePersistence.layerMemory))(
           expect((yield* sql`SELECT id FROM instruction_profile_applications`).length).toBe(2);
           yield* service.recordLaunch({ threadId: thread, driver, launch: launch! });
           expect((yield* store.latestProfileUse(thread))?.profileName).toBe("Quiet");
+
+          yield* service.remove(profile.id);
+          const lookupsBefore = threadLookups.length;
+          expect(
+            yield* service.launchFor({
+              threadId: thread,
+              driver,
+              instanceId: ProviderInstanceId.make("codex"),
+            }),
+          ).toBeUndefined();
+          expect(threadLookups.length).toBe(lookupsBefore);
         }),
+        threadLookups,
       ),
     );
   },

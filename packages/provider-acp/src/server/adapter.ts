@@ -8497,7 +8497,10 @@ export const makeAcpAdapterV2 = Effect.fn("makeAcpAdapterV2")(function* (
           const text = !sendProfileBlock
             ? t3Text
             : t3InstructionsAdded
-              ? t3Text.replace(T3_INSTRUCTIONS_END, `${T3_INSTRUCTIONS_END}\n\n${profileBlock}`)
+              ? t3Text.replace(
+                  T3_INSTRUCTIONS_END,
+                  () => `${T3_INSTRUCTIONS_END}\n\n${profileBlock}`,
+                )
               : `${profileBlock}\n\n${t3Text}`;
           const sessionSetup = yield* Ref.get(activeSessionSetup);
           const runtimeInstructions = buildRuntimeInstructions({

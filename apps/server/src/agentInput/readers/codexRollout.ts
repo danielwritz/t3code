@@ -254,7 +254,7 @@ export function makeCodexRolloutReader() {
         messageCount: messages.length,
         messageChars,
         totalChars: systemChars + toolChars + messageChars,
-        verified: false,
+        verification: "unverified",
         partText: (part) =>
           part === "system"
             ? systemTextOf(point)

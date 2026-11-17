@@ -69,6 +69,8 @@ it.layer(
       expect(yield* store.listRecords(deleted)).toEqual([]);
       expect(yield* store.latestProfileUse(deleted)).toBeUndefined();
       expect(yield* store.listRecords(live)).toHaveLength(1);
+      const blobsAfter = yield* sql<{ readonly text: string }>`SELECT text FROM agent_input_blobs`;
+      expect(blobsAfter.map((row) => row.text)).toEqual(["Shared instructions."]);
     }),
   );
 });

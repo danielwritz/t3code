@@ -371,24 +371,100 @@ const systemLayers = (
     ];
   });
 
+/** The dialog lists this many of the latest requests; older ones are only counted. */
+export const CLAUDE_LISTED_REQUESTS = 50;
+/** Open assistant messages kept while matching; a block written later than this is matched alone. */
+const OPEN_ASSISTANT_GROUPS = 16;
+
+interface IndexedRequest extends ApiRequestRecord {
+  readonly systemChars: number;
+  readonly toolChars: number;
+  readonly toolCount: number;
+}
+
+/** What a later pass needs to rebuild any one request. */
+export interface ClaudeRequestIndex {
+  readonly requests: ReadonlyArray<IndexedRequest>;
+  readonly blobHashes: ReadonlySet<string>;
+}
+
+export interface RebuiltClaudeRequest {
+  readonly system: string;
+  readonly tools: string;
+  readonly messages: string;
+  readonly messageCount: number;
+  readonly verification: "verified" | "unverified";
+}
+
+export interface ClaudeTranscriptRead {
+  readonly trace: HarnessTrace;
+  readonly index: ClaudeRequestIndex;
+  /** The request the layers describe, rebuilt by a second pass. */
+  readonly latest: number | undefined;
+}
+
+const messageCountOf = (request: ApiRequestRecord, byId: ReadonlyMap<string, ApiRequestRecord>) => {
+  if (!request.keep) return request.tail.length;
+  return request.base !== undefined && byId.has(request.base)
+    ? request.keep + request.tail.length
+    : 0;
+};
+
 /**
- * Reads a Claude Code transcript in two streamed passes. The second pass is needed only when
- * some request messages have no blob record and must be rebuilt from user and assistant lines.
+ * First streamed pass: the layers, each request's record and cheap sizes, and which messages
+ * have blobs. Request bodies are not rebuilt here; shapes are dropped once sized.
  */
-export function makeClaudeTranscriptReader() {
-  const blobs = new Map<string, Message>();
+export function makeClaudeIndexReader() {
   const shapes = new Map<string, Shape>();
-  const requests: Array<ApiRequestRecord> = [];
+  const shapeSizes = new Map<string, { systemChars: number; toolChars: number }>();
+  const requests: Array<IndexedRequest> = [];
+  const blobHashes = new Set<string>();
   const pending: Array<PendingLayer> = [];
+  // Requests repeat their params and cache settings, and sessions repeat instruction files.
+  const interned = new Map<string, Json>();
+  const texts = new Map<string, string>();
+  const prettyLength = makePrettyJsonLength();
   let promptSnapshot: { readonly systemPrompt: Json; readonly at?: string | undefined } | undefined;
   let sidechain = false;
   let lineCount = 0;
 
-  const hash = makeCanonicalJson();
-  const resolved = new Map<string, Message>();
-  let needed: Set<string> | undefined;
+  const intern = <A extends Json>(value: A): A => {
+    const key = JSON.stringify(value);
+    const known = interned.get(key);
+    if (known !== undefined) return known as A;
+    interned.set(key, value);
+    return value;
+  };
+  const internText = (text: string) => {
+    const known = texts.get(text);
+    if (known !== undefined) return known;
+    texts.set(text, text);
+    return text;
+  };
 
-  const acceptFirst = (line: string) => {
+  const sizesOf = (
+    shapeHash: string | undefined,
+    cacheControl: ApiRequestRecord["cacheControl"],
+  ) => {
+    const shape = shapeHash === undefined ? undefined : shapes.get(shapeHash);
+    if (shape === undefined) return { systemChars: 0, toolChars: 0, toolCount: 0 };
+    const toolCount = Array.isArray(shape.tools) ? shape.tools.length : 0;
+    const toolPaths = cacheControl.filter((entry) => entry.path[0] === "tools");
+    let sizes = shapeSizes.get(shapeHash!);
+    if (sizes === undefined) {
+      sizes = {
+        systemChars: textOfBlocks(shape.system).length,
+        toolChars: prettyLength(shape.tools ?? []),
+      };
+      shapeSizes.set(shapeHash!, sizes);
+    }
+    if (toolPaths.length === 0) return { ...sizes, toolCount };
+    const root: Record<string, Json> = { tools: shape.tools };
+    for (const entry of toolPaths) setCacheControl(root, entry.path, entry.value);
+    return { systemChars: sizes.systemChars, toolChars: prettyLength(root.tools ?? []), toolCount };
+  };
+
+  const accept = (line: string) => {
     lineCount++;
     const record = parseJsonLine(line);
     if (!isRecord(record)) return;
@@ -396,17 +472,23 @@ export function makeClaudeTranscriptReader() {
     if (record.isSidechain === true) sidechain = true;
     switch (record.type) {
       case "api-request-blob":
-        if (typeof record.hash === "string" && isRecord(record.message)) {
-          blobs.set(record.hash, record.message);
-        }
+        if (typeof record.hash === "string") blobHashes.add(record.hash);
         return;
       case "api-request-shape":
         if (typeof record.shapeHash === "string" && isRecord(record.shape)) {
           shapes.set(record.shapeHash, { system: record.shape.system, tools: record.shape.tools });
         }
         return;
-      case "api-request":
+      case "api-request": {
         if (typeof record.id !== "string" || record.isSidechain === true) return;
+        const shapeHash = stringField(record, "shapeHash");
+        const cacheControl = Array.isArray(record.cacheControl)
+          ? record.cacheControl.flatMap((entry) =>
+              isRecord(entry) && Array.isArray(entry.path)
+                ? [{ path: entry.path as Array<string | number>, value: intern(entry.value) }]
+                : [],
+            )
+          : [];
         requests.push({
           id: record.id,
           timestamp: at,
@@ -415,18 +497,14 @@ export function makeClaudeTranscriptReader() {
           tail: Array.isArray(record.tail)
             ? record.tail.filter((item): item is string => typeof item === "string")
             : [],
-          shapeHash: stringField(record, "shapeHash"),
-          params: isRecord(record.params) ? record.params : {},
-          cacheControl: Array.isArray(record.cacheControl)
-            ? record.cacheControl.flatMap((entry) =>
-                isRecord(entry) && Array.isArray(entry.path)
-                  ? [{ path: entry.path as Array<string | number>, value: entry.value }]
-                  : [],
-              )
-            : [],
+          shapeHash,
+          params: intern(isRecord(record.params) ? record.params : {}),
+          cacheControl,
           requestDigest: stringField(record, "requestDigest"),
+          ...sizesOf(shapeHash, cacheControl),
         });
         return;
+      }
       case "attachment": {
         if (!isRecord(record.attachment) || record.isSidechain === true) return;
         if (record.attachment.type === "prompt_snapshot") {
@@ -435,8 +513,14 @@ export function makeClaudeTranscriptReader() {
         }
         const id = `attachment:${stringField(record, "uuid") ?? lineCount}`;
         for (const layer of attachmentLayers(record.attachment, id)) {
-          if (layer.text.length > 0)
-            pending.push({ ...layer, requestsBefore: requests.length, at });
+          if (layer.text.length > 0) {
+            pending.push({
+              ...layer,
+              text: internText(layer.text),
+              requestsBefore: requests.length,
+              at,
+            });
+          }
         }
         return;
       }
@@ -453,7 +537,7 @@ export function makeClaudeTranscriptReader() {
           kind: "user-prompt",
           origin: "user",
           title: "User message",
-          text,
+          text: internText(text),
           role: "user",
           requestsBefore: requests.length,
           at,
@@ -463,221 +547,27 @@ export function makeClaudeTranscriptReader() {
     }
   };
 
-  /** Resolves blob hashes; returns whether a second pass over user and assistant lines is needed. */
-  const prepareSecondPass = () => {
-    for (const [blobHash, message] of blobs) {
-      if (hash(message) === blobHash) {
-        resolved.set(blobHash, message);
-        continue;
-      }
-      // A blob may be stored with string content while the request used one text block.
-      const normalized = { ...message, content: asContentArray(message.content) };
-      resolved.set(
-        blobHash,
-        typeof message.content === "string" && hash(normalized) === blobHash ? normalized : message,
-      );
-    }
-    needed = new Set(
-      requests.flatMap((request) => request.tail.filter((tailHash) => !resolved.has(tailHash))),
-    );
-    return needed.size > 0;
-  };
-
-  const assistantGroups = new Map<string, Array<Record<string, Json>>>();
-  let userRun: Array<Record<string, Json>> = [];
-  const offer = (message: Message) => {
-    if (needed === undefined || needed.size === 0) return;
-    const messageHash = hash(message);
-    if (needed.has(messageHash) && !resolved.has(messageHash)) {
-      resolved.set(messageHash, message);
-      needed.delete(messageHash);
-    }
-  };
-  const contentOf = (record: Record<string, Json>) =>
-    asContentArray((record.message as Message).content);
-  const flushUserRun = () => {
-    if (userRun.length > 1) {
-      for (let start = 0; start < userRun.length; start++) {
-        for (let end = start + 2; end <= userRun.length; end++) {
-          offer({ role: "user", content: userRun.slice(start, end).flatMap(contentOf) });
-        }
-      }
-    }
-    userRun = [];
-  };
-
-  const acceptSecond = (line: string) => {
-    if (needed === undefined || needed.size === 0) return;
-    const record = parseJsonLine(line);
-    if (!isRecord(record) || !isRecord(record.message)) return;
-    if (record.type === "user") {
-      const message = record.message;
-      offer(message);
-      offer({ role: "user", content: message.content });
-      if (typeof message.content === "string") {
-        offer({ role: "user", content: asContentArray(message.content) });
-      }
-      userRun.push(record);
-      if (userRun.length > 12) userRun.shift();
-    } else if (record.type === "assistant") {
-      flushUserRun();
-      const key =
-        stringField(record, "requestRef") ??
-        stringField(record.message, "id") ??
-        stringField(record, "uuid") ??
-        "";
-      const group = assistantGroups.get(key) ?? [];
-      group.push(record);
-      assistantGroups.set(key, group);
-    }
-  };
-
-  const finishSecondPass = () => {
-    flushUserRun();
-    const blockIndex = (record: Record<string, Json>) =>
-      typeof record.apiBlockIndex === "number" ? record.apiBlockIndex : undefined;
-    for (const unsorted of assistantGroups.values()) {
-      const sorted = unsorted.toSorted((a, b) => (blockIndex(a) ?? 0) - (blockIndex(b) ?? 0));
-      // The same block can be written twice; keep one per apiBlockIndex.
-      const group = sorted.filter(
-        (record, index) =>
-          blockIndex(record) === undefined ||
-          index === 0 ||
-          blockIndex(sorted[index - 1]!) !== blockIndex(record),
-      );
-      const wire: Record<string, Json> = Object.assign(
-        {},
-        ...group.map((record) => (isRecord(record.wireToolInputs) ? record.wireToolInputs : {})),
-      );
-      const content = group.flatMap((record) => {
-        const blocks = (record.message as Message).content;
-        return Array.isArray(blocks) ? blocks : [];
-      });
-      offer({ role: "assistant", content });
-      const wired = content.map((block) => {
-        const id = stringField(block, "id");
-        return isRecord(block) && block.type === "tool_use" && id !== undefined && id in wire
-          ? { ...block, input: wire[id] }
-          : block;
-      });
-      offer({ role: "assistant", content: wired });
-      // An advisor call whose result never arrived is dropped from the next request.
-      const answered = new Set(wired.map((block) => stringField(block, "tool_use_id")));
-      const pruned = wired.filter(
-        (block) =>
-          !(
-            isRecord(block) &&
-            block.type === "server_tool_use" &&
-            !answered.has(stringField(block, "id"))
-          ),
-      );
-      if (pruned.length !== wired.length) offer({ role: "assistant", content: pruned });
-    }
-    assistantGroups.clear();
-  };
-
-  const finish = (): HarnessTrace => {
-    if (needed === undefined) prepareSecondPass();
+  const finish = (): ClaudeTranscriptRead => {
     const notes: Array<string> = [];
     if (sidechain) {
       notes.push("Subagent requests are not shown yet; this trace covers the main thread.");
     }
-    const prettyLength = makePrettyJsonLength();
     const byId = new Map(requests.map((request) => [request.id, request]));
-    const messagesById = new Map<string, Array<Json> | null>();
-    const messagesOf = (request: ApiRequestRecord): Array<Json> | null => {
-      const chain: Array<ApiRequestRecord> = [];
-      let current: ApiRequestRecord | undefined = request;
-      while (current !== undefined && !messagesById.has(current.id)) {
-        chain.push(current);
-        if (!current.base || !current.keep) break;
-        const base = byId.get(current.base);
-        if (base === undefined) {
-          messagesById.set(current.id, null);
-          break;
-        }
-        if (chain.includes(base)) break;
-        current = base;
-      }
-      for (const link of chain.toReversed()) {
-        if (messagesById.has(link.id)) continue;
-        let head: Array<Json> = [];
-        if (link.base && link.keep) {
-          const baseMessages = messagesById.get(link.base);
-          if (!baseMessages) {
-            messagesById.set(link.id, null);
-            continue;
-          }
-          head = baseMessages.slice(0, link.keep);
-        } else if (link.keep) {
-          messagesById.set(link.id, null);
-          continue;
-        }
-        const tail = link.tail.map((tailHash) => resolved.get(tailHash));
-        messagesById.set(
-          link.id,
-          tail.every((message) => message !== undefined) ? [...head, ...tail] : null,
-        );
-      }
-      return messagesById.get(request.id) ?? null;
-    };
-    const bodyOf = (request: ApiRequestRecord) => {
-      const messages = messagesOf(request);
-      const shape = request.shapeHash === undefined ? undefined : shapes.get(request.shapeHash);
-      if (messages === null || shape === undefined) return undefined;
-      const body: Record<string, Json> = {
-        ...request.params,
-        system: shape.system,
-        tools: shape.tools,
-        messages,
-      };
-      let applied = true;
-      for (const entry of request.cacheControl) {
-        if (!setCacheControl(body, entry.path, entry.value)) applied = false;
-      }
-      return { body, applied };
-    };
-
-    const traceRequests: Array<TraceRequest> = requests.map((request, index) => {
-      const shape = request.shapeHash === undefined ? undefined : shapes.get(request.shapeHash);
-      const rebuilt = bodyOf(request);
-      const messages = rebuilt === undefined ? [] : (rebuilt.body.messages as Array<Json>);
-      const verified =
-        rebuilt !== undefined &&
-        rebuilt.applied &&
-        request.requestDigest !== undefined &&
-        hash(rebuilt.body) === request.requestDigest;
-      // Sized as the text partText returns, so the list and the opened part agree.
-      const systemChars = textOfBlocks(rebuilt?.body.system ?? shape?.system).length;
-      const toolChars = prettyLength(rebuilt?.body.tools ?? shape?.tools ?? []);
-      const messageChars = prettyLength(messages);
+    const firstListed = Math.max(0, requests.length - CLAUDE_LISTED_REQUESTS);
+    if (firstListed > 0) notes.push(`${firstListed} earlier requests are not listed.`);
+    const listed: Array<TraceRequest> = requests.slice(firstListed).map((request, offset) => {
       const model = request.params.model;
       return {
-        index,
+        index: firstListed + offset,
         ...(request.timestamp === undefined ? {} : { at: request.timestamp }),
         ...(typeof model === "string" ? { model } : {}),
-        systemChars,
-        toolCount: Array.isArray(shape?.tools) ? shape.tools.length : 0,
-        toolChars,
-        messageCount: messages.length,
-        messageChars,
-        totalChars: systemChars + toolChars + messageChars,
-        verified,
-        partText: (part) => {
-          const body = bodyOf(request)?.body;
-          if (part === "system") return textOfBlocks(body?.system ?? shape?.system);
-          return prettyJson(
-            part === "tools" ? (body?.tools ?? shape?.tools ?? []) : (body?.messages ?? []),
-          );
-        },
+        systemChars: request.systemChars,
+        toolCount: request.toolCount,
+        toolChars: request.toolChars,
+        messageCount: messageCountOf(request, byId),
+        verification: "not-checked",
       };
     });
-    const unrebuilt = traceRequests.filter((request) => !request.verified).length;
-    if (unrebuilt > 0) {
-      notes.push(
-        `${unrebuilt} of ${traceRequests.length} requests could not be checked against their digest.`,
-      );
-    }
 
     const layers: Array<TraceLayer> = [];
     // The system prompt can change mid-session (an instruction profile chosen later), so the
@@ -725,24 +615,297 @@ export function makeClaudeTranscriptReader() {
         "This Claude Code version does not store API requests; showing loaded files only.",
       );
     }
+    let retainedChars = blobHashes.size * 64 + listed.length * 200;
+    for (const text of texts.keys()) retainedChars += text.length;
+    for (const layer of layers) if (!texts.has(layer.text)) retainedChars += layer.text.length;
+    for (const request of requests) retainedChars += 200 + request.tail.length * 64;
+    shapes.clear();
     return {
-      fidelity: requests.length > 0 ? "exact" : "harness-record",
-      layers,
-      requests: traceRequests,
-      notes,
+      trace: {
+        fidelity: requests.length > 0 ? "exact" : "harness-record",
+        layers,
+        requests: listed,
+        notes,
+        retainedChars,
+      },
+      index: { requests, blobHashes },
+      latest: requests.length > 0 ? requests.length - 1 : undefined,
     };
   };
 
-  return { acceptFirst, prepareSecondPass, acceptSecond, finishSecondPass, finish };
+  return { accept, finish };
 }
 
-/** Reads a whole transcript held in memory, for tests and small files. */
-export function readClaudeTranscriptLines(lines: ReadonlyArray<string>): HarnessTrace {
-  const reader = makeClaudeTranscriptReader();
-  for (const line of lines) reader.acceptFirst(line);
-  if (reader.prepareSecondPass()) {
-    for (const line of lines) reader.acceptSecond(line);
-    reader.finishSecondPass();
+interface ChainLink {
+  readonly link: ApiRequestRecord;
+  /** How many of this link's messages the target request uses. */
+  readonly count: number;
+  readonly headLen: number;
+}
+
+/** messages(N) = messages(base)[0:keep] ++ tail, walked from the target to its root. */
+function chainOf(
+  byId: ReadonlyMap<string, ApiRequestRecord>,
+  target: ApiRequestRecord,
+): ReadonlyArray<ChainLink> | undefined {
+  const chain: Array<ChainLink> = [];
+  const seen = new Set<string>();
+  let link = target;
+  let need = Number.POSITIVE_INFINITY;
+  for (;;) {
+    if (seen.has(link.id)) return undefined;
+    seen.add(link.id);
+    if (link.keep && !link.base) return undefined;
+    const headLen = link.base && link.keep ? link.keep : 0;
+    const count = Math.min(need, headLen + link.tail.length);
+    chain.push({ link, count, headLen });
+    if (headLen === 0) return chain;
+    const base = byId.get(link.base!);
+    if (base === undefined) return undefined;
+    need = Math.min(count, headLen);
+    link = base;
   }
-  return reader.finish();
+}
+
+/**
+ * Second streamed pass for one request: keeps only its shape and the messages it uses, matching
+ * messages without a blob against the user and assistant lines, then checks the digest.
+ */
+export function makeClaudeRequestRebuilder(index: ClaudeRequestIndex, requestIndex: number) {
+  const target = index.requests[requestIndex];
+  const byId = new Map(index.requests.map((request) => [request.id, request]));
+  const chain = target === undefined ? undefined : chainOf(byId, target);
+  const needed = new Set(
+    (chain ?? []).flatMap(({ link, count, headLen }) =>
+      link.tail.slice(0, Math.max(0, count - headLen)),
+    ),
+  );
+  const fromBlobs = new Set([...needed].filter((tailHash) => index.blobHashes.has(tailHash)));
+  const unmatched = new Set([...needed].filter((tailHash) => !fromBlobs.has(tailHash)));
+  const resolved = new Map<string, Message>();
+  const hash = makeCanonicalJson();
+  let shape: Shape | undefined;
+
+  const offer = (message: Message) => {
+    if (unmatched.size === 0) return;
+    const messageHash = hash(message);
+    if (unmatched.has(messageHash)) {
+      resolved.set(messageHash, message);
+      unmatched.delete(messageHash);
+    }
+  };
+  const contentOf = (record: Record<string, Json>) =>
+    asContentArray((record.message as Message).content);
+  let userRun: Array<Record<string, Json>> = [];
+  const flushUserRun = () => {
+    if (userRun.length > 1) {
+      for (let start = 0; start < userRun.length; start++) {
+        for (let end = start + 2; end <= userRun.length; end++) {
+          offer({ role: "user", content: userRun.slice(start, end).flatMap(contentOf) });
+        }
+      }
+    }
+    userRun = [];
+  };
+
+  const blockIndex = (record: Record<string, Json>) =>
+    typeof record.apiBlockIndex === "number" ? record.apiBlockIndex : undefined;
+  const offerAssistant = (unsorted: ReadonlyArray<Record<string, Json>>) => {
+    const sorted = unsorted.toSorted((a, b) => (blockIndex(a) ?? 0) - (blockIndex(b) ?? 0));
+    // The same block can be written twice; keep one per apiBlockIndex.
+    const group = sorted.filter(
+      (record, position) =>
+        blockIndex(record) === undefined ||
+        position === 0 ||
+        blockIndex(sorted[position - 1]!) !== blockIndex(record),
+    );
+    const wire: Record<string, Json> = Object.assign(
+      {},
+      ...group.map((record) => (isRecord(record.wireToolInputs) ? record.wireToolInputs : {})),
+    );
+    const content = group.flatMap((record) => {
+      const blocks = (record.message as Message).content;
+      return Array.isArray(blocks) ? blocks : [];
+    });
+    offer({ role: "assistant", content });
+    const wired = content.map((block) => {
+      const id = stringField(block, "id");
+      return isRecord(block) && block.type === "tool_use" && id !== undefined && id in wire
+        ? { ...block, input: wire[id] }
+        : block;
+    });
+    offer({ role: "assistant", content: wired });
+    // An advisor call whose result never arrived is dropped from the next request.
+    const answered = new Set(wired.map((block) => stringField(block, "tool_use_id")));
+    const pruned = wired.filter(
+      (block) =>
+        !(
+          isRecord(block) &&
+          block.type === "server_tool_use" &&
+          !answered.has(stringField(block, "id"))
+        ),
+    );
+    if (pruned.length !== wired.length) offer({ role: "assistant", content: pruned });
+  };
+  const assistantGroups = new Map<string, Array<Record<string, Json>>>();
+
+  const accept = (line: string) => {
+    if (target === undefined) return;
+    if (unmatched.size === 0 && !line.includes('"api-request-')) return;
+    const record = parseJsonLine(line);
+    if (!isRecord(record)) return;
+    switch (record.type) {
+      case "api-request-shape":
+        if (
+          shape === undefined &&
+          record.shapeHash === target.shapeHash &&
+          isRecord(record.shape)
+        ) {
+          shape = { system: record.shape.system, tools: record.shape.tools };
+        }
+        return;
+      case "api-request-blob": {
+        const blobHash = record.hash;
+        if (typeof blobHash !== "string" || !fromBlobs.has(blobHash)) return;
+        if (resolved.has(blobHash) || !isRecord(record.message)) return;
+        const message = record.message;
+        // A blob may be stored with string content while the request used one text block.
+        const normalized = { ...message, content: asContentArray(message.content) };
+        resolved.set(
+          blobHash,
+          typeof message.content === "string" &&
+            hash(message) !== blobHash &&
+            hash(normalized) === blobHash
+            ? normalized
+            : message,
+        );
+        return;
+      }
+      case "user": {
+        if (unmatched.size === 0 || !isRecord(record.message)) return;
+        const message = record.message;
+        offer(message);
+        offer({ role: "user", content: message.content });
+        if (typeof message.content === "string") {
+          offer({ role: "user", content: asContentArray(message.content) });
+        }
+        userRun.push(record);
+        if (userRun.length > 12) userRun.shift();
+        return;
+      }
+      case "assistant": {
+        if (unmatched.size === 0 || !isRecord(record.message)) return;
+        flushUserRun();
+        const key =
+          stringField(record, "requestRef") ??
+          stringField(record.message, "id") ??
+          stringField(record, "uuid") ??
+          "";
+        const group = assistantGroups.get(key) ?? [];
+        group.push(record);
+        assistantGroups.delete(key);
+        assistantGroups.set(key, group);
+        for (const [oldest, records] of assistantGroups) {
+          if (assistantGroups.size <= OPEN_ASSISTANT_GROUPS) break;
+          assistantGroups.delete(oldest);
+          offerAssistant(records);
+        }
+        return;
+      }
+    }
+  };
+
+  const finish = (): RebuiltClaudeRequest | undefined => {
+    if (target === undefined) return undefined;
+    flushUserRun();
+    for (const records of assistantGroups.values()) offerAssistant(records);
+    assistantGroups.clear();
+    let messages: Array<Json> | undefined = chain === undefined ? undefined : [];
+    for (const { link, count, headLen } of (chain ?? []).toReversed()) {
+      const tail = link.tail
+        .slice(0, Math.max(0, count - headLen))
+        .map((tailHash) => resolved.get(tailHash));
+      if (messages === undefined || tail.some((message) => message === undefined)) {
+        messages = undefined;
+        break;
+      }
+      messages = [...messages.slice(0, Math.min(count, headLen)), ...tail];
+    }
+    const body: Record<string, Json> | undefined =
+      messages === undefined || shape === undefined
+        ? undefined
+        : { ...target.params, system: shape.system, tools: shape.tools, messages };
+    let applied = body !== undefined;
+    if (body !== undefined) {
+      for (const entry of target.cacheControl) {
+        if (!setCacheControl(body, entry.path, entry.value)) applied = false;
+      }
+    }
+    const verified =
+      body !== undefined &&
+      applied &&
+      target.requestDigest !== undefined &&
+      hash(body) === target.requestDigest;
+    const rebuiltMessages = (body?.messages as Array<Json> | undefined) ?? [];
+    return {
+      system: textOfBlocks(body?.system ?? shape?.system),
+      tools: prettyJson(body?.tools ?? shape?.tools ?? []),
+      messages: prettyJson(rebuiltMessages),
+      messageCount: rebuiltMessages.length,
+      verification: verified ? "verified" : "unverified",
+    };
+  };
+
+  return { accept, finish };
+}
+
+/** Puts a rebuilt request's sizes and check into the listed request, when it is listed. */
+export function withRebuiltRequest(
+  trace: HarnessTrace,
+  requestIndex: number,
+  rebuilt: RebuiltClaudeRequest,
+): HarnessTrace {
+  return {
+    ...trace,
+    requests: trace.requests.map((request) =>
+      request.index !== requestIndex
+        ? request
+        : {
+            ...request,
+            systemChars: rebuilt.system.length,
+            toolChars: rebuilt.tools.length,
+            messageCount: rebuilt.messageCount,
+            messageChars: rebuilt.messages.length,
+            totalChars: rebuilt.system.length + rebuilt.tools.length + rebuilt.messages.length,
+            verification: rebuilt.verification,
+          },
+    ),
+    notes:
+      rebuilt.verification === "verified" || requestIndex !== trace.requests.at(-1)?.index
+        ? trace.notes
+        : [...trace.notes, "The latest request did not match the digest Claude Code stored."],
+  };
+}
+
+/** Rebuilds one request from a transcript held in memory, for tests. */
+export function rebuildClaudeRequestLines(
+  lines: ReadonlyArray<string>,
+  index: ClaudeRequestIndex,
+  requestIndex: number,
+): RebuiltClaudeRequest | undefined {
+  const rebuilder = makeClaudeRequestRebuilder(index, requestIndex);
+  for (const line of lines) rebuilder.accept(line);
+  return rebuilder.finish();
+}
+
+/** Reads a whole transcript held in memory the way the server streams it, for tests. */
+export function readClaudeTranscriptLines(lines: ReadonlyArray<string>): ClaudeTranscriptRead {
+  const reader = makeClaudeIndexReader();
+  for (const line of lines) reader.accept(line);
+  const read = reader.finish();
+  if (read.latest === undefined) return read;
+  const rebuilt = rebuildClaudeRequestLines(lines, read.index, read.latest);
+  return rebuilt === undefined
+    ? read
+    : { ...read, trace: withRebuiltRequest(read.trace, read.latest, rebuilt) };
 }

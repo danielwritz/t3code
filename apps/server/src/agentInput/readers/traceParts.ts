@@ -13,7 +13,8 @@ export interface TraceLayer extends AgentInputLayer {
 }
 
 export interface TraceRequest extends AgentInputRequest {
-  readonly partText: (part: AgentInputRequestPart) => string;
+  /** Absent when the part must be rebuilt from the file first. */
+  readonly partText?: (part: AgentInputRequestPart) => string;
 }
 
 export interface HarnessTrace {
@@ -21,6 +22,8 @@ export interface HarnessTrace {
   readonly layers: ReadonlyArray<TraceLayer>;
   readonly requests: ReadonlyArray<TraceRequest>;
   readonly notes: ReadonlyArray<string>;
+  /** Characters the trace keeps alive, when the reader knows; it sizes the server cache. */
+  readonly retainedChars?: number;
 }
 
 const PREVIEW_CHARS = 200;

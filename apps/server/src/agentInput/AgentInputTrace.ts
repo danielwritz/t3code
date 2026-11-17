@@ -5,6 +5,7 @@ import {
   ProviderDriverKind,
   type AgentInputFidelity,
   type AgentInputText,
+  type AgentInputVerification,
   type GetThreadAgentInputInput,
   type GetThreadAgentInputTextInput,
   type OrchestrationV2ProviderThread,
@@ -33,7 +34,13 @@ import * as ServerSettings from "../serverSettings.ts";
 import * as AgentInputStore from "./AgentInputStore.ts";
 import { loadAntigravitySessionFiles } from "./readers/antigravityFiles.ts";
 import { readAntigravitySession } from "./readers/antigravitySession.ts";
-import { makeClaudeTranscriptReader } from "./readers/claudeTranscript.ts";
+import {
+  makeClaudeIndexReader,
+  makeClaudeRequestRebuilder,
+  withRebuiltRequest,
+  type ClaudeRequestIndex,
+  type RebuiltClaudeRequest,
+} from "./readers/claudeTranscript.ts";
 import { makeCodexRolloutReader } from "./readers/codexRollout.ts";
 import {
   makeLayer,
@@ -42,16 +49,32 @@ import {
   type TraceRequest,
 } from "./readers/traceParts.ts";
 
+interface ClaudeFile {
+  readonly key: string;
+  readonly path: string;
+  readonly index: ClaudeRequestIndex;
+}
+
 interface BuiltTrace {
   readonly result: ThreadAgentInput;
   readonly layers: ReadonlyArray<TraceLayer>;
   readonly requests: ReadonlyArray<TraceRequest>;
+  readonly claude: ClaudeFile | undefined;
 }
 
 interface HarnessRead {
   readonly trace: HarnessTrace | undefined;
   readonly source: string | undefined;
   readonly notes: ReadonlyArray<string>;
+  readonly claude?: ClaudeFile;
+}
+
+interface CachedTrace {
+  readonly trace: HarnessTrace;
+  readonly bytes: number;
+  readonly claude?: ClaudeFile;
+  /** Requests rebuilt since, so their checks show without reading the file again. */
+  readonly checks: Map<number, RebuiltClaudeRequest>;
 }
 
 class AgentInputFileError extends Schema.TaggedError<AgentInputFileError>()("AgentInputFileError", {
@@ -65,8 +88,51 @@ class AgentInputFileError extends Schema.TaggedError<AgentInputFileError>()("Age
 const NO_HARNESS: HarnessRead = { trace: undefined, source: undefined, notes: [] };
 const isThreadNotFound = Schema.is(ProjectionStoreThreadNotFoundError);
 const CODEX_UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-// Parsed harness traces kept for the dialog's text reads; a changed file is read again.
-const CACHE_ENTRIES = 4;
+// Parsed traces and rebuilt requests kept for the dialog; a changed file is read again.
+const TRACE_CACHE_BYTES = 48 * 1024 * 1024;
+const REQUEST_CACHE_BYTES = 32 * 1024 * 1024;
+const rebuiltBytes = (rebuilt: RebuiltClaudeRequest) =>
+  2 * (rebuilt.system.length + rebuilt.tools.length + rebuilt.messages.length);
+
+/** Least recently used entries go first once the estimated bytes pass the budget. */
+function makeByteCache<A>(budget: number, sizeOf: (value: A) => number) {
+  const entries = new Map<string, A>();
+  let total = 0;
+  const drop = (key: string) => {
+    const value = entries.get(key);
+    if (value === undefined) return;
+    entries.delete(key);
+    total -= sizeOf(value);
+  };
+  return {
+    get: (key: string) => {
+      const value = entries.get(key);
+      if (value === undefined) return undefined;
+      entries.delete(key);
+      entries.set(key, value);
+      return value;
+    },
+    set: (key: string, value: A) => {
+      drop(key);
+      if (sizeOf(value) > budget) return value;
+      entries.set(key, value);
+      total += sizeOf(value);
+      for (const oldest of entries.keys()) {
+        if (total <= budget) break;
+        drop(oldest);
+      }
+      return value;
+    },
+  };
+}
+
+const cachedTraceOf = (entry: CachedTrace) => {
+  let trace = entry.trace;
+  for (const [requestIndex, rebuilt] of entry.checks) {
+    trace = withRebuiltRequest(trace, requestIndex, rebuilt);
+  }
+  return trace;
+};
 
 const normalized = (text: string) => text.replaceAll(/\s+/g, " ").trim();
 
@@ -91,17 +157,8 @@ const make = Effect.gen(function* () {
   const path = yield* Path.Path;
   const digest = yield* Digest.Digest;
   const { stateDir } = yield* ServerConfig.ServerConfig;
-  const cache = new Map<string, HarnessTrace>();
-
-  const remember = (key: string, trace: HarnessTrace) => {
-    cache.delete(key);
-    cache.set(key, trace);
-    for (const oldest of cache.keys()) {
-      if (cache.size <= CACHE_ENTRIES) break;
-      cache.delete(oldest);
-    }
-    return trace;
-  };
+  const traces = makeByteCache<CachedTrace>(TRACE_CACHE_BYTES, (entry) => entry.bytes);
+  const rebuiltRequests = makeByteCache(REQUEST_CACHE_BYTES, rebuiltBytes);
 
   const listDirectory = (directory: string) =>
     fileSystem.readDirectory(directory).pipe(Effect.orElseSucceed((): ReadonlyArray<string> => []));
@@ -118,7 +175,22 @@ const make = Effect.gen(function* () {
   const fileKey = Effect.fn("AgentInputTrace.fileKey")(function* (filePath: string) {
     const info = yield* fileSystem.stat(filePath);
     const modified = info.mtime._tag === "Some" ? info.mtime.value.getTime() : 0;
-    return `${filePath}\0${info.size}\0${modified}`;
+    return { key: `${filePath}\0${info.size}\0${modified}`, size: Number(info.size) };
+  });
+
+  const rebuildClaudeRequest = Effect.fn("AgentInputTrace.rebuildClaudeRequest")(function* (
+    claude: ClaudeFile,
+    requestIndex: number,
+  ) {
+    const cacheKey = `${claude.key}\0${requestIndex}`;
+    const cached = rebuiltRequests.get(cacheKey);
+    if (cached !== undefined) return cached;
+    const rebuilder = makeClaudeRequestRebuilder(claude.index, requestIndex);
+    yield* forEachLine(claude.path, rebuilder.accept);
+    const rebuilt = rebuilder.finish();
+    if (rebuilt === undefined) return undefined;
+    traces.get(claude.key)?.checks.set(requestIndex, rebuilt);
+    return rebuiltRequests.set(cacheKey, rebuilt);
   });
 
   const instanceConfig = Effect.fn("AgentInputTrace.instanceConfig")(function* (
@@ -159,20 +231,28 @@ const make = Effect.gen(function* () {
     if (subagents.length > 0) {
       notes.push(`${subagents.length} subagent transcripts are not shown yet.`);
     }
-    const key = yield* fileKey(transcriptPath);
-    const cached = cache.get(key);
-    if (cached !== undefined) return { trace: cached, source: "Claude Code transcript", notes };
-    const reader = makeClaudeTranscriptReader();
-    yield* forEachLine(transcriptPath, reader.acceptFirst);
-    if (reader.prepareSecondPass()) {
-      yield* forEachLine(transcriptPath, reader.acceptSecond);
-      reader.finishSecondPass();
+    const { key } = yield* fileKey(transcriptPath);
+    const source = "Claude Code transcript";
+    const cached = traces.get(key);
+    if (cached?.claude !== undefined) {
+      return { trace: cachedTraceOf(cached), source, notes, claude: cached.claude };
     }
-    return {
-      trace: remember(key, reader.finish()),
-      source: "Claude Code transcript",
-      notes,
+    const reader = makeClaudeIndexReader();
+    yield* forEachLine(transcriptPath, reader.accept);
+    const read = reader.finish();
+    const claude = { key, path: transcriptPath, index: read.index };
+    const entry: CachedTrace = {
+      trace: read.trace,
+      bytes: 2 * (read.trace.retainedChars ?? 0),
+      claude,
+      checks: new Map(),
     };
+    traces.set(key, entry);
+    if (read.latest !== undefined) {
+      const rebuilt = yield* rebuildClaudeRequest(claude, read.latest);
+      if (rebuilt !== undefined) entry.checks.set(read.latest, rebuilt);
+    }
+    return { trace: cachedTraceOf(entry), source, notes, claude };
   });
 
   const findCodexRollout = Effect.fn("AgentInputTrace.findCodexRollout")(function* (
@@ -239,12 +319,16 @@ const make = Effect.gen(function* () {
         ],
       };
     }
-    const key = yield* fileKey(rollout);
-    const cached = cache.get(key);
-    if (cached !== undefined) return { trace: cached, source: "Codex session file", notes: [] };
+    const { key, size } = yield* fileKey(rollout);
+    const source = "Codex session file";
+    const cached = traces.get(key);
+    if (cached !== undefined) return { trace: cached.trace, source, notes: [] };
     const reader = makeCodexRolloutReader();
     yield* forEachLine(rollout, reader.accept);
-    return { trace: remember(key, reader.finish()), source: "Codex session file", notes: [] };
+    const trace = reader.finish();
+    // Request parts keep the parsed rollout items, about the file's size.
+    traces.set(key, { trace, bytes: 2 * size, checks: new Map() });
+    return { trace, source, notes: [] };
   });
 
   const readAntigravity = Effect.fn("AgentInputTrace.readAntigravity")(function* (
@@ -380,6 +464,7 @@ const make = Effect.gen(function* () {
     return {
       layers,
       requests,
+      claude: harness.claude,
       result: {
         threadId,
         driver,
@@ -407,12 +492,19 @@ const make = Effect.gen(function* () {
     const built = yield* buildTrace(input.threadId);
     const { target } = input;
     let text: string | undefined;
+    let verification: AgentInputVerification | undefined;
     if (target.type === "layer") {
       text = built.layers.find((layer) => layer.id === target.layerId)?.text;
+    } else if (built.claude !== undefined) {
+      const rebuilt = yield* rebuildClaudeRequest(built.claude, target.index).pipe(
+        Effect.mapError((cause) => new AgentInputReadError({ threadId: input.threadId, cause })),
+      );
+      text = rebuilt?.[target.part];
+      verification = rebuilt?.verification;
     } else {
-      text = built.requests
-        .find((request) => request.index === target.index)
-        ?.partText(target.part);
+      const request = built.requests.find((candidate) => candidate.index === target.index);
+      text = request?.partText?.(target.part);
+      verification = request?.verification;
     }
     if (text === undefined) {
       return yield* new AgentInputNotFoundError({ threadId: input.threadId, missing: target.type });
@@ -422,6 +514,7 @@ const make = Effect.gen(function* () {
       text: truncated ? text.slice(0, AGENT_INPUT_TEXT_MAX_CHARS) : text,
       chars: text.length,
       truncated,
+      ...(verification === undefined ? {} : { verification }),
     };
   });
 

@@ -211,7 +211,7 @@ export const layerProviderInputRecorder = Layer.effect(
   }),
 );
 
-/** Removes trace and profile rows of deleted threads; unreferenced blobs may stay. */
+/** Removes trace and profile rows of deleted threads, and text no thread references. */
 export const purgeDeletedThreadAgentInput = Effect.fn("AgentInput.purgeDeletedThreads")(
   function* () {
     const sql = yield* SqlClient.SqlClient;
@@ -219,6 +219,9 @@ export const purgeDeletedThreadAgentInput = Effect.fn("AgentInput.purgeDeletedTh
       DELETE FROM agent_input_records WHERE thread_id IN (
         SELECT thread_id FROM orchestration_v2_projection_threads WHERE deleted_at IS NOT NULL
       )
+    `;
+    yield* sql`
+      DELETE FROM agent_input_blobs WHERE sha256 NOT IN (SELECT sha256 FROM agent_input_records)
     `;
     yield* sql`
       DELETE FROM thread_instruction_profiles WHERE thread_id IN (

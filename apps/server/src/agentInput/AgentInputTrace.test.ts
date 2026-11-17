@@ -18,6 +18,7 @@ import * as AgentInputStore from "./AgentInputStore.ts";
 import * as AgentInputTrace from "./AgentInputTrace.ts";
 
 const codexThread = ThreadId.make("thread-codex");
+const claudeThread = ThreadId.make("thread-claude");
 const cursorThread = ThreadId.make("thread-cursor");
 const missingThread = ThreadId.make("thread-missing");
 const T3_RUNTIME = "<t3_code_runtime>Running in T3 Code.</t3_code_runtime>";
@@ -39,7 +40,8 @@ const records = (threadId: ThreadId) => {
       }),
     );
   }
-  const driver = threadId === codexThread ? "codex" : "cursor";
+  const driver =
+    threadId === codexThread ? "codex" : threadId === claudeThread ? "claudeAgent" : "cursor";
   return Effect.succeed({
     thread: {
       id: threadId,
@@ -69,6 +71,30 @@ const rollout = [
   .map((line) => JSON.stringify(line))
   .join("\n");
 
+const request = (id: string, rest: object) => ({
+  type: "api-request",
+  id,
+  shapeHash: "shape-1",
+  params: { model: "claude-test" },
+  ...rest,
+});
+const transcript = [
+  {
+    type: "api-request-shape",
+    shapeHash: "shape-1",
+    shape: { system: [{ type: "text", text: "System rules." }], tools: [] },
+  },
+  {
+    type: "api-request-blob",
+    hash: "hello",
+    message: { role: "user", content: [{ type: "text", text: "Hello." }] },
+  },
+  request("r1", { keep: 0, tail: ["hello"] }),
+  request("r2", { base: "r1", keep: 1, tail: [] }),
+]
+  .map((line) => JSON.stringify(line))
+  .join("\n");
+
 const traceLayer = (codexHome: string) =>
   AgentInputTrace.layer.pipe(
     Layer.provideMerge(AgentInputStore.layer),
@@ -77,7 +103,10 @@ const traceLayer = (codexHome: string) =>
         Layer.mock(ThreadManagement.ThreadManagementService)({ getThreadRecords: records }),
         Layer.mock(ServerSettings.ServerSettingsService)({
           getSettings: Effect.succeed({
-            providerInstances: { codex: { driver: "codex", config: { homePath: codexHome } } },
+            providerInstances: {
+              codex: { driver: "codex", config: { homePath: codexHome } },
+              claudeAgent: { driver: "claudeAgent", config: { homePath: codexHome } },
+            },
           } as never),
         }),
       ),
@@ -97,6 +126,9 @@ const withTrace = <A, E>(
       path.join(day, "rollout-2026-01-01T00-00-00-native-1.jsonl"),
       rollout,
     );
+    const claudeProject = path.join(home, "projects", "D--repo");
+    yield* fileSystem.makeDirectory(claudeProject, { recursive: true });
+    yield* fileSystem.writeFileString(path.join(claudeProject, "native-1.jsonl"), transcript);
     return yield* use.pipe(Effect.provide(traceLayer(home)));
   }).pipe(Effect.scoped);
 
@@ -144,6 +176,35 @@ it.layer(
         });
         expect(text.truncated).toBe(false);
         expect(text.text).toContain("Fix it.");
+      }),
+    ),
+  );
+
+  it.effect("rebuilds a Claude request when its text is read and keeps the check", () =>
+    withTrace(
+      Effect.gen(function* () {
+        const trace = yield* AgentInputTrace.AgentInputTrace;
+        const checks = (result: { requests: ReadonlyArray<{ verification: string }> }) =>
+          result.requests.map((item) => item.verification);
+        const first = yield* trace.getThreadAgentInput({ threadId: claudeThread });
+        expect(first.source).toBe("Claude Code transcript");
+        expect(checks(first)).toEqual(["not-checked", "unverified"]);
+        expect(first.requests[1]!.messageChars).toBeGreaterThan(0);
+        const text = yield* trace.getThreadAgentInputText({
+          threadId: claudeThread,
+          target: { type: "request", index: 0, part: "messages" },
+        });
+        expect(text.text).toContain("Hello.");
+        expect(text.verification).toBe("unverified");
+        const again = yield* trace.getThreadAgentInput({ threadId: claudeThread });
+        expect(checks(again)).toEqual(["unverified", "unverified"]);
+        const missing = yield* trace
+          .getThreadAgentInputText({
+            threadId: claudeThread,
+            target: { type: "request", index: 9, part: "system" },
+          })
+          .pipe(Effect.flip);
+        expect(missing._tag).toBe("AgentInputNotFoundError");
       }),
     ),
   );

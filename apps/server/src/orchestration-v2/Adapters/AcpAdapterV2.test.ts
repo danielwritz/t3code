@@ -2458,7 +2458,7 @@ describe("AcpAdapterV2", () => {
           plan: {
             effects: [],
             acp: {
-              promptPrefix: `<instruction_profile name="${name}">\nBe brief.\n</instruction_profile>`,
+              promptPrefix: `<instruction_profile name="${name}">\nBe brief; quote $' and $& as written.\n</instruction_profile>`,
             },
           },
         });

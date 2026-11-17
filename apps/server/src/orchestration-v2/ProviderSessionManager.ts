@@ -484,12 +484,18 @@ export const layerWithOptions = (
               const planKey =
                 launch === undefined ? "" : JSON.stringify([launch.profileId, launch.plan]);
               if (recordedProfilePlans.get(key) === planKey) return Effect.void;
-              recordedProfilePlans.set(key, planKey);
-              return service.recordLaunch({
-                threadId: input.threadId,
-                driver: runtime.driver,
-                launch,
-              });
+              // The record feeds the trace only; failing to write it must not drop the profile.
+              return service
+                .recordLaunch({ threadId: input.threadId, driver: runtime.driver, launch })
+                .pipe(
+                  Effect.tap(() => Effect.sync(() => recordedProfilePlans.set(key, planKey))),
+                  Effect.catch((error) =>
+                    Effect.logWarning("Could not record the thread's instruction profile.", {
+                      threadId: input.threadId,
+                      error: error._tag,
+                    }),
+                  ),
+                );
             }),
             Effect.map((launch) =>
               launch === undefined ? input : { ...input, instructionProfile: launch },

@@ -4,6 +4,7 @@ import type {
   AgentInputProfileUse,
   AgentInputRequest,
   AgentInputRequestPart,
+  AgentInputVerification,
   AgentInputText,
   AgentInputTextTarget,
   EnvironmentId,
@@ -395,7 +396,10 @@ function AgentInputRequests(props: {
             },
             {
               part: "messages",
-              detail: `${request.messageCount} · ${formatAgentInputChars(request.messageChars)}`,
+              detail:
+                request.messageChars === undefined
+                  ? `${request.messageCount}`
+                  : `${request.messageCount} · ${formatAgentInputChars(request.messageChars)}`,
             },
           ];
           return (
@@ -405,14 +409,12 @@ function AgentInputRequests(props: {
                 {request.model === undefined ? null : (
                   <span className="font-mono text-muted-foreground">{request.model}</span>
                 )}
-                <span className="text-muted-foreground">
-                  {formatAgentInputChars(request.totalChars)} characters
-                </span>
-                {request.verified ? (
-                  <Badge size="sm" variant="success">
-                    Verified
-                  </Badge>
-                ) : null}
+                {request.totalChars === undefined ? null : (
+                  <span className="text-muted-foreground">
+                    {formatAgentInputChars(request.totalChars)} characters
+                  </span>
+                )}
+                <AgentInputVerificationBadge verification={request.verification} />
               </div>
               <div className="flex flex-wrap gap-1.5">
                 {parts.map(({ part, detail }) => {
@@ -440,6 +442,24 @@ function AgentInputRequests(props: {
   );
 }
 
+function AgentInputVerificationBadge(props: { readonly verification: AgentInputVerification }) {
+  if (props.verification === "verified") {
+    return (
+      <Badge size="sm" variant="success">
+        Verified
+      </Badge>
+    );
+  }
+  if (props.verification === "not-checked") {
+    return (
+      <Badge size="sm" variant="outline">
+        Not checked yet
+      </Badge>
+    );
+  }
+  return null;
+}
+
 function AgentInputTextPane(props: {
   readonly environmentId: EnvironmentId;
   readonly threadId: ThreadId;
@@ -459,6 +479,9 @@ function AgentInputTextPane(props: {
         <h3 className="min-w-0 flex-1 truncate text-sm font-medium">{props.title}</h3>
         {text === null ? null : (
           <>
+            {text.verification === undefined ? null : (
+              <AgentInputVerificationBadge verification={text.verification} />
+            )}
             <span className="shrink-0 font-mono text-xs text-muted-foreground">
               {text.chars.toLocaleString()} chars
             </span>

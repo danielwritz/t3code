@@ -3,7 +3,11 @@ import * as NodeCrypto from "node:crypto";
 
 import { describe, expect, it } from "@effect/vitest";
 
-import { readClaudeTranscriptLines } from "./claudeTranscript.ts";
+import {
+  CLAUDE_LISTED_REQUESTS,
+  readClaudeTranscriptLines,
+  rebuildClaudeRequestLines,
+} from "./claudeTranscript.ts";
 
 // The harness hashes key-sorted JSON; this copy is independent of the reader's own.
 const sortKeys = (value: unknown): unknown =>
@@ -107,31 +111,61 @@ const lines = [
 ].map((record) => JSON.stringify(record));
 
 describe("readClaudeTranscriptLines", () => {
-  const trace = readClaudeTranscriptLines([...lines, '{"type":"user","mess']);
+  const read = readClaudeTranscriptLines([...lines, '{"type":"user","mess']);
+  const { trace } = read;
+  const rebuild = (index: number) =>
+    rebuildClaudeRequestLines([...lines, '{"type":"user","mess'], read.index, index);
 
-  it("rebuilds each request and checks it against its digest", () => {
+  it("checks only the latest request up front and the others when their text is read", () => {
     expect(trace.fidelity).toBe("exact");
-    expect(trace.requests.map((request) => [request.messageCount, request.verified])).toEqual([
-      [1, true],
-      [4, false],
+    expect(trace.requests.map((request) => [request.messageCount, request.verification])).toEqual([
+      [1, "not-checked"],
+      [4, "unverified"],
     ]);
-    expect(trace.requests[1]!.partText("messages")).toContain("second question");
-    expect(trace.requests[0]!.partText("system")).toContain("You are a test harness.");
-    expect(trace.notes).toContain("1 of 2 requests could not be checked against their digest.");
+    expect(trace.requests[0]!.messageChars).toBeUndefined();
+    const first = rebuild(0);
+    expect(first?.verification).toBe("verified");
+    expect(first?.system).toContain("You are a test harness.");
+    expect(first?.messages).toContain("first question");
+    const second = rebuild(1);
+    expect(second?.verification).toBe("unverified");
+    expect(second?.messages).toContain("second question");
+    expect(second?.messages).toContain("first answer");
+    expect(rebuild(2)).toBeUndefined();
   });
 
   it("sizes each request part as the text it returns", () => {
     for (const request of trace.requests) {
-      const system = request.partText("system").length;
-      const tools = request.partText("tools").length;
-      const messages = request.partText("messages").length;
-      expect([request.systemChars, request.toolChars, request.messageChars]).toEqual([
-        system,
-        tools,
-        messages,
+      const rebuilt = rebuild(request.index)!;
+      expect([request.systemChars, request.toolChars, request.messageCount]).toEqual([
+        rebuilt.system.length,
+        rebuilt.tools.length,
+        rebuilt.messageCount,
       ]);
-      expect(request.totalChars).toBe(system + tools + messages);
     }
+    const latest = trace.requests[1]!;
+    const rebuilt = rebuild(1)!;
+    expect(latest.messageChars).toBe(rebuilt.messages.length);
+    expect(latest.totalChars).toBe(
+      rebuilt.system.length + rebuilt.tools.length + rebuilt.messages.length,
+    );
+  });
+
+  it("lists only the latest requests and counts the rest in a note", () => {
+    const many = Array.from({ length: CLAUDE_LISTED_REQUESTS + 2 }, (_, index) =>
+      JSON.stringify({
+        type: "api-request",
+        id: `many-${index}`,
+        keep: 0,
+        tail: [digest(firstUser)],
+        shapeHash,
+        params,
+      }),
+    );
+    const listed = readClaudeTranscriptLines([...lines.slice(0, 5), ...many]);
+    expect(listed.trace.requests).toHaveLength(CLAUDE_LISTED_REQUESTS);
+    expect(listed.trace.requests[0]!.index).toBe(2);
+    expect(listed.trace.notes).toContain("2 earlier requests are not listed.");
   });
 
   it("splits the agent's input into labelled layers", () => {
@@ -175,7 +209,7 @@ describe("readClaudeTranscriptLines", () => {
         shapeHash: laterHash,
         params,
       }),
-    ]);
+    ]).trace;
     expect(
       changed.layers
         .filter((layer) => layer.kind !== "user-prompt" && layer.requestIndex === 1)
@@ -189,7 +223,7 @@ describe("readClaudeTranscriptLines", () => {
   });
 
   it("falls back to the attachments when no request was recorded", () => {
-    const attachmentsOnly = readClaudeTranscriptLines(lines.slice(0, 4));
+    const attachmentsOnly = readClaudeTranscriptLines(lines.slice(0, 4)).trace;
     expect(attachmentsOnly.fidelity).toBe("harness-record");
     expect(attachmentsOnly.requests).toEqual([]);
     expect(attachmentsOnly.layers.map((layer) => layer.kind)).toEqual([

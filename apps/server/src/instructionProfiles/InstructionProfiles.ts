@@ -87,6 +87,22 @@ const make = Effect.gen(function* () {
 
   const now = DateTime.now.pipe(Effect.map(DateTime.formatIso));
 
+  // Every turn asks for a profile; with none chosen anywhere that answer is kept until a choice
+  // changes. The version stops a read that raced a change from being kept.
+  let choiceVersion = 0;
+  let anyChoice: boolean | undefined;
+  const choicesChanged = Effect.sync(() => {
+    choiceVersion++;
+    anyChoice = undefined;
+  });
+  const hasAnyChoice = Effect.gen(function* () {
+    if (anyChoice !== undefined) return anyChoice;
+    const version = choiceVersion;
+    const chosen = yield* repository.hasAnyChoice.pipe(Effect.mapError(storeError("read")));
+    if (version === choiceVersion) anyChoice = chosen;
+    return chosen;
+  });
+
   const requireProfile = Effect.fn("InstructionProfiles.requireProfile")(function* (id: string) {
     const profile = yield* repository.get(id).pipe(Effect.mapError(storeError("read")));
     if (profile === undefined) {
@@ -194,7 +210,9 @@ const make = Effect.gen(function* () {
     }),
     remove: Effect.fn("InstructionProfiles.remove")(function* (id) {
       yield* requireProfile(id);
-      yield* repository.remove(id).pipe(Effect.mapError(storeError("deleted")));
+      yield* repository
+        .remove(id)
+        .pipe(Effect.ensuring(choicesChanged), Effect.mapError(storeError("deleted")));
     }),
     getThreadProfile,
     setThreadProfile: Effect.fn("InstructionProfiles.setThreadProfile")(function* (input) {
@@ -202,7 +220,7 @@ const make = Effect.gen(function* () {
       if (input.profileId !== null) yield* requireProfile(input.profileId);
       yield* repository
         .setThreadChoice({ threadId: input.threadId, profileId: input.profileId, now: yield* now })
-        .pipe(Effect.mapError(storeError("saved")));
+        .pipe(Effect.ensuring(choicesChanged), Effect.mapError(storeError("saved")));
       return yield* getThreadProfile(input.threadId);
     }),
     getDefaults,
@@ -210,18 +228,19 @@ const make = Effect.gen(function* () {
       if (input.profileId !== null) yield* requireProfile(input.profileId);
       yield* repository
         .setScope({ projectId: null, profileId: input.profileId, now: yield* now })
-        .pipe(Effect.mapError(storeError("saved")));
+        .pipe(Effect.ensuring(choicesChanged), Effect.mapError(storeError("saved")));
       return yield* getDefaults;
     }),
     setProject: Effect.fn("InstructionProfiles.setProject")(function* (input) {
       if (input.profileId !== null) yield* requireProfile(input.profileId);
       yield* repository
         .setScope({ projectId: input.projectId, profileId: input.profileId, now: yield* now })
-        .pipe(Effect.mapError(storeError("saved")));
+        .pipe(Effect.ensuring(choicesChanged), Effect.mapError(storeError("saved")));
       return yield* getDefaults;
     }),
     support: { drivers: instructionProfileSupportTable() },
     launchFor: Effect.fn("InstructionProfiles.launchFor")(function* (input) {
+      if (!(yield* hasAnyChoice)) return undefined;
       const { profile } = yield* getThreadProfile(input.threadId);
       if (profile === undefined) return undefined;
       const context =

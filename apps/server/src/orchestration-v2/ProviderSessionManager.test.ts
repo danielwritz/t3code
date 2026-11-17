@@ -5,6 +5,7 @@ import { assert, it } from "@effect/vitest";
 import { AgentScope } from "@t3tools/shared/AgentScope";
 import {
   EnvironmentId,
+  InstructionProfileStoreError,
   type ModelSelection,
   type OrchestrationV2AppThread,
   type OrchestrationV2DomainEvent,
@@ -62,6 +63,8 @@ import * as ThreadCommandExecutor from "./ThreadCommandExecutor.ts";
 import * as ProviderSessionManager from "./ProviderSessionManager.ts";
 import * as CommandOutputHub from "./CommandOutputHub.ts";
 import * as ProviderAdapter from "@t3tools/provider-core/server/ProviderAdapter";
+import type { InstructionProfileLaunch } from "@t3tools/provider-core/server/instructionProfilePlan";
+import * as InstructionProfiles from "../instructionProfiles/InstructionProfiles.ts";
 import {
   makeProviderFailure,
   makeProviderRetryTurnItem,
@@ -454,6 +457,7 @@ const makeProviderAdapter = Effect.fnUntraced(function* (
     readonly beforeOpen?: (input: {
       readonly providerSessionId: ProviderSessionId;
       readonly initialProviderItemIdentityVersion?: 2;
+      readonly instructionProfile?: InstructionProfileLaunch;
     }) => Effect.Effect<void>;
     readonly hasPendingBackgroundWork?: Effect.Effect<boolean>;
     readonly hasPendingBackgroundWorkForThread?: Effect.Effect<boolean>;
@@ -627,6 +631,7 @@ function layerTest(input: {
   readonly beforeOpen?: (input: {
     readonly providerSessionId: ProviderSessionId;
     readonly initialProviderItemIdentityVersion?: 2;
+    readonly instructionProfile?: InstructionProfileLaunch;
   }) => Effect.Effect<void>;
   readonly failReleaseEventWrites?: boolean;
   readonly flakyReleaseWrites?: FlakyReleaseWrites;
@@ -651,6 +656,7 @@ function layerTest(input: {
   readonly serverSettingsLayer?: ReturnType<typeof ServerSettings.layerTest>;
   readonly projectServiceLayer?: Layer.Layer<ProjectService.ProjectService>;
   readonly installationGateLayer?: Layer.Layer<ProviderInstallationGate.ProviderInstallationGate>;
+  readonly instructionProfilesLayer?: Layer.Layer<InstructionProfiles.InstructionProfiles>;
 }) {
   const layerConfiguredEventSink =
     input.flakyReleaseWrites !== undefined
@@ -742,6 +748,7 @@ function layerTest(input: {
           layerConfiguredMcpRegistry,
           layerTestStores,
           input.installationGateLayer ?? ProviderInstallationGate.layer,
+          ...(input.instructionProfilesLayer === undefined ? [] : [input.instructionProfilesLayer]),
           ...(input.serverSettingsLayer === undefined ? [] : [input.serverSettingsLayer]),
           ...(input.projectServiceLayer === undefined ? [] : [input.projectServiceLayer]),
         ),
@@ -1193,6 +1200,51 @@ it.effect("ProviderSessionManagerV2 opens provider sessions inside the installat
               update: () => Effect.die("unused"),
             }),
           ),
+        }),
+      ),
+    );
+  }),
+);
+
+it.effect("ProviderSessionManagerV2 keeps the instruction profile when its record fails", () =>
+  Effect.gen(function* () {
+    const state = yield* Ref.make(emptyState);
+    const opened: Array<InstructionProfileLaunch | undefined> = [];
+    const launch: InstructionProfileLaunch = {
+      profileId: "profile-lean",
+      profileName: "Lean",
+      plan: { effects: [], acp: { promptPrefix: "<instruction_profile>" } },
+    };
+    const effect = Effect.gen(function* () {
+      const eventSink = yield* EventSink.EventSinkV2;
+      const idAllocator = yield* IdAllocator.IdAllocatorV2;
+      const manager = yield* ProviderSessionManager.ProviderSessionManagerV2;
+      const threadId = ThreadId.make("thread-provider-session-manager-profile-record");
+      const providerSessionId = yield* idAllocator.allocate.providerSession({
+        providerInstanceId: modelSelection.instanceId,
+        threadId,
+      });
+      yield* eventSink.write({
+        events: [
+          yield* makeThreadCreatedEvent({ idAllocator, threadId, now: yield* DateTime.now }),
+        ],
+      });
+      yield* manager.open({ threadId, providerSessionId, modelSelection, runtimePolicy });
+      assert.deepStrictEqual(opened, [launch]);
+    });
+
+    yield* effect.pipe(
+      Effect.provide(
+        layerTest({
+          state,
+          idleTimeoutMs: 60_000,
+          beforeOpen: (input) => Effect.sync(() => opened.push(input.instructionProfile)),
+          instructionProfilesLayer: Layer.mock(InstructionProfiles.InstructionProfiles)({
+            support: { drivers: [] },
+            launchFor: () => Effect.succeed(launch),
+            recordLaunch: () =>
+              Effect.fail(new InstructionProfileStoreError({ operation: "recorded" })),
+          }),
         }),
       ),
     );

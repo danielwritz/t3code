@@ -81,6 +81,8 @@ export class InstructionProfilesRepository extends Context.Service<
       readonly now: string;
     }) => Effect.Effect<void, InstructionProfilesRepositoryError>;
     readonly getScopes: Effect.Effect<InstructionProfileScopes, InstructionProfilesRepositoryError>;
+    /** Whether any thread, project or default names a profile. */
+    readonly hasAnyChoice: Effect.Effect<boolean, InstructionProfilesRepositoryError>;
     /** `projectId` null sets the environment default; `profileId` null clears it. */
     readonly setScope: (input: {
       readonly projectId: ProjectId | null;
@@ -247,6 +249,13 @@ const make = Effect.gen(function* () {
       }
       return { defaultProfileId, projects } satisfies InstructionProfileScopes;
     }).pipe(Effect.mapError(toRepositoryError("readInstructionProfileScopes"))),
+    hasAnyChoice: sql<{ readonly chosen: number }>`
+      SELECT (EXISTS (SELECT 1 FROM thread_instruction_profiles)
+        OR EXISTS (SELECT 1 FROM instruction_profile_scopes)) AS "chosen"
+    `.pipe(
+      Effect.map((rows) => rows[0]?.chosen === 1),
+      Effect.mapError(toRepositoryError("readInstructionProfileChoices")),
+    ),
     setScope: Effect.fn("InstructionProfilesRepository.setScope")(
       function* (input) {
         const scope =

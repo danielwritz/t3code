@@ -66,6 +66,13 @@ export const AgentInputLayer = Schema.Struct({
 });
 export type AgentInputLayer = typeof AgentInputLayer.Type;
 
+/**
+ * `verified`: the rebuilt request matched the digest the harness stored. `unverified`: it did
+ * not, or the harness stores no digest. `not-checked`: not rebuilt yet; reading its text checks it.
+ */
+export const AgentInputVerification = Schema.Literals(["verified", "unverified", "not-checked"]);
+export type AgentInputVerification = typeof AgentInputVerification.Type;
+
 export const AgentInputRequest = Schema.Struct({
   index: NonNegativeInt,
   at: Schema.optional(IsoDateTime),
@@ -74,10 +81,10 @@ export const AgentInputRequest = Schema.Struct({
   toolCount: NonNegativeInt,
   toolChars: NonNegativeInt,
   messageCount: NonNegativeInt,
-  messageChars: NonNegativeInt,
-  totalChars: NonNegativeInt,
-  /** The rebuilt request matched the digest the harness stored. */
-  verified: Schema.Boolean,
+  /** Absent until the request is rebuilt. */
+  messageChars: Schema.optional(NonNegativeInt),
+  totalChars: Schema.optional(NonNegativeInt),
+  verification: AgentInputVerification,
 });
 export type AgentInputRequest = typeof AgentInputRequest.Type;
 
@@ -158,6 +165,8 @@ export const AgentInputText = Schema.Struct({
   /** The full length before truncation. */
   chars: NonNegativeInt,
   truncated: Schema.Boolean,
+  /** For a request part: whether the rebuilt request matched its digest. */
+  verification: Schema.optional(AgentInputVerification),
 });
 export type AgentInputText = typeof AgentInputText.Type;
 

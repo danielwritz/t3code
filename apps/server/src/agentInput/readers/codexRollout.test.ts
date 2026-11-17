@@ -75,13 +75,13 @@ describe("readCodexRolloutLines", () => {
       [4, "gpt-test"],
     ]);
     expect(trace.requests[0]!.toolCount).toBe(2);
-    expect(trace.requests[1]!.partText("messages")).toContain("Thanks.");
+    expect(trace.requests[1]!.partText!("messages")).toContain("Thanks.");
     expect(trace.fidelity).toBe("harness-record");
     for (const request of trace.requests) {
       expect([request.systemChars, request.toolChars, request.messageChars]).toEqual([
-        request.partText("system").length,
-        request.partText("tools").length,
-        request.partText("messages").length,
+        request.partText!("system").length,
+        request.partText!("tools").length,
+        request.partText!("messages").length,
       ]);
     }
   });
