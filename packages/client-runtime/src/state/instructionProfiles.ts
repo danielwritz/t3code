@@ -18,6 +18,8 @@ export function createInstructionProfileEnvironmentAtoms<R, E>(
   runtime: Atom.AtomRuntime<EnvironmentRegistry | R, E>,
 ) {
   const commandScheduler = createAtomCommandScheduler();
+  // Bumped by every write; mounted thread choices refetch, since any write can change them.
+  const revision = Atom.family((_environmentId: string) => Atom.make(0).pipe(Atom.keepAlive));
   const profiles = createEnvironmentRpcQueryAtomFamily(runtime, {
     label: "environment-data:instruction-profiles:list",
     tag: ORCHESTRATION_V2_WS_METHODS.listInstructionProfiles,
@@ -28,12 +30,12 @@ export function createInstructionProfileEnvironmentAtoms<R, E>(
     tag: ORCHESTRATION_V2_WS_METHODS.getInstructionProfileDefaults,
     staleTimeMs: 0,
   });
-  // A profile edit or a default change can change which profile a thread resolves to.
   const threadProfile = createEnvironmentRpcQueryAtomFamily(runtime, {
     label: "environment-data:instruction-profiles:thread",
     tag: ORCHESTRATION_V2_WS_METHODS.getThreadInstructionProfile,
     staleTimeMs: 0,
     idleTtlMs: 0,
+    refreshTrigger: ({ environmentId }) => revision(environmentId),
   });
   const support = createEnvironmentRpcQueryAtomFamily(runtime, {
     label: "environment-data:instruction-profiles:support",
@@ -47,6 +49,7 @@ export function createInstructionProfileEnvironmentAtoms<R, E>(
     Effect.sync(() => {
       registry.refresh(profiles({ environmentId: target.environmentId, input: {} }));
       registry.refresh(defaults({ environmentId: target.environmentId, input: {} }));
+      registry.update(revision(target.environmentId), (value) => value + 1);
     });
   const serialPerEnvironment = {
     mode: "serial" as const,
@@ -89,14 +92,7 @@ export function createInstructionProfileEnvironmentAtoms<R, E>(
       label: "environment-data:instruction-profiles:set-thread",
       tag: ORCHESTRATION_V2_WS_METHODS.setThreadInstructionProfile,
       onSettled: (target, registry) =>
-        Effect.sync(() =>
-          registry.refresh(
-            threadProfile({
-              environmentId: target.environmentId,
-              input: { threadId: target.input.threadId },
-            }),
-          ),
-        ),
+        Effect.sync(() => registry.update(revision(target.environmentId), (value) => value + 1)),
     }),
   };
 }

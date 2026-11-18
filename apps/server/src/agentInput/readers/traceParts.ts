@@ -56,6 +56,50 @@ export function makeLayer(input: {
   };
 }
 
+/** T3 Code's own MCP servers; Codex writes their names with underscores. */
+export const isT3McpServer = (server: string) => /^t3[-_]code(?:[-_]direct)?$/.test(server);
+
+/** The MCP server in a Claude tool name (`mcp__<server>__<tool>`); undefined for built-in tools. */
+export const mcpServerOfToolName = (name: string) => /^mcp__(.+?)__/.exec(name)?.[1];
+
+interface ToolOwnerGroup<T> {
+  /** Undefined for the agent's built-in tools. */
+  readonly server: string | undefined;
+  readonly origin: AgentInputOrigin;
+  /** "Built-in tools", "T3 Code tools" or "<server> tools". */
+  readonly label: string;
+  readonly idSuffix: string;
+  readonly items: ReadonlyArray<T>;
+}
+
+/** Built-in tools first, then one group per MCP server in first-seen order. */
+export function groupToolsByOwner<T>(
+  items: ReadonlyArray<T>,
+  serverOf: (item: T) => string | undefined,
+): ReadonlyArray<ToolOwnerGroup<T>> {
+  const groups = new Map<string | undefined, Array<T>>([[undefined, []]]);
+  for (const item of items) {
+    const server = serverOf(item);
+    const members = groups.get(server);
+    if (members === undefined) groups.set(server, [item]);
+    else members.push(item);
+  }
+  return [...groups]
+    .filter(([, members]) => members.length > 0)
+    .map(([server, members]) => ({
+      server,
+      origin: server === undefined ? "harness" : isT3McpServer(server) ? "t3" : "mcp-server",
+      label:
+        server === undefined
+          ? "Built-in tools"
+          : isT3McpServer(server)
+            ? "T3 Code tools"
+            : `${server} tools`,
+      idSuffix: server === undefined ? "" : `:mcp:${server}`,
+      items: members,
+    }));
+}
+
 export const isRecord = (value: unknown): value is Record<string, unknown> =>
   value !== null && typeof value === "object" && !Array.isArray(value);
 

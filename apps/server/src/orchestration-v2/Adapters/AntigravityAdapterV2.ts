@@ -146,7 +146,9 @@ export function makeAntigravityAcpAdapterFlavor(
           options.makeRuntime({
             ...input,
             clientFileReads: true,
-            sessionSystemPromptAppend: PULL_REQUEST_LINKING_INSTRUCTIONS,
+            ...(input.omitHostInstructions === true
+              ? {}
+              : { sessionSystemPromptAppend: PULL_REQUEST_LINKING_INSTRUCTIONS }),
             additionalDirectories: [options.host.paths.attachmentsDir],
           }),
         )

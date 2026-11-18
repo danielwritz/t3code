@@ -261,12 +261,63 @@ describe("planInstructionProfile", () => {
     assert.deepStrictEqual(Object.keys(plan), ["effects"]);
   });
 
+  describe("T3 Code's own instructions and tools", () => {
+    const t3Off = off("host", "*");
+
+    it("leaves T3's text and tools out for Claude, Codex and ACP drivers", () => {
+      const claudePlan = planInstructionProfile(claude, profile([t3Off]), {});
+      assert.deepStrictEqual(claudePlan.claude, { omitHost: true });
+      const codexPlan = planInstructionProfile(codex, profile([t3Off]), {});
+      assert.deepStrictEqual(codexPlan.codex, { omitHost: true });
+      const acpPlan = planInstructionProfile(antigravity, profile([t3Off], "Be brief."), {});
+      assert.deepStrictEqual(acpPlan.acp, {
+        omitHost: true,
+        promptPrefix: '<instruction_profile name="Lean">\nBe brief.\n</instruction_profile>',
+      });
+      for (const plan of [claudePlan, codexPlan, acpPlan]) {
+        const effect = plan.effects.find((entry) => entry.kind === "host");
+        assert.strictEqual(effect?.requested, "off");
+        assert.strictEqual(effect?.result, "applied");
+      }
+    });
+
+    it("says when each driver stops sending the text and the tools", () => {
+      const how = (driver: ProviderDriverKind) =>
+        planInstructionProfile(driver, profile([t3Off]), {}).effects[0]?.how ?? "";
+      assert.match(how(claude), /from the next turn/);
+      assert.match(how(codex), /starts or resumes this thread/);
+      assert.match(how(antigravity), /Plan mode/);
+    });
+
+    it("keeps today's behaviour when the switch is on or absent", () => {
+      const plan = planInstructionProfile(claude, profile([on("host", "*")]), {});
+      assert.deepStrictEqual(results(plan), [["host", "*", "skipped"]]);
+      assert.strictEqual(plan.claude, undefined);
+      assert.strictEqual(planInstructionProfile(codex, profile([]), {}).codex, undefined);
+    });
+
+    it("other drivers report it as not supported", () => {
+      const plan = planInstructionProfile(cursor, profile([t3Off]), {});
+      assert.deepStrictEqual(results(plan), [["host", "*", "not-supported"]]);
+      assert.deepStrictEqual(Object.keys(plan), ["effects"]);
+    });
+  });
+
   it("support table has a row per supported driver and a catch-all row", () => {
     const table = instructionProfileSupportTable();
     assert.deepStrictEqual(
       table.map((row) => row.driver),
       ["claudeAgent", "codex", "antigravity", "fx", "grok", "kiro", "acpRegistry", "*"],
     );
-    for (const row of table) assert.strictEqual(row.kinds.length, 4);
+    for (const row of table) assert.strictEqual(row.kinds.length, 5);
+    const host = (driver: string) =>
+      table.find((row) => row.driver === driver)?.kinds.find((kind) => kind.kind === "host")
+        ?.support;
+    assert.deepStrictEqual(["claudeAgent", "codex", "antigravity", "*"].map(host), [
+      "yes",
+      "yes",
+      "yes",
+      "no",
+    ]);
   });
 });

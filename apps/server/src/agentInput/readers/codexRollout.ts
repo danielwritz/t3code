@@ -1,6 +1,7 @@
 import type { AgentInputLayerKind, AgentInputOrigin } from "@t3tools/contracts";
 
 import {
+  groupToolsByOwner,
   isRecord,
   makeLayer,
   makePrettyJsonLength,
@@ -148,19 +149,23 @@ export function makeCodexRolloutReader() {
     }
     if (payload.type === "additional_tools") {
       tools = Array.isArray(payload.tools) ? payload.tools : [];
-      const count = tools.reduce<number>(
-        (total, tool) =>
-          total + (isRecord(tool) && Array.isArray(tool.tools) ? tool.tools.length : 1),
-        0,
-      );
-      push({
-        id: `tools:${lineCount}`,
-        kind: "tools",
-        origin: "harness",
-        title: `Tools (${count})`,
-        text: prettyJson(tools),
-        at,
-      });
+      // MCP tools arrive as a namespace named `mcp__<server>`.
+      const serverOf = (tool: unknown) => /^mcp__(.+)$/.exec(stringField(tool, "name") ?? "")?.[1];
+      for (const group of groupToolsByOwner(tools, serverOf)) {
+        const count = group.items.reduce<number>(
+          (total, tool) =>
+            total + (isRecord(tool) && Array.isArray(tool.tools) ? tool.tools.length : 1),
+          0,
+        );
+        push({
+          id: `tools:${lineCount}${group.idSuffix}`,
+          kind: "tools",
+          origin: group.origin,
+          title: `${group.label} (${count})`,
+          text: prettyJson(group.items),
+          at,
+        });
+      }
       return;
     }
     if (payload.type === "message" && payload.role === "developer") {

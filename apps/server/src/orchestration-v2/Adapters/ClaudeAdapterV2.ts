@@ -2318,6 +2318,26 @@ export function makeClaudeQueryOptions(input: {
           },
         } as ClaudeSdkSettings);
   const deviceInstructions = input.mcpServers !== undefined && input.deviceToolsAvailable === true;
+  const omitHost = input.instructionProfile?.omitHost === true;
+  const append = [
+    ...(omitHost
+      ? []
+      : [
+          buildRuntimeInstructions({ harness: "Claude Code" }) +
+            (input.mcpServers === undefined
+              ? ""
+              : T3_CODE_ORCHESTRATION_INSTRUCTIONS +
+                CLAUDE_BACKGROUND_WAIT_INSTRUCTIONS +
+                CLAUDE_SEND_TO_USER_INSTRUCTIONS +
+                (deviceInstructions
+                  ? `\n${T3_CODE_DEVICE_TOOL_INSTRUCTIONS_WITH_TOOL_SEARCH}\n`
+                  : "")),
+        ]),
+    ...launchAppendSystemPrompt,
+    ...(input.instructionProfile?.appendSystemPrompt === undefined
+      ? []
+      : [input.instructionProfile.appendSystemPrompt]),
+  ].join("\n\n");
   const options: ClaudeAgentSdkQueryOptions = {
     model: compiledSelection.apiModelId,
     // T3 names threads; a supplied title skips Claude's redundant naming request.
@@ -2370,24 +2390,12 @@ export function makeClaudeQueryOptions(input: {
     systemPrompt: {
       type: "preset" as const,
       preset: "claude_code" as const,
-      append: [
-        buildRuntimeInstructions({ harness: "Claude Code" }) +
-          (input.mcpServers === undefined
-            ? ""
-            : T3_CODE_ORCHESTRATION_INSTRUCTIONS +
-              CLAUDE_BACKGROUND_WAIT_INSTRUCTIONS +
-              CLAUDE_SEND_TO_USER_INSTRUCTIONS +
-              (deviceInstructions
-                ? `\n${T3_CODE_DEVICE_TOOL_INSTRUCTIONS_WITH_TOOL_SEARCH}\n`
-                : "")),
-        ...launchAppendSystemPrompt,
-        ...(input.instructionProfile?.appendSystemPrompt === undefined
-          ? []
-          : [input.instructionProfile.appendSystemPrompt]),
-      ].join("\n\n"),
+      ...(append.length === 0 ? {} : { append }),
       // Claude Code otherwise reuses the session's first system prompt on every resume, so a
       // profile chosen later would never reach the model.
-      ...(input.instructionProfile?.appendSystemPrompt === undefined ? {} : { snapshot: false }),
+      ...(input.instructionProfile?.appendSystemPrompt === undefined && !omitHost
+        ? {}
+        : { snapshot: false }),
     },
     ...(deviceInstructions || input.onStop !== undefined
       ? {
@@ -12733,7 +12741,11 @@ export const makeClaudeAdapterV2 = Effect.fn("makeClaudeAdapterV2")(function* (
           nativeThreadId: string,
           queryPolicy: Effect.Success<ReturnType<typeof queryPolicyForTurn>>,
         ) {
-          const mcpSession = yield* mcpSessions.read(turnInput.threadId);
+          const profilePlan = turnInput.instructionProfile?.plan.claude;
+          const mcpSession =
+            profilePlan?.omitHost === true
+              ? undefined
+              : yield* mcpSessions.read(turnInput.threadId);
           // Claude Code defers its goal Stop hook only for its own background tasks, so a goal
           // re-prompts in a loop while T3 work that will wake this thread is still running.
           const onStop: HookCallback = () =>
@@ -12752,7 +12764,6 @@ export const makeClaudeAdapterV2 = Effect.fn("makeClaudeAdapterV2")(function* (
               ? {}
               : { allowedTools: queryPolicy.allowedTools }),
           });
-          const profilePlan = turnInput.instructionProfile?.plan.claude;
           const queryPolicyKey = claudeEffectiveQueryPolicyKey(
             queryPolicy,
             mcpOverrides,

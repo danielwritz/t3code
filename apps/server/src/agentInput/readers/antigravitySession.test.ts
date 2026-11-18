@@ -70,7 +70,10 @@ describe("readAntigravitySession", () => {
         created_at: "2026-01-01T00:00:05.000Z",
       }),
     ],
-    mcpTools: [{ server: "t3-code", name: "list", json: '{"name":"list"}' }],
+    mcpTools: [
+      { server: "t3-code", name: "list", json: '{"name":"list"}' },
+      { server: "github", name: "issues", json: '{"name":"issues"}' },
+    ],
     lastGeneration: generation,
   });
 
@@ -78,7 +81,8 @@ describe("readAntigravitySession", () => {
     expect(trace.layers.map((layer) => [layer.kind, layer.origin, layer.title])).toEqual([
       ["system-prompt", "harness", "Section: identity"],
       ["system-prompt", "harness", "Section: mcp_servers"],
-      ["tools", "mcp-server", "t3-code (1 tools)"],
+      ["tools", "t3", "T3 Code tools (1)"],
+      ["tools", "mcp-server", "github tools (1)"],
       ["host-instructions", "t3", "T3 instructions"],
       ["profile", "profile", "Instruction profile"],
       ["user-prompt", "user", "User message"],
@@ -97,6 +101,6 @@ describe("readAntigravitySession", () => {
       trace.layers
         .filter((layer) => layer.kind === "system-prompt" || layer.kind === "tools")
         .map((layer) => layer.at),
-    ).toEqual(["2026-01-01T00:00:05.000Z", "2026-01-01T00:00:05.000Z", "2026-01-01T00:00:05.000Z"]);
+    ).toEqual(Array.from({ length: 4 }, () => "2026-01-01T00:00:05.000Z"));
   });
 });

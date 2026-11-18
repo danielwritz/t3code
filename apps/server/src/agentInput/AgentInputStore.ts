@@ -61,6 +61,7 @@ const TOGGLE_OF = {
   skill: "skill",
   agent: "agent",
   mcpServer: "mcpServer",
+  host: "host",
 } as const;
 
 const shortEffect = (effect: InstructionProfileItemEffect): InstructionProfileEffect => ({

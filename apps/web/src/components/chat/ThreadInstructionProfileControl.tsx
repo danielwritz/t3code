@@ -20,6 +20,7 @@ import {
   MenuSeparator,
   MenuTrigger,
 } from "../ui/menu";
+import { Badge } from "../ui/badge";
 import { ThreadDetailsControl } from "./ThreadDetailsControl";
 import { THREAD_DETAILS_PANEL_ICON_CLASS } from "./threadDetailsPanelStyles";
 
@@ -55,24 +56,39 @@ export function ThreadInstructionProfileControl(props: {
   const current = threadQuery.data;
   const profiles = profilesQuery.data?.profiles ?? [];
   const choice = current === null ? null : threadProfileChoice(current);
-  const inheritedName = (() => {
-    if (current === null) return "None";
-    const inheritedId = current.projectProfileId ?? current.defaultProfileId;
-    return profiles.find((profile) => profile.id === inheritedId)?.name ?? "None";
-  })();
+  const inheritedId =
+    current === null ? null : (current.projectProfileId ?? current.defaultProfileId);
+  const inheritedName = profiles.find((profile) => profile.id === inheritedId)?.name ?? "none";
   const inheritedSource =
     current?.projectProfileId !== null && current?.projectProfileId !== undefined
-      ? "project"
-      : "default";
+      ? "the project"
+      : "the default";
 
   return (
-    <Menu>
+    <Menu
+      onOpenChange={(open) => {
+        // Another tab or device may have changed the profiles since this row loaded.
+        if (!open) return;
+        profilesQuery.refresh();
+        threadQuery.refresh();
+      }}
+    >
       <MenuTrigger
-        render={<ThreadDetailsControl part="select" />}
-        aria-label={`Instruction profile: ${choice?.label ?? "loading"}`}
+        render={<ThreadDetailsControl part="select" multiline />}
+        aria-label={choice?.label ?? "Instruction profile: loading"}
       >
         <ScrollTextIcon className={cn(THREAD_DETAILS_PANEL_ICON_CLASS, "me-1")} aria-hidden />
-        {choice?.label ?? "Instruction profile"}
+        <span className="flex min-w-0 flex-col gap-0.5">
+          <span className="truncate">{choice?.name ?? "Instruction profile"}</span>
+          <span className="flex min-w-0 items-center gap-1.5 text-xs font-normal text-muted-foreground">
+            <span className="truncate">{choice?.source ?? "Loading…"}</span>
+            {choice?.interfaceOnly ? (
+              <Badge size="sm" variant="outline">
+                Interface only
+              </Badge>
+            ) : null}
+          </span>
+        </span>
       </MenuTrigger>
       <MenuPopup align="start" side="bottom" className="w-(--anchor-width) min-w-64">
         <MenuGroup>
@@ -87,9 +103,11 @@ export function ThreadInstructionProfileControl(props: {
             }
           >
             <MenuRadioItem value={INHERIT} disabled={!canSetThread} closeOnClick>
-              <span className="flex items-center gap-2">
+              <span className="flex min-w-0 items-center gap-2">
                 <MenuRadioItemIndicator />
-                Inherit from {inheritedSource}: {inheritedName}
+                <span className="min-w-0 break-words">
+                  Same as {inheritedSource}: {inheritedName}
+                </span>
               </span>
             </MenuRadioItem>
             {profiles.map((profile) => (
@@ -99,9 +117,9 @@ export function ThreadInstructionProfileControl(props: {
                 disabled={!canSetThread}
                 closeOnClick
               >
-                <span className="flex items-center gap-2">
+                <span className="flex min-w-0 items-center gap-2">
                   <MenuRadioItemIndicator />
-                  {profile.name}
+                  <span className="min-w-0 break-words">{profile.name}</span>
                 </span>
               </MenuRadioItem>
             ))}
@@ -114,12 +132,10 @@ export function ThreadInstructionProfileControl(props: {
             onClick={() => {
               const profileId = current.profile?.id;
               if (profileId === undefined) return;
-              void setProject({ environmentId, input: { projectId, profileId } }).then(() =>
-                threadQuery.refresh(),
-              );
+              void setProject({ environmentId, input: { projectId, profileId } });
             }}
           >
-            Use {current.profile.name} for this project
+            <span className="min-w-0 break-words">Use {current.profile.name} for this project</span>
           </MenuItem>
         )}
         <MenuItem onClick={() => void navigate({ to: "/settings/instruction-profiles" })}>

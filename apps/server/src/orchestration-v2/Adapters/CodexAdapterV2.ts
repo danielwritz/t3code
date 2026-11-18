@@ -1972,6 +1972,7 @@ export const makeCodexAdapterV2 = Effect.fn("makeCodexAdapterV2")(function* (
         const threadsAwaitingContextRestore = yield* Ref.make(new Set<string>());
         // One app-server serves many threads, so each thread keeps its own profile switches.
         const profileConfigByThread = new Map<string, CodexInstructionProfilePlan["config"]>();
+        const hostOffThreads = new Set<string>();
         const rememberInstructionProfile = (
           threadId: string,
           launch: InstructionProfileLaunch | undefined,
@@ -1979,14 +1980,19 @@ export const makeCodexAdapterV2 = Effect.fn("makeCodexAdapterV2")(function* (
           const config = launch?.plan.codex?.config;
           if (config === undefined) profileConfigByThread.delete(threadId);
           else profileConfigByThread.set(threadId, config);
+          if (launch?.plan.codex?.omitHost === true) hostOffThreads.add(threadId);
+          else hostOffThreads.delete(threadId);
         };
         rememberInstructionProfile(input.threadId, input.instructionProfile);
         const threadRuntimeParams = (params: Parameters<typeof codexThreadRuntimeParams>[0]) => {
           const config =
             params.threadId === null ? undefined : profileConfigByThread.get(params.threadId);
-          return codexThreadRuntimeParams(
-            config === undefined ? params : { ...params, instructionProfileConfig: config },
-          );
+          const hostOff = params.threadId !== null && hostOffThreads.has(params.threadId);
+          return codexThreadRuntimeParams({
+            ...params,
+            ...(config === undefined ? {} : { instructionProfileConfig: config }),
+            ...(hostOff ? { mcpSession: undefined } : {}),
+          });
         };
         // Codex drops client developer messages during compaction but only resends additionalContext
         // when it changes. Restore after turn/completed: items injected mid-turn make the turn sample again.
@@ -7581,7 +7587,10 @@ export const makeCodexAdapterV2 = Effect.fn("makeCodexAdapterV2")(function* (
           ) {
             const threadId = yield* getNativeThreadId(turnInput.providerThread);
             rememberInstructionProfile(turnInput.threadId, turnInput.instructionProfile);
-            const mcpSession = yield* mcpSessions.read(turnInput.threadId);
+            const mcpSession =
+              turnInput.instructionProfile?.plan.codex?.omitHost === true
+                ? undefined
+                : yield* mcpSessions.read(turnInput.threadId);
             const models = adapterOptions.models === undefined ? [] : yield* adapterOptions.models;
             const configuredReasoningSummary = yield* client
               .request("config/read", { cwd: turnInput.runtimePolicy.cwd, includeLayers: false })

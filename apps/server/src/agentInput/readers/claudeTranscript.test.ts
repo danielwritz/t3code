@@ -176,7 +176,7 @@ describe("readClaudeTranscriptLines", () => {
       ["system-prompt", "harness", "System block 2", 0],
       ["host-instructions", "t3", "System block 2: T3 Code", 0],
       ["profile", "profile", "System block 2: instruction profile Lean", 0],
-      ["tools", "harness", "Tools (1)", 0],
+      ["tools", "harness", "Built-in tools (1)", 0],
       ["user-prompt", "user", "User message", 0],
       ["instruction-file", "user-file", "CLAUDE.md (Project)", 0],
       ["hook-output", "hook", "SessionStart:startup", 0],
@@ -217,9 +217,88 @@ describe("readClaudeTranscriptLines", () => {
     ).toEqual([
       ["system-prompt", "System block 1"],
       ["system-prompt", "System block 2"],
-      ["tools", "Tools (1)"],
+      ["tools", "Built-in tools (1)"],
     ]);
     expect(changed.layers.some((layer) => layer.kind === "profile")).toBe(false);
+  });
+
+  it("splits the tools by owner: built in, T3 Code and each MCP server", () => {
+    const mixed = [
+      ...tools,
+      { name: "mcp__t3-code__send_to_user", description: "T3." },
+      { name: "mcp__docs-server__search", description: "Docs." },
+    ];
+    const mixedHash = digest({ system, tools: mixed });
+    const owned = readClaudeTranscriptLines([
+      JSON.stringify({
+        type: "attachment",
+        uuid: "d1",
+        attachment: {
+          type: "deferred_tools_delta",
+          addedNames: ["Cron", "mcp__t3-code__t3_thread_wait", "mcp__docs-server__fetch"],
+          addedLines: ["Cron", "mcp__t3-code__t3_thread_wait", "mcp__docs-server__fetch"],
+        },
+      }),
+      JSON.stringify({
+        type: "attachment",
+        uuid: "m1",
+        attachment: {
+          type: "mcp_instructions_delta",
+          addedNames: ["t3-code", "docs-server"],
+          addedBlocks: ["Use T3 tools.", "Search the docs first."],
+        },
+      }),
+      JSON.stringify({
+        type: "api-request-shape",
+        shapeHash: mixedHash,
+        shape: { system, tools: mixed },
+      }),
+      JSON.stringify({
+        type: "api-request",
+        id: "r1",
+        keep: 0,
+        tail: [],
+        shapeHash: mixedHash,
+        params,
+      }),
+    ]).trace;
+    expect(
+      owned.layers
+        .filter((layer) => layer.kind === "tools" || layer.kind === "mcp-instructions")
+        .map((layer) => [layer.origin, layer.title, layer.text.includes("mcp__t3-code__")]),
+    ).toEqual([
+      ["harness", "Built-in tools (1)", false],
+      ["t3", "T3 Code tools (1)", true],
+      ["mcp-server", "docs-server tools (1)", false],
+      ["harness", "Deferred built-in tools (1)", false],
+      ["t3", "Deferred T3 Code tools (1)", true],
+      ["mcp-server", "Deferred docs-server tools (1)", false],
+      ["t3", "T3 Code", false],
+      ["mcp-server", "docs-server", false],
+    ]);
+  });
+
+  it("drops deferred tools that a later delta removed", () => {
+    const delta = (uuid: string, added: Array<string>, removed: Array<string>) =>
+      JSON.stringify({
+        type: "attachment",
+        uuid,
+        attachment: {
+          type: "deferred_tools_delta",
+          addedNames: added,
+          addedLines: added,
+          removedNames: removed,
+        },
+      });
+    const later = readClaudeTranscriptLines([
+      delta("d1", ["Cron", "mcp__t3-code__t3_thread_wait", "mcp__t3-code__send_to_user"], []),
+      delta("d2", [], ["mcp__t3-code__t3_thread_wait", "mcp__t3-code__send_to_user"]),
+      delta("d3", ["Monitor", "mcp__t3-code__list"], ["Cron"]),
+      delta("d4", [], ["mcp__t3-code__list"]),
+    ]).trace;
+    expect(later.layers.map((layer) => [layer.origin, layer.title, layer.text])).toEqual([
+      ["harness", "Deferred built-in tools (1)", "Monitor"],
+    ]);
   });
 
   it("falls back to the attachments when no request was recorded", () => {

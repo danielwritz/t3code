@@ -93,6 +93,7 @@ export const InstructionProfileToggle = Schema.Literals([
   "skill",
   "agent",
   "mcpServer",
+  "host",
 ]);
 export type InstructionProfileToggle = typeof InstructionProfileToggle.Type;
 

@@ -2543,7 +2543,87 @@ describe("AcpAdapterV2", () => {
           ),
         );
         assert.notInclude(changedProfile.prompt, "<t3_code_instructions>");
+
+        const hostOff: InstructionProfileLaunch = {
+          ...strict,
+          plan: { ...strict.plan, acp: { ...strict.plan.acp, omitHost: true } },
+        };
+        const composer = { instanceId, model: "composer-2" } as const;
+        const quiet = yield* runTurn(9, defaultPolicy, "Only the interface.", composer, hostOff);
+        assert.equal(quiet.prompt, "Only the interface.");
+        assert.equal(quiet.textBlockCount, 1);
+        // A thread in Plan mode still gets T3's Plan note, and only that note.
+        const hostOffPlan = yield* runTurn(10, planPolicy, "Plan quietly.", composer, hostOff);
+        assert.include(hostOffPlan.prompt, "T3 Code interaction mode: Plan");
+        assert.notInclude(hostOffPlan.prompt, "T3 Code orchestration");
+        assert.notInclude(hostOffPlan.prompt, "<runtime_info>");
+        const leavePlan = yield* runTurn(11, defaultPolicy, "Build quietly.", composer, hostOff);
+        assert.include(leavePlan.prompt, "T3 Code interaction mode: Default");
+        assert.notInclude(leavePlan.prompt, "T3 Code orchestration");
+        assert.equal(
+          (yield* runTurn(12, defaultPolicy, "Done.", composer, hostOff)).prompt,
+          "Done.",
+        );
       }).pipe(Effect.provide(layerTest)),
+  );
+
+  it.live("opens the ACP session without T3's MCP server when the profile omits T3", () =>
+    Effect.gen(function* () {
+      const childProcessSpawner = yield* ChildProcessSpawner.ChildProcessSpawner;
+      const protocolEvents = yield* Queue.unbounded<EffectAcpProtocol.AcpProtocolLogEvent>();
+      const instanceId = ProviderInstanceId.make("acp-test-host-off");
+      const threadId = ThreadId.make("thread-acp-host-off");
+      yield* (yield* McpProviderSessions.McpProviderSessions).set({
+        environmentId: EnvironmentId.make("environment-acp-host-off"),
+        threadId,
+        providerSessionId: "mcp-session-acp-host-off",
+        providerInstanceId: instanceId,
+        endpoint: "http://127.0.0.1:43123/mcp",
+        authorizationHeader: "Bearer host-off-token",
+        browserToolsAvailable: false,
+      });
+      const mockRuntime = makeMockRuntime({
+        childProcessSpawner,
+        mockAgentPath: yield* bundledMockAgentPath,
+        protocolEvents,
+      });
+      const omitted: Array<true | undefined> = [];
+      const adapter = yield* makeAcpAdapterV2({
+        instanceId,
+        flavor: {
+          driver: ACP_TEST_DRIVER,
+          capabilities: AcpProviderCapabilitiesV2,
+          makeRuntime: (runtimeInput) => {
+            omitted.push(runtimeInput.omitHostInstructions);
+            return mockRuntime(runtimeInput);
+          },
+        },
+        selfInvocation: yield* resolveSelfInvocation(),
+      });
+      yield* adapter.openSession({
+        threadId,
+        providerSessionId: ProviderSessionId.make("provider-session-acp-host-off"),
+        modelSelection: { instanceId, model: "default" },
+        runtimePolicy: ProviderAdapter.ProviderAdapterV2RuntimePolicy.make({
+          runtimeMode: "full-access",
+          interactionMode: "default",
+          cwd: process.cwd(),
+        }),
+        instructionProfile: {
+          profileId: "p1",
+          profileName: "Interface only",
+          plan: { effects: [], acp: { omitHost: true } },
+        },
+      });
+      while (true) {
+        const event = yield* Queue.take(protocolEvents);
+        if (event.direction !== "outgoing" || rawProtocolMethod(event) !== "session/new") continue;
+        assert.deepEqual(rawProtocolRequestParam(event, "mcpServers"), []);
+        // Flavors that append T3 text at session start (Antigravity) leave it out.
+        assert.deepEqual(omitted, [true]);
+        return;
+      }
+    }).pipe(Effect.provide(layerTest)),
   );
 
   it.live.each(["cancelled", "refusal", "error"] as const)(

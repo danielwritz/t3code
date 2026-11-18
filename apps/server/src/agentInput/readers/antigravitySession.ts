@@ -2,6 +2,7 @@ import type { AgentInputLayerKind, AgentInputOrigin } from "@t3tools/contracts";
 
 import {
   isRecord,
+  isT3McpServer,
   makeLayer,
   parseJsonLine,
   prettyJson,
@@ -246,12 +247,13 @@ export function readAntigravitySession(files: AntigravitySessionFiles): HarnessT
     servers.set(tool.server, [...(servers.get(tool.server) ?? []), parsed]);
   }
   for (const [server, tools] of servers) {
+    const t3 = isT3McpServer(server);
     layers.push(
       makeLayer({
         id: `mcp:${server}`,
         kind: "tools",
-        origin: "mcp-server",
-        title: `${server} (${tools.length} tools)`,
+        origin: t3 ? "t3" : "mcp-server",
+        title: `${t3 ? "T3 Code tools" : `${server} tools`} (${tools.length})`,
         text: prettyJson(tools),
         at: latestRequestAt,
       }),

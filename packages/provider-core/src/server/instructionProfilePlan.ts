@@ -27,6 +27,8 @@ export interface InstructionProfilePlanContext {
 }
 
 export interface ClaudeInstructionProfilePlan {
+  /** Leave out T3's own system prompt text and its `t3-code` MCP server. */
+  readonly omitHost?: true;
   /** Added after T3's own `systemPrompt.append` text. */
   readonly appendSystemPrompt?: string;
   /** SDK `skills` allow list. */
@@ -41,6 +43,8 @@ export interface ClaudeInstructionProfilePlan {
 }
 
 export interface CodexInstructionProfilePlan {
+  /** Leave out T3's own additionalContext entries and its MCP servers. */
+  readonly omitHost?: true;
   /** Extra per-turn `additionalContext` entries, kind `application`. */
   readonly additionalContext?: ReadonlyArray<{ readonly key: string; readonly value: string }>;
   /** Merged into the per-thread `config` map of `thread/start|resume|fork`. */
@@ -50,6 +54,8 @@ export interface CodexInstructionProfilePlan {
 }
 
 export interface AcpInstructionProfilePlan {
+  /** Leave out T3's prompt notes, runtime info and `t3-code` MCP server; Plan mode keeps its note. */
+  readonly omitHost?: true;
   /** Added to the first prompt beside T3's own instructions. */
   readonly promptPrefix?: string;
 }
@@ -444,6 +450,7 @@ const KIND_PLURAL: Record<InstructionProfileItemKind, string> = {
   skill: "skills",
   agent: "agents",
   mcpServer: "MCP servers",
+  host: "T3 Code tools",
 };
 
 function planAcp(profile: InstructionProfile, effects: Array<Effect>): InstructionProfilePlan {
@@ -468,6 +475,37 @@ function planAcp(profile: InstructionProfile, effects: Array<Effect>): Instructi
 
 const NO_SWITCH = "T3 has no launch-time switch for this provider yet";
 
+type Family = "claude" | "codex" | "acp";
+
+const HOST_HOW: Record<Family, string> = {
+  claude:
+    "T3 Code's system prompt text (runtime info, pull request linking, orchestration, background wait, send to user, device notes) and its t3-code MCP server are left out; the system prompt is sent fresh on each request (snapshot off), so this applies from the next turn",
+  codex:
+    "T3 Code's additionalContext entries (orchestration, runtime info, tool notes) are left out from the next turn; its t3-code and t3-code-direct MCP servers are left out when Codex starts or resumes this thread (a new thread, a server restart, or after the idle thread unloads)",
+  acp: "T3 Code's first-prompt notes and runtime info are left out from the next turn; its t3-code MCP server is left out when the agent session next starts or loads (a new thread or a server restart); T3 still sends its Plan mode note while the thread is in Plan mode",
+};
+
+function planFamily(
+  family: Family | undefined,
+  profile: InstructionProfile,
+  context: InstructionProfilePlanContext,
+  effects: Array<Effect>,
+): InstructionProfilePlan {
+  switch (family) {
+    case "claude":
+      return planClaude(profile, effects);
+    case "codex":
+      return planCodex(profile, context, effects);
+    case "acp":
+      return planAcp(profile, effects);
+    default:
+      for (const item of profile.items) {
+        effects.push(itemEffect(item, "not-supported", "none", NO_SWITCH));
+      }
+      return { effects };
+  }
+}
+
 /** Decides, without I/O, which launch-time switches a profile sets for one driver. */
 export function planInstructionProfile(
   driver: ProviderDriverKind,
@@ -476,7 +514,7 @@ export function planInstructionProfile(
 ): InstructionProfilePlan {
   const effects: Array<Effect> = [];
   const hasText = profile.globalInstructions.trim().length > 0;
-  const family =
+  const family: Family | undefined =
     driver === "claudeAgent"
       ? "claude"
       : driver === "codex"
@@ -493,26 +531,34 @@ export function planInstructionProfile(
       ...(family === undefined ? { reason: NO_SWITCH } : {}),
     });
   }
-  switch (family) {
-    case "claude":
-      return planClaude(profile, effects);
-    case "codex":
-      return planCodex(profile, context, effects);
-    case "acp":
-      return planAcp(profile, effects);
-    default:
-      for (const item of profile.items) {
-        effects.push(itemEffect(item, "not-supported", "none", NO_SWITCH));
-      }
-      return { effects };
-  }
+  const hostItems = profile.items.filter((item) => item.kind === "host");
+  const plan = planFamily(
+    family,
+    { ...profile, items: profile.items.filter((item) => item.kind !== "host") },
+    context,
+    effects,
+  );
+  const hostEffects = hostItems.map((item) =>
+    item.enabled
+      ? itemEffect(item, "skipped", "none", ON_BY_DEFAULT)
+      : family === undefined
+        ? itemEffect(item, "not-supported", "none", NO_SWITCH)
+        : itemEffect(item, "applied", HOST_HOW[family]),
+  );
+  const omitHost = family !== undefined && hostItems.some((item) => !item.enabled);
+  return {
+    ...plan,
+    effects: [...plan.effects, ...hostEffects],
+    ...(omitHost ? { [family]: { ...plan[family], omitHost: true } } : {}),
+  };
 }
 
 type SupportKind = InstructionProfileDriverSupport["kinds"][number]["kind"];
 type SupportRow = Record<SupportKind, string | undefined>;
 
-const SUPPORT_HOW: Record<"claude" | "codex" | "acp", SupportRow> = {
+const SUPPORT_HOW: Record<Family, SupportRow> = {
   claude: {
+    host: "leaves out T3 Code's system prompt text and its t3-code MCP server; applies from the next turn",
     "global-instructions":
       "system prompt append after T3 Code's own text, sent fresh on each request (snapshot off), so a change applies from the next turn",
     skill:
@@ -522,6 +568,7 @@ const SUPPORT_HOW: Record<"claude" | "codex" | "acp", SupportRow> = {
   },
   codex: {
     "global-instructions": "turn additionalContext entry t3_code_instruction_profile",
+    host: "leaves out T3 Code's additionalContext entries from the next turn, and its MCP servers when Codex starts or resumes the thread",
     skill:
       "config skills.config per skill, or skills.include_instructions=false for all; applies when Codex starts or resumes the thread",
     agent:
@@ -531,6 +578,7 @@ const SUPPORT_HOW: Record<"claude" | "codex" | "acp", SupportRow> = {
   },
   acp: {
     "global-instructions": "block added to the first prompt beside T3 Code's instructions",
+    host: "leaves out T3 Code's prompt notes and runtime info from the next turn, and its MCP server when the session next starts or loads; the Plan mode note stays in Plan mode",
     skill: undefined,
     agent: undefined,
     mcpServer: undefined,
@@ -543,6 +591,7 @@ const SUPPORT_KINDS: ReadonlyArray<SupportKind> = [
   "skill",
   "agent",
   "mcpServer",
+  "host",
 ];
 
 const supportRow = (

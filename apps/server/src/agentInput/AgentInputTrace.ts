@@ -32,7 +32,7 @@ import { resolveAgentHarnessHome } from "../project/AgentSessionScanner.ts";
 import { resolveAntigravityInstanceDirectories } from "../provider/antigravityAuthSupport.ts";
 import * as ServerSettings from "../serverSettings.ts";
 import * as AgentInputStore from "./AgentInputStore.ts";
-import { loadAntigravitySessionFiles } from "./readers/antigravityFiles.ts";
+import { antigravitySessionKey, loadAntigravitySessionFiles } from "./readers/antigravityFiles.ts";
 import { readAntigravitySession } from "./readers/antigravitySession.ts";
 import {
   makeClaudeIndexReader,
@@ -339,17 +339,30 @@ const make = Effect.gen(function* () {
       Effect.provideService(Digest.Digest, digest),
       Effect.provideService(Path.Path, path),
     );
+    const notFound = {
+      ...NO_HARNESS,
+      notes: ["Antigravity's session files for this thread were not found."],
+    };
+    const source = "Antigravity session files";
+    const key = yield* Effect.tryPromise({
+      try: () => antigravitySessionKey(directories.profile, nativeId),
+      catch: (cause) => new AgentInputFileError({ cause }),
+    });
+    if (key === undefined) return notFound;
+    // Each read walks every MCP tool file, so a dialog open or a layer click reuses it.
+    const cached = traces.get(key);
+    if (cached !== undefined) return { trace: cached.trace, source, notes: [] };
     const files = yield* Effect.tryPromise({
       try: () => loadAntigravitySessionFiles(directories.profile, nativeId),
       catch: (cause) => new AgentInputFileError({ cause }),
     });
-    if (files === undefined) {
-      return {
-        ...NO_HARNESS,
-        notes: ["Antigravity's session files for this thread were not found."],
-      };
-    }
-    return { trace: readAntigravitySession(files), source: "Antigravity session files", notes: [] };
+    if (files === undefined) return notFound;
+    const trace = readAntigravitySession(files);
+    let textBytes = 0;
+    for (const line of files.transcriptLines) textBytes += line.length;
+    for (const tool of files.mcpTools) textBytes += tool.json.length;
+    traces.set(key, { trace, bytes: 2 * textBytes, checks: new Map() });
+    return { trace, source, notes: [] };
   });
 
   const readHarness = (
@@ -454,9 +467,10 @@ const make = Effect.gen(function* () {
       ...harness.notes,
       ...(harness.trace?.notes ?? []),
       ...(harness.trace === undefined && fidelity === "t3-recorded"
-        ? ["Only the text T3 handed to the agent is shown; the agent's own instructions are not."]
+        ? [
+            "Only the text T3 Code handed to the agent is shown; the agent's own instructions are not.",
+          ]
         : []),
-      ...(fidelity === "none" ? ["Nothing was recorded for this thread yet."] : []),
     ];
     const profile = yield* store.latestProfileUse(threadId).pipe(Effect.mapError(storeError));
     const layers = [...harnessLayers, ...recorded];

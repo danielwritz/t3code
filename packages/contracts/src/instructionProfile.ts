@@ -9,7 +9,8 @@ export const INSTRUCTION_PROFILE_ALL_ITEMS = "*";
 export const InstructionProfileId = TrimmedNonEmptyString;
 export type InstructionProfileId = typeof InstructionProfileId.Type;
 
-export const InstructionProfileItemKind = Schema.Literals(["skill", "agent", "mcpServer"]);
+/** `host` with name `*` is T3 Code's own instruction text and MCP tools. */
+export const InstructionProfileItemKind = Schema.Literals(["skill", "agent", "mcpServer", "host"]);
 export type InstructionProfileItemKind = typeof InstructionProfileItemKind.Type;
 
 export const InstructionProfileItem = Schema.Struct({
@@ -38,6 +39,7 @@ export const InstructionProfileEffectKind = Schema.Literals([
   "skill",
   "agent",
   "mcpServer",
+  "host",
 ]);
 export type InstructionProfileEffectKind = typeof InstructionProfileEffectKind.Type;
 

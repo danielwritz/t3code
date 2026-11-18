@@ -19,6 +19,8 @@ const lines = [
       type: "additional_tools",
       tools: [
         { type: "namespace", name: "functions", tools: [{ name: "exec" }, { name: "wait" }] },
+        { type: "namespace", name: "mcp__docs", tools: [{ name: "search" }] },
+        { type: "namespace", name: "mcp__t3_code_direct", tools: [{ name: "delegate_task" }] },
       ],
     },
   },
@@ -56,7 +58,9 @@ describe("readCodexRolloutLines", () => {
       trace.layers.map((layer) => [layer.kind, layer.origin, layer.title, layer.requestIndex]),
     ).toEqual([
       ["system-prompt", "harness", "Base instructions", 0],
-      ["tools", "harness", "Tools (2)", 0],
+      ["tools", "harness", "Built-in tools (2)", 0],
+      ["tools", "mcp-server", "docs tools (1)", 0],
+      ["tools", "t3", "T3 Code tools (1)", 0],
       ["skills", "harness", "Skills", 0],
       ["system-prompt", "harness", "Section: permissions", 0],
       ["instruction-file", "user-file", "AGENTS.md", 0],
@@ -74,7 +78,7 @@ describe("readCodexRolloutLines", () => {
       [2, "gpt-test"],
       [4, "gpt-test"],
     ]);
-    expect(trace.requests[0]!.toolCount).toBe(2);
+    expect(trace.requests[0]!.toolCount).toBe(4);
     expect(trace.requests[1]!.partText!("messages")).toContain("Thanks.");
     expect(trace.fidelity).toBe("harness-record");
     for (const request of trace.requests) {

@@ -223,6 +223,8 @@ export interface AcpAdapterV2RuntimeInput {
   readonly onOutgoingResponseFailure?: AcpSessionRuntime.AcpSessionRuntimeOptions["onOutgoingResponseFailure"];
   readonly onOutgoingResponse?: AcpSessionRuntime.AcpSessionRuntimeOptions["onOutgoingResponse"];
   readonly onIncomingRequest?: AcpSessionRuntime.AcpSessionRuntimeOptions["onIncomingRequest"];
+  /** The thread's profile turns T3's own instructions off, so the session gets none of its text. */
+  readonly omitHostInstructions?: true;
 }
 
 export type AcpAdapterV2NativeLogging = Pick<
@@ -908,6 +910,7 @@ interface AcpMcpContext {
   readonly processEnvironment?: NodeJS.ProcessEnv;
   readonly endpoint?: string;
   readonly authorization?: string;
+  readonly omitHost?: true;
 }
 
 function acpMcpContext(
@@ -1833,16 +1836,27 @@ export const makeAcpAdapterV2 = Effect.fn("makeAcpAdapterV2")(function* (
   const mcpSessions = yield* McpProviderSessions.McpProviderSessions;
   const inputRecorder = yield* currentProviderInputRecorder;
   const { flavor, selfInvocation: self } = options;
-  const readMcpContext = (threadId: ThreadId | null) =>
-    threadId === null
-      ? Effect.succeed(acpMcpContext(undefined, self, flavor.mcpOverHttp, flavor.deferMcpTools))
-      : mcpSessions
-          .read(threadId)
-          .pipe(
-            Effect.map((session) =>
-              acpMcpContext(session, self, flavor.mcpOverHttp, flavor.deferMcpTools),
-            ),
-          );
+  // Threads whose profile turns T3's own instructions and tools off; checked at every session start.
+  const hostOffThreads = new Set<ThreadId>();
+  const rememberHostOff = (
+    threadId: ThreadId,
+    launch: ProviderAdapter.ProviderAdapterV2TurnInput["instructionProfile"],
+  ) => {
+    if (launch?.plan.acp?.omitHost === true) hostOffThreads.add(threadId);
+    else hostOffThreads.delete(threadId);
+  };
+  const readMcpContext = (threadId: ThreadId | null): Effect.Effect<AcpMcpContext> =>
+    threadId !== null && hostOffThreads.has(threadId)
+      ? Effect.succeed({ servers: [], acpServers: [], httpServers: [], omitHost: true })
+      : threadId === null
+        ? Effect.succeed(acpMcpContext(undefined, self, flavor.mcpOverHttp, flavor.deferMcpTools))
+        : mcpSessions
+            .read(threadId)
+            .pipe(
+              Effect.map((session) =>
+                acpMcpContext(session, self, flavor.mcpOverHttp, flavor.deferMcpTools),
+              ),
+            );
   const driver = flavor.driver;
   const continuationRequests = options.continuationRequests;
   const postSettleContinuationEnabled =
@@ -1870,6 +1884,7 @@ export const makeAcpAdapterV2 = Effect.fn("makeAcpAdapterV2")(function* (
     }),
     openSession: Effect.fn("AcpAdapterV2.openSession")(
       function* (input: ProviderAdapter.ProviderAdapterV2OpenSessionInput) {
+        rememberHostOff(input.threadId, input.instructionProfile);
         const sessionScope = yield* Effect.scope;
         let itemIdentityVersion: 2 | undefined =
           input.initialProviderItemIdentityVersion ??
@@ -2593,6 +2608,7 @@ export const makeAcpAdapterV2 = Effect.fn("makeAcpAdapterV2")(function* (
               ? {}
               : { processEnvironment: mcpContext.processEnvironment }),
             ...(resumeSessionId === undefined ? {} : { resumeSessionId }),
+            ...(mcpContext.omitHost === true ? { omitHostInstructions: true } : {}),
             interruptPromptOnCancel: flavor.interruptPromptOnCancel ?? false,
             clientCapabilities: {
               fs: {
@@ -8405,7 +8421,8 @@ export const makeAcpAdapterV2 = Effect.fn("makeAcpAdapterV2")(function* (
           turnInput: ProviderAdapter.ProviderAdapterV2TurnInput,
           sessionId: string,
         ) {
-          const mcpSession = yield* mcpSessions.read(turnInput.threadId);
+          const omitHost = turnInput.instructionProfile?.plan.acp?.omitHost === true;
+          const mcpSession = omitHost ? undefined : yield* mcpSessions.read(turnInput.threadId);
           const instructionState = {
             interactionMode: turnInput.runtimePolicy.interactionMode,
             hasT3Mcp: mcpSession !== undefined,
@@ -8478,13 +8495,20 @@ export const makeAcpAdapterV2 = Effect.fn("makeAcpAdapterV2")(function* (
           // while the prompt is prepared still resends the notes in this prompt.
           const previousInstructionState = (yield* Ref.get(promptInstructionStates)).get(sessionId);
           const compactionMarker = (yield* Ref.get(compactionMarkers)).get(sessionId);
-          const t3Text = t3AcpPromptWithInstructions({
-            prompt: messageText,
-            state: instructionState,
-            ...(previousInstructionState === undefined || compactionMarker !== undefined
-              ? {}
-              : { previousState: previousInstructionState }),
-          });
+          // With T3 off, only Plan mode, and the step back out of it, still needs T3's mode note.
+          const sendModeNoteOnly =
+            instructionState.interactionMode === "plan" ||
+            previousInstructionState?.interactionMode === "plan";
+          const t3Text =
+            omitHost && !sendModeNoteOnly
+              ? messageText
+              : t3AcpPromptWithInstructions({
+                  prompt: messageText,
+                  state: instructionState,
+                  ...(previousInstructionState === undefined || compactionMarker !== undefined
+                    ? {}
+                    : { previousState: previousInstructionState }),
+                });
           const t3InstructionsAdded = t3Text !== messageText;
           // The profile rides with T3's notes, and alone when only the profile changed.
           const profileBlock = isNativeSlashCommand
@@ -8493,6 +8517,7 @@ export const makeAcpAdapterV2 = Effect.fn("makeAcpAdapterV2")(function* (
           const sendProfileBlock =
             profileBlock !== undefined &&
             (t3InstructionsAdded ||
+              compactionMarker !== undefined ||
               (yield* Ref.get(promptProfileBlocks)).get(sessionId) !== profileBlock);
           const text = !sendProfileBlock
             ? t3Text
@@ -8512,6 +8537,7 @@ export const makeAcpAdapterV2 = Effect.fn("makeAcpAdapterV2")(function* (
           });
           // The agent keeps its own history, so resend only after compaction or when the text changes.
           const sendRuntimeInstructions =
+            !omitHost &&
             !isNativeSlashCommand &&
             (compactionMarker !== undefined ||
               (yield* Ref.get(promptRuntimeInstructions)).get(sessionId) !== runtimeInstructions);
@@ -8590,6 +8616,7 @@ export const makeAcpAdapterV2 = Effect.fn("makeAcpAdapterV2")(function* (
 
         const startTurnUnlocked = Effect.fn("AcpAdapterV2.startTurn")(
           function* (turnInput: ProviderAdapter.ProviderAdapterV2TurnInput) {
+            rememberHostOff(turnInput.threadId, turnInput.instructionProfile);
             yield* awaitRuntimeTeardown();
             const existing = yield* Ref.get(activeTurn);
             if (existing !== null) {
@@ -9246,6 +9273,7 @@ export const makeAcpAdapterV2 = Effect.fn("makeAcpAdapterV2")(function* (
             : {}),
           ensureThread: Effect.fn("AcpAdapterV2.ensureThread")(
             function* (threadInput: ProviderAdapter.ProviderAdapterV2EnsureThreadInput) {
+              rememberHostOff(threadInput.threadId, threadInput.instructionProfile);
               return yield* runtimeTransitionPermit.withPermit(
                 Effect.gen(function* () {
                   if (threadInput.forceNewNativeThread) {

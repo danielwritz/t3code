@@ -1388,6 +1388,52 @@ describe("ClaudeAdapterV2 append-system-prompt-file launch argument", () => {
     ),
   );
 
+  it.effect("leaves out T3's system prompt text and MCP server when the profile omits T3", () =>
+    Effect.scoped(
+      Effect.gen(function* () {
+        const fileSystem = yield* FileSystem.FileSystem;
+        const cwd = yield* fileSystem.makeTempDirectoryScoped({ prefix: "t3-claude-host-off-" });
+        yield* (yield* McpProviderSessions.McpProviderSessions).set({
+          environmentId: EnvironmentId.make("environment-host-off"),
+          threadId: ThreadId.make("thread-claude-append-file"),
+          providerSessionId: "mcp-session-host-off",
+          providerInstanceId: ProviderInstanceId.make("claudeAgent"),
+          endpoint: "http://127.0.0.1:43123/mcp",
+          authorizationHeader: "Bearer secret-claude-token",
+          browserToolsAvailable: true,
+          capabilities: new Set(["device"]),
+        });
+        const plain = yield* startTurnWithLaunchArgs("", cwd);
+        assert.property(plain.opened[0]?.mcpServers, "t3-code");
+        assert.include(appendSystemPrompt(plain.opened[0]), "<runtime_info>");
+        const { exit, opened } = yield* startTurnWithLaunchArgs("", cwd, {
+          profileId: "p1",
+          profileName: "Interface only",
+          plan: { effects: [], claude: { omitHost: true } },
+        });
+        assert.isTrue(Exit.isSuccess(exit));
+        const options = opened[0]!;
+        assert.isUndefined(options.mcpServers);
+        assert.notInclude(options.allowedTools ?? [], ClaudeAdapterV2.CLAUDE_T3_MCP_TOOL_WILDCARD);
+        // Fresh on each request, so switching an existing thread drops the text on its next turn.
+        assert.deepEqual(options.systemPrompt, {
+          type: "preset",
+          preset: "claude_code",
+          snapshot: false,
+        });
+      }).pipe(
+        Effect.provide(
+          Layer.mergeAll(
+            IdAllocator.layer,
+            McpProviderSessions.layer,
+            NodeServices.layer,
+            NodeCrypto.layer,
+          ),
+        ),
+      ),
+    ),
+  );
+
   it.effect("sends append launch arguments to Claude after the T3 instructions", () =>
     Effect.gen(function* () {
       const fileSystem = yield* FileSystem.FileSystem;

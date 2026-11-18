@@ -30,6 +30,33 @@ function lastGeneration(databasePath: string): Uint8Array | undefined {
 }
 
 /**
+ * Changes whenever the files `loadAntigravitySessionFiles` reads could have changed: the
+ * transcript and the conversation database with its WAL. Undefined when there is no transcript.
+ */
+export async function antigravitySessionKey(
+  profileDirectory: string,
+  sessionId: string,
+): Promise<string | undefined> {
+  if (!NATIVE_SESSION_ID.test(sessionId)) return undefined;
+  const root = await antigravityProfileRoot(profileDirectory);
+  if (root === undefined) return undefined;
+  const transcript = await antigravityManagedPath(
+    root,
+    ["antigravity-acp", "brain", sessionId, ".system_generated", "logs", "transcript_full.jsonl"],
+    "file",
+  );
+  if (transcript === undefined) return undefined;
+  const database = NodePath.join(root, "antigravity-acp", "conversations", `${sessionId}.db`);
+  const stamp = (info: { size: number; mtimeMs: number } | undefined) =>
+    info === undefined ? "-" : `${info.size}:${info.mtimeMs}`;
+  const [databaseInfo, walInfo] = await Promise.all([
+    NodeFSP.lstat(database).catch(() => undefined),
+    NodeFSP.lstat(`${database}-wal`).catch(() => undefined),
+  ]);
+  return [transcript.path, stamp(transcript.info), stamp(databaseInfo), stamp(walInfo)].join("\0");
+}
+
+/**
  * Reads one session's own files below the Antigravity profile. Like the turn-outcome reader it
  * refuses links, which could point at another session's records. Undefined when no transcript.
  */

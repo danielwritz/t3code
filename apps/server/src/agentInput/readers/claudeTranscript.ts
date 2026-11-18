@@ -4,8 +4,11 @@ import * as NodeCrypto from "node:crypto";
 import type { AgentInputLayerKind, AgentInputOrigin } from "@t3tools/contracts";
 
 import {
+  groupToolsByOwner,
   isRecord,
+  isT3McpServer,
   makeLayer,
+  mcpServerOfToolName,
   makePrettyJsonLength,
   parseJsonLine,
   prettyJson,
@@ -134,6 +137,33 @@ interface PendingLayer {
   /** Number of requests recorded before this line; the next one is the first to carry it. */
   readonly requestsBefore: number;
   readonly at?: string | undefined;
+  /** A deferred tool list, kept by name so a later delta can remove tools from it. */
+  readonly deferred?: {
+    readonly label: string;
+    readonly entries: ReadonlyArray<{ readonly name: string; readonly line: unknown }>;
+  };
+}
+
+/** Takes tools a later delta removed out of the earlier deferred lists; empty lists go. */
+function removeDeferredTools(pending: Array<PendingLayer>, removedNames: unknown) {
+  if (!Array.isArray(removedNames) || removedNames.length === 0) return;
+  const removed = new Set(removedNames.filter((name) => typeof name === "string"));
+  for (let index = pending.length - 1; index >= 0; index--) {
+    const layer = pending[index]!;
+    if (layer.deferred === undefined) continue;
+    const entries = layer.deferred.entries.filter((entry) => !removed.has(entry.name));
+    if (entries.length === layer.deferred.entries.length) continue;
+    if (entries.length === 0) {
+      pending.splice(index, 1);
+      continue;
+    }
+    pending[index] = {
+      ...layer,
+      title: `Deferred ${layer.deferred.label} (${entries.length})`,
+      text: joinText(entries.map((entry) => entry.line)),
+      deferred: { ...layer.deferred, entries },
+    };
+  }
 }
 
 const basename = (filePath: string) => filePath.split(/[\\/]/).pop() ?? filePath;
@@ -221,27 +251,51 @@ function attachmentLayers(
     case "mcp_instructions_delta": {
       const names = Array.isArray(attachment.addedNames) ? attachment.addedNames : [];
       const blocks = Array.isArray(attachment.addedBlocks) ? attachment.addedBlocks : [];
-      return names.map((name, index) => ({
-        id: `${id}:${index}`,
-        kind: "mcp-instructions" as const,
-        origin: "mcp-server" as const,
-        title: typeof name === "string" ? name : "MCP server",
-        text: typeof blocks[index] === "string" ? (blocks[index] as string) : "",
-        role: "system" as const,
-      }));
+      return names.map((name, index) => {
+        const t3 = typeof name === "string" && isT3McpServer(name);
+        return {
+          id: `${id}:${index}`,
+          kind: "mcp-instructions" as const,
+          origin: t3 ? ("t3" as const) : ("mcp-server" as const),
+          title: t3 ? "T3 Code" : typeof name === "string" ? name : "MCP server",
+          text: typeof blocks[index] === "string" ? (blocks[index] as string) : "",
+          role: "system" as const,
+        };
+      });
     }
     case "deferred_tools_delta": {
-      const added = Array.isArray(attachment.addedNames) ? attachment.addedNames.length : 0;
-      return [
-        {
-          id,
-          kind: "tools",
-          origin: "harness",
-          title: `Deferred tools (${added})`,
-          text: textOr(joinText(attachment.addedLines)),
-          role: "system",
+      const names = Array.isArray(attachment.addedNames) ? attachment.addedNames : [];
+      const lines = Array.isArray(attachment.addedLines) ? attachment.addedLines : [];
+      // addedLines and addedNames run in parallel, one line per tool.
+      const entries = names.map((name, index) => ({
+        name: typeof name === "string" ? name : "",
+        line: lines[index],
+      }));
+      const groups = groupToolsByOwner(entries, (entry) => mcpServerOfToolName(entry.name));
+      if (groups.length === 0) {
+        return [
+          {
+            id,
+            kind: "tools",
+            origin: "harness",
+            title: "Deferred tools (0)",
+            text: textOr(joinText(attachment.addedLines)),
+            role: "system",
+          },
+        ];
+      }
+      return groups.map((group) => ({
+        deferred: {
+          label: group.server === undefined ? "built-in tools" : group.label,
+          entries: group.items,
         },
-      ];
+        id: `${id}${group.idSuffix}`,
+        kind: "tools" as const,
+        origin: group.origin,
+        title: `Deferred ${group.server === undefined ? "built-in tools" : group.label} (${group.items.length})`,
+        text: joinText(group.items.map((entry) => entry.line)),
+        role: "system" as const,
+      }));
     }
     case "hook_additional_context":
       return [
@@ -512,6 +566,9 @@ export function makeClaudeIndexReader() {
           return;
         }
         const id = `attachment:${stringField(record, "uuid") ?? lineCount}`;
+        if (record.attachment.type === "deferred_tools_delta") {
+          removeDeferredTools(pending, record.attachment.removedNames);
+        }
         for (const layer of attachmentLayers(record.attachment, id)) {
           if (layer.text.length > 0) {
             pending.push({
@@ -580,16 +637,20 @@ export function makeClaudeIndexReader() {
     if (latestShape !== undefined) {
       layers.push(...systemLayers(latestShape.system, "system", "System block", shapeIndex));
       const tools = Array.isArray(latestShape.tools) ? latestShape.tools : [];
-      layers.push(
-        makeLayer({
-          id: "tools",
-          kind: "tools",
-          origin: "harness",
-          title: `Tools (${tools.length})`,
-          text: prettyJson(tools),
-          requestIndex: shapeIndex,
-        }),
-      );
+      for (const group of groupToolsByOwner(tools, (tool) =>
+        mcpServerOfToolName(stringField(tool, "name") ?? ""),
+      )) {
+        layers.push(
+          makeLayer({
+            id: `tools${group.idSuffix}`,
+            kind: "tools",
+            origin: group.origin,
+            title: `${group.label} (${group.items.length})`,
+            text: prettyJson(group.items),
+            requestIndex: shapeIndex,
+          }),
+        );
+      }
     } else if (promptSnapshot !== undefined) {
       layers.push(
         ...systemLayers(
