@@ -10,6 +10,7 @@ import {
   issueHiddenProjects,
   issueListTargets,
   issuesSearchFromUrl,
+  scopedEnvironmentIds,
   sidebarProjectScope,
 } from "./issuesSearch.logic";
 
@@ -112,8 +113,18 @@ describe("sidebarProjectScope", () => {
         resolveEnvironmentLabel: () => null,
       }).find((group) => group.repositoryIdentity?.name === repository)!.projectKey;
 
-    const scope = sidebarProjectScope(projects, settings, [keyOf("web")]);
-    expect(scope?.label).toBe("web");
+    const scopeOf = (keys: ReadonlyArray<string>, projectsKnown = true) =>
+      sidebarProjectScope(projects, settings, keys, { projectsKnown, primaryEnvironmentId: vps });
+    const label = (keys: ReadonlyArray<string>) => {
+      const scope = scopeOf(keys);
+      return typeof scope === "object" && scope !== null ? scope.label : scope;
+    };
+
+    const scope = scopeOf([keyOf("web")]);
+    if (typeof scope !== "object" || scope === null) throw new Error("expected a scope");
+    expect(scope.label).toBe("web");
+    // The chip's icon is the project the sidebar shows for the group.
+    expect(scope.project.id).toBe("web-vps");
     // Both clones of the repository stay; every other project is left out of the listing.
     const hidden = [[laptop, ProjectId.make("removed")]] as const;
     expect(issueHiddenProjects(hidden, projects, scope)).toEqual([
@@ -121,17 +132,26 @@ describe("sidebarProjectScope", () => {
       [laptop, "api"],
       [laptop, "old"],
     ]);
+    // Only machines that hold the project are asked for issues.
+    const docs = EnvironmentId.make("docs");
+    expect(scopedEnvironmentIds([laptop, vps, docs], scope)).toEqual([laptop, vps]);
+    expect(scopedEnvironmentIds([laptop, vps, docs], null)).toEqual([laptop, vps, docs]);
 
     // Two projects, none, a project that is gone or archived: the page lists as it did.
-    expect(sidebarProjectScope(projects, settings, [keyOf("web"), keyOf("api")])).toBeNull();
-    expect(sidebarProjectScope(projects, settings, [])).toBeNull();
-    expect(sidebarProjectScope(projects, settings, ["github.com/acme/gone"])).toBeNull();
-    expect(sidebarProjectScope(projects, settings, [keyOf("old")])).toBeNull();
+    expect(scopeOf([keyOf("web"), keyOf("api")])).toBeNull();
+    expect(scopeOf([])).toBeNull();
+    expect(scopeOf(["github.com/acme/gone"])).toBeNull();
+    expect(scopeOf([keyOf("old")])).toBeNull();
     // A gone project next to a live one leaves the sidebar on the live one, and the page too.
-    expect(
-      sidebarProjectScope(projects, settings, [keyOf("api"), "github.com/acme/gone"])?.label,
-    ).toBe("api");
+    expect(label([keyOf("api"), "github.com/acme/gone"])).toBe("api");
     expect(issueHiddenProjects(hidden, projects, null)).toBe(hidden);
+
+    // Until every machine has sent its projects, a stored project may still arrive: one such
+    // project waits instead of listing everything, and a second one is not read as a one-project
+    // scope.
+    expect(scopeOf(["github.com/acme/later"], false)).toBe("pending");
+    expect(scopeOf([keyOf("api"), "github.com/acme/later"], false)).toBeNull();
+    expect(label([keyOf("api")])).toBe("api");
   });
 });
 

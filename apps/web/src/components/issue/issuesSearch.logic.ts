@@ -15,6 +15,7 @@ import {
   buildSidebarProjectSnapshots,
   resolveSidebarProjectScopeKeys,
 } from "~/sidebarProjectGrouping";
+import type { MessageResolver } from "~/i18n/messages";
 
 import type { IssuesSearch } from "./IssuesPage";
 
@@ -83,34 +84,62 @@ export const issueProjectKeys = (pairs: IssuesSearch["hideProjects"]): ReadonlyS
 export interface SidebarProjectScope {
   readonly key: string;
   readonly label: string;
+  /** The project the sidebar shows for the group, for its icon. */
+  readonly project: EnvironmentProject;
   readonly projects: ReadonlyArray<ScopedProjectRef>;
 }
 
-/** The sidebar's project scope when it is exactly one project, resolved as the sidebar does. */
+/**
+ * The sidebar's project scope when it is exactly one project, resolved as the sidebar does.
+ * `pending` while a stored project may still arrive with a machine's project list.
+ */
 export function sidebarProjectScope(
   projects: ReadonlyArray<EnvironmentProject>,
   settings: ProjectGroupingSettings,
   keys: ReadonlyArray<string>,
-): SidebarProjectScope | null {
+  options: {
+    readonly projectsKnown: boolean;
+    readonly primaryEnvironmentId: EnvironmentId | null;
+    readonly resolve?: MessageResolver;
+  },
+): SidebarProjectScope | "pending" | null {
   if (keys.length === 0) return null;
-  const groups = buildSidebarProjectSnapshots({
-    projects,
-    settings,
-    groupScratchProjects: true,
-    primaryEnvironmentId: null,
-    resolveEnvironmentLabel: () => null,
-  });
+  const groups = buildSidebarProjectSnapshots(
+    {
+      projects,
+      settings,
+      groupScratchProjects: true,
+      primaryEnvironmentId: options.primaryEnvironmentId,
+      resolveEnvironmentLabel: () => null,
+    },
+    options.resolve,
+  );
   const chosen = resolveSidebarProjectScopeKeys({
     groups,
     keys,
     settings,
-    canClearMissingScope: true,
-  }).flatMap((key) => groups.find((group) => group.projectKey === key && !group.archived) ?? []);
-  const group = chosen.length === 1 ? chosen[0]! : null;
-  return group === null
-    ? null
-    : { key: group.projectKey, label: group.displayName, projects: group.memberProjectRefs };
+    canClearMissingScope: options.projectsKnown,
+  }).filter((key) => !groups.some((group) => group.projectKey === key && group.archived));
+  if (chosen.length !== 1) return null;
+  const group = groups.find((candidate) => candidate.projectKey === chosen[0]);
+  return group === undefined
+    ? "pending"
+    : {
+        key: group.projectKey,
+        label: group.displayName,
+        project: group,
+        projects: group.memberProjectRefs,
+      };
 }
+
+/** Under a scope, only the machines that hold one of its projects are asked for issues. */
+export const scopedEnvironmentIds = (
+  environmentIds: ReadonlyArray<EnvironmentId>,
+  scope: SidebarProjectScope | null,
+): ReadonlyArray<EnvironmentId> =>
+  scope === null
+    ? environmentIds
+    : environmentIds.filter((id) => scope.projects.some((ref) => ref.environmentId === id));
 
 /** The saved hidden projects, plus every project outside the sidebar's scope. */
 export function issueHiddenProjects(

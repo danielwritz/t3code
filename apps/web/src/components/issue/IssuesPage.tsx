@@ -62,6 +62,7 @@ import {
   issueHiddenProjects,
   issueListTargets,
   issueProjectKeys,
+  scopedEnvironmentIds,
   sidebarProjectScope,
 } from "./issuesSearch.logic";
 import { ISSUE_SAVED_VIEWS } from "./issueSavedViews";
@@ -106,8 +107,8 @@ import {
 } from "~/rightPanelStore";
 import { useAtomCommand } from "~/state/use-atom-command";
 import { squashAtomCommandFailure } from "@t3tools/client-runtime/state/runtime";
-import { useProjects } from "~/state/entities";
-import { useEnvironments, useIssuesSupported } from "~/state/environments";
+import { useAllEnvironmentShellsBootstrapped, useProjects } from "~/state/entities";
+import { useEnvironments, useIssuesSupported, usePrimaryEnvironmentId } from "~/state/environments";
 import { issueEnvironment, useIssueList } from "~/state/issues";
 import { useDebouncedValue } from "~/state/queries";
 import { primaryServerKeybindingsAtom } from "~/state/server";
@@ -211,6 +212,8 @@ export function IssuesPage() {
   const keybindings = useAtomValue(primaryServerKeybindingsAtom);
   const groupingSettings = useClientSettings(selectProjectGroupingSettings);
   const sidebarScopeKeys = useUiStateStore((store) => store.sidebarProjectScopeKeys);
+  const projectsKnown = useAllEnvironmentShellsBootstrapped();
+  const primaryEnvironmentId = usePrimaryEnvironmentId();
   const setSidebarScopeKeys = useUiStateStore((store) => store.setSidebarProjectScopeKeys);
 
   const capableEnvironments = environments.filter(
@@ -223,15 +226,19 @@ export function IssuesPage() {
     ),
     environmentLabels,
   );
-  const sidebarScope = sidebarProjectScope(projects, groupingSettings, sidebarScopeKeys);
-  const scopedProjects =
-    sidebarScope === null
-      ? filterProjects
-      : filterProjects.filter((project) =>
-          sidebarScope.projects.some(
-            (ref) => ref.environmentId === project.environmentId && ref.projectId === project.id,
-          ),
-        );
+  const resolvedScope = sidebarProjectScope(projects, groupingSettings, sidebarScopeKeys, {
+    projectsKnown,
+    primaryEnvironmentId,
+    resolve,
+  });
+  const scopePending = resolvedScope === "pending";
+  const sidebarScope = scopePending ? null : resolvedScope;
+  const listEnvironmentIds = scopedEnvironmentIds(
+    capableEnvironments.map((e) => e.environmentId),
+    sidebarScope,
+  );
+  // The scoped project lives only on machines whose server cannot list issues.
+  const scopeUnavailable = sidebarScope !== null && listEnvironmentIds.length === 0;
   const listHiddenProjects = issueHiddenProjects(search.hideProjects, filterProjects, sidebarScope);
   const hiddenProjects = issueProjectKeys(listHiddenProjects);
 
@@ -249,14 +256,10 @@ export function IssuesPage() {
   const everyProjectHidden =
     filterProjects.length > 0 &&
     filterProjects.every((project) => hiddenProjects.has(pullRequestProjectKey(project)));
-  const targets = everyProjectHidden
-    ? []
-    : issueListTargets(
-        capableEnvironments.map((e) => e.environmentId),
-        filterProjects,
-        listHiddenProjects,
-        listInput,
-      );
+  const targets =
+    everyProjectHidden || scopePending
+      ? []
+      : issueListTargets(listEnvironmentIds, filterProjects, listHiddenProjects, listInput);
   const list = useIssueList(targets);
   // Refreshing a list still loading would cancel it and start over, losing the scopes already read.
   useLiveRefresh(
@@ -528,165 +531,166 @@ export function IssuesPage() {
   const showTracker = groups.length > 1;
   const noneAnswered = list.answers.length === 0;
 
-  const listBody: ReactNode = !issuesSupported ? (
-    <PullRequestsUnavailableState
-      title={gt("Issues unavailable")}
-      error={gt("Update this environment's T3 Code server to browse issues.")}
-    />
-  ) : noneAnswered && list.isPending ? (
-    <PullRequestListGhost />
-  ) : noneAnswered && list.error ? (
-    <PullRequestsUnavailableState
-      error={list.error}
-      onRetry={list.retry}
-      refreshing={list.isPending}
-    />
-  ) : everyProjectHidden ? (
-    <Empty>
-      <EmptyMedia variant="icon">
-        <IssueGlyph.issue />
-      </EmptyMedia>
-      <EmptyHeader>
-        <EmptyTitle>
-          <T>Every project is hidden</T>
-        </EmptyTitle>
-      </EmptyHeader>
-      <EmptyContent>
-        <Button
-          variant="outline"
-          onClick={() => {
-            setSidebarScopeKeys([]);
-            updateSearch({ hideProjects: undefined });
-          }}
-        >
-          <T>Show all projects</T>
-        </Button>
-      </EmptyContent>
-    </Empty>
-  ) : groups.length === 0 ? (
-    <Empty>
-      <EmptyMedia variant="icon">
-        <IssueGlyph.issue />
-      </EmptyMedia>
-      <EmptyHeader>
-        <EmptyTitle>
-          <T>No trackers to read</T>
-        </EmptyTitle>
-        <EmptyDescription>
-          <T>Add a project whose remote is on a supported tracker.</T>
-        </EmptyDescription>
-      </EmptyHeader>
-    </Empty>
-  ) : (
-    <div className="flex flex-col gap-6">
-      {list.error ? (
-        <div className="flex items-center justify-between gap-3 rounded-lg border border-warning/30 bg-warning-surface px-3 py-2 text-xs">
-          <span>
-            <T>
-              <Var>{list.error}</Var> Showing the issues that loaded.
-            </T>
-          </span>
-          <Button size="xs" variant="outline" onClick={list.retry}>
-            <T>Retry</T>
+  const listBody: ReactNode =
+    !issuesSupported || scopeUnavailable ? (
+      <PullRequestsUnavailableState
+        title={gt("Issues unavailable")}
+        error={gt("Update this environment's T3 Code server to browse issues.")}
+      />
+    ) : scopePending || (noneAnswered && list.isPending) ? (
+      <PullRequestListGhost />
+    ) : noneAnswered && list.error ? (
+      <PullRequestsUnavailableState
+        error={list.error}
+        onRetry={list.retry}
+        refreshing={list.isPending}
+      />
+    ) : everyProjectHidden ? (
+      <Empty>
+        <EmptyMedia variant="icon">
+          <IssueGlyph.issue />
+        </EmptyMedia>
+        <EmptyHeader>
+          <EmptyTitle>
+            <T>Every project is hidden</T>
+          </EmptyTitle>
+        </EmptyHeader>
+        <EmptyContent>
+          <Button
+            variant="outline"
+            onClick={() => {
+              if (sidebarScope !== null) setSidebarScopeKeys([]);
+              updateSearch({ hideProjects: undefined });
+            }}
+          >
+            <T>Show all projects</T>
           </Button>
-        </div>
-      ) : null}
-      {groups.map((group) => {
-        const presentation = issueTrackerPresentation(group.tracker.tracker);
-        const showScope = new Set(group.rows.map((row) => row.scope.toLowerCase())).size > 1;
-        return (
-          <section key={issueTrackerKey(group.tracker)} className="flex flex-col gap-1">
-            <h2 className="flex items-center gap-1.5 px-3 text-xs font-medium text-muted-foreground">
-              <presentation.Icon aria-hidden className="size-3.5" />
-              {presentation.providerName}
-              {presentation.providerName.toLowerCase() !== group.tracker.host ? (
-                <span className="font-normal">· {group.tracker.host}</span>
+        </EmptyContent>
+      </Empty>
+    ) : groups.length === 0 ? (
+      <Empty>
+        <EmptyMedia variant="icon">
+          <IssueGlyph.issue />
+        </EmptyMedia>
+        <EmptyHeader>
+          <EmptyTitle>
+            <T>No trackers to read</T>
+          </EmptyTitle>
+          <EmptyDescription>
+            <T>Add a project whose remote is on a supported tracker.</T>
+          </EmptyDescription>
+        </EmptyHeader>
+      </Empty>
+    ) : (
+      <div className="flex flex-col gap-6">
+        {list.error ? (
+          <div className="flex items-center justify-between gap-3 rounded-lg border border-warning/30 bg-warning-surface px-3 py-2 text-xs">
+            <span>
+              <T>
+                <Var>{list.error}</Var> Showing the issues that loaded.
+              </T>
+            </span>
+            <Button size="xs" variant="outline" onClick={list.retry}>
+              <T>Retry</T>
+            </Button>
+          </div>
+        ) : null}
+        {groups.map((group) => {
+          const presentation = issueTrackerPresentation(group.tracker.tracker);
+          const showScope = new Set(group.rows.map((row) => row.scope.toLowerCase())).size > 1;
+          return (
+            <section key={issueTrackerKey(group.tracker)} className="flex flex-col gap-1">
+              <h2 className="flex items-center gap-1.5 px-3 text-xs font-medium text-muted-foreground">
+                <presentation.Icon aria-hidden className="size-3.5" />
+                {presentation.providerName}
+                {presentation.providerName.toLowerCase() !== group.tracker.host ? (
+                  <span className="font-normal">· {group.tracker.host}</span>
+                ) : null}
+                <span className="font-normal">
+                  ·{" "}
+                  {gt("{count, plural, one {{count} project} other {{count} projects}}", {
+                    count: group.tracker.projectCount,
+                  })}
+                </span>
+              </h2>
+              {!group.tracker.configured ? (
+                <p className="px-3 text-sm text-muted-foreground">
+                  {group.tracker.detail === null
+                    ? gt("This tracker cannot be read right now.")
+                    : issueTrackerDetailText(group.tracker.detail, resolve)}
+                </p>
               ) : null}
-              <span className="font-normal">
-                ·{" "}
-                {gt("{count, plural, one {{count} project} other {{count} projects}}", {
-                  count: group.tracker.projectCount,
-                })}
-              </span>
-            </h2>
-            {!group.tracker.configured ? (
-              <p className="px-3 text-sm text-muted-foreground">
-                {group.tracker.detail === null
-                  ? gt("This tracker cannot be read right now.")
-                  : issueTrackerDetailText(group.tracker.detail, resolve)}
-              </p>
-            ) : null}
-            {group.errors.map((error) => (
-              <p
-                key={`${error.environmentId}:${error.projectTitle}`}
-                className="px-3 text-xs text-destructive"
-              >
-                {error.projectTitle}: {error.message}
-              </p>
-            ))}
-            {group.tracker.configured && group.rows.length === 0 && group.errors.length === 0 ? (
-              <p className="px-3 text-sm text-muted-foreground">
-                {debouncedQuery ? (
-                  <T>Nothing matches that.</T>
-                ) : (
-                  <T>No issues under these filters.</T>
-                )}
-              </p>
-            ) : null}
-            {group.rows.map((row) => {
-              const key = issueEntryKey(row);
-              const selected =
-                renderedSurface?.kind === "issue" &&
-                renderedSurface.environmentId === row.environmentId &&
-                issueEntryKey({
-                  ...renderedSurface,
-                  host: renderedSurface.host ?? "",
-                  projectId: renderedSurface.projectId as ProjectId,
-                }) === key;
-              return (
-                <IssueRow
-                  key={`${row.environmentId}:${key}`}
-                  entry={row}
-                  selected={selected}
-                  showScope={showScope}
-                  showTracker={showTracker}
-                  {...(capableEnvironments.length > 1 && environmentLabels.has(row.environmentId)
-                    ? { environmentLabel: environmentLabels.get(row.environmentId) }
-                    : {})}
-                  onSelect={selectEntry}
-                />
-              );
-            })}
-            {group.more.map((environmentId) => {
-              const moreFailure = held.get(environmentId)?.moreFailure ?? null;
-              return (
-                <Fragment key={environmentId}>
-                  {moreFailure === null ? null : (
-                    <p className="px-3 text-xs text-destructive">{moreFailure}</p>
+              {group.errors.map((error) => (
+                <p
+                  key={`${error.environmentId}:${error.projectTitle}`}
+                  className="px-3 text-xs text-destructive"
+                >
+                  {error.projectTitle}: {error.message}
+                </p>
+              ))}
+              {group.tracker.configured && group.rows.length === 0 && group.errors.length === 0 ? (
+                <p className="px-3 text-sm text-muted-foreground">
+                  {debouncedQuery ? (
+                    <T>Nothing matches that.</T>
+                  ) : (
+                    <T>No issues under these filters.</T>
                   )}
-                  <Button
-                    size="sm"
-                    variant="ghost-muted"
-                    className="self-start"
-                    disabled={loadingMore !== null}
-                    onClick={() => void loadMore(environmentId, group.tracker.host)}
-                  >
-                    {loadingMore === `${environmentId} ${group.tracker.host}` ? (
-                      <T>Loading…</T>
-                    ) : moreFailure === null ? (
-                      <T>Load more</T>
-                    ) : (
-                      <T>Retry</T>
+                </p>
+              ) : null}
+              {group.rows.map((row) => {
+                const key = issueEntryKey(row);
+                const selected =
+                  renderedSurface?.kind === "issue" &&
+                  renderedSurface.environmentId === row.environmentId &&
+                  issueEntryKey({
+                    ...renderedSurface,
+                    host: renderedSurface.host ?? "",
+                    projectId: renderedSurface.projectId as ProjectId,
+                  }) === key;
+                return (
+                  <IssueRow
+                    key={`${row.environmentId}:${key}`}
+                    entry={row}
+                    selected={selected}
+                    showScope={showScope}
+                    showTracker={showTracker}
+                    {...(capableEnvironments.length > 1 && environmentLabels.has(row.environmentId)
+                      ? { environmentLabel: environmentLabels.get(row.environmentId) }
+                      : {})}
+                    onSelect={selectEntry}
+                  />
+                );
+              })}
+              {group.more.map((environmentId) => {
+                const moreFailure = held.get(environmentId)?.moreFailure ?? null;
+                return (
+                  <Fragment key={environmentId}>
+                    {moreFailure === null ? null : (
+                      <p className="px-3 text-xs text-destructive">{moreFailure}</p>
                     )}
-                  </Button>
-                </Fragment>
-              );
-            })}
-          </section>
-        );
-      })}
-    </div>
-  );
+                    <Button
+                      size="sm"
+                      variant="ghost-muted"
+                      className="self-start"
+                      disabled={loadingMore !== null}
+                      onClick={() => void loadMore(environmentId, group.tracker.host)}
+                    >
+                      {loadingMore === `${environmentId} ${group.tracker.host}` ? (
+                        <T>Loading…</T>
+                      ) : moreFailure === null ? (
+                        <T>Load more</T>
+                      ) : (
+                        <T>Retry</T>
+                      )}
+                    </Button>
+                  </Fragment>
+                );
+              })}
+            </section>
+          );
+        })}
+      </div>
+    );
 
   return (
     <SidebarInset className="h-dvh min-h-0 overflow-hidden overscroll-y-none">
@@ -768,7 +772,7 @@ export function IssuesPage() {
                   onLabels={(label) => updateSearch({ label })}
                   assignee={search.assignee}
                   onAssignee={(assignee) => updateSearch({ assignee })}
-                  projects={scopedProjects}
+                  projects={filterProjects}
                   hiddenProjects={issueProjectKeys(search.hideProjects)}
                   onHiddenProjects={(hideProjects) => updateSearch({ hideProjects })}
                 />
@@ -810,9 +814,7 @@ export function IssuesPage() {
                         />
                       }
                     >
-                      {scopedProjects[0] ? (
-                        <ProjectFavicon project={scopedProjects[0]} className="size-3.5" />
-                      ) : null}
+                      <ProjectFavicon project={sidebarScope.project} className="size-3.5" />
                       <span className="max-w-40 truncate">{sidebarScope.label}</span>
                       <XIcon aria-hidden />
                     </TooltipTrigger>
