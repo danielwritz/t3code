@@ -32,6 +32,7 @@ import {
   Plug2Icon,
   UserCheckIcon,
   UsersIcon,
+  XIcon,
 } from "lucide-react";
 import { msg, T, useGT, useMessages, Var } from "gt-react";
 import { Fragment, useEffect, useEffectEvent, useState, type ReactNode } from "react";
@@ -56,7 +57,13 @@ import {
 import { m, type MessageResolver } from "~/i18n/messages";
 import { resolveFilterOptions } from "../pullRequest/pullRequestListOptions";
 import { IssueFiltersMenu } from "./IssueListFilterPickers";
-import { issueFilterProjects, issueListTargets, issueProjectKeys } from "./issuesSearch.logic";
+import {
+  issueFilterProjects,
+  issueHiddenProjects,
+  issueListTargets,
+  issueProjectKeys,
+  sidebarProjectScope,
+} from "./issuesSearch.logic";
 import { ISSUE_SAVED_VIEWS } from "./issueSavedViews";
 import { SavedViewsMenu } from "~/components/SavedViewsMenu";
 import { PullRequestCompactFilterMenu } from "../pullRequest/PullRequestCompactFilterMenu";
@@ -77,6 +84,11 @@ import {
 } from "~/components/ui/empty";
 import { Menu, MenuPopup, MenuRadioGroup, MenuRadioItem, MenuTrigger } from "~/components/ui/menu";
 import { SidebarInset } from "~/components/ui/sidebar";
+import { Tooltip, TooltipPopup, TooltipTrigger } from "~/components/ui/tooltip";
+import { ProjectFavicon } from "~/components/ProjectFavicon";
+import { useClientSettings } from "~/hooks/useSettings";
+import { useUiStateStore } from "~/uiStateStore";
+import { selectProjectGroupingSettings } from "@t3tools/client-runtime/state/project-grouping";
 import { isCommandPaletteOpen } from "~/commandPaletteBus";
 import { isElectron } from "~/env";
 import { useLiveRefresh } from "~/hooks/useLiveRefresh";
@@ -197,6 +209,9 @@ export function IssuesPage() {
   const projects = useProjects();
   const issuesSupported = useIssuesSupported();
   const keybindings = useAtomValue(primaryServerKeybindingsAtom);
+  const groupingSettings = useClientSettings(selectProjectGroupingSettings);
+  const sidebarScopeKeys = useUiStateStore((store) => store.sidebarProjectScopeKeys);
+  const setSidebarScopeKeys = useUiStateStore((store) => store.setSidebarProjectScopeKeys);
 
   const capableEnvironments = environments.filter(
     (environment) => environment.serverConfig?.environment.capabilities.issues === true,
@@ -208,7 +223,17 @@ export function IssuesPage() {
     ),
     environmentLabels,
   );
-  const hiddenProjects = issueProjectKeys(search.hideProjects);
+  const sidebarScope = sidebarProjectScope(projects, groupingSettings, sidebarScopeKeys);
+  const scopedProjects =
+    sidebarScope === null
+      ? filterProjects
+      : filterProjects.filter((project) =>
+          sidebarScope.projects.some(
+            (ref) => ref.environmentId === project.environmentId && ref.projectId === project.id,
+          ),
+        );
+  const listHiddenProjects = issueHiddenProjects(search.hideProjects, filterProjects, sidebarScope);
+  const hiddenProjects = issueProjectKeys(listHiddenProjects);
 
   const debouncedQuery = useDebouncedValue(search.q ?? "", 300);
   const listInput: IssueListInput = {
@@ -229,7 +254,7 @@ export function IssuesPage() {
     : issueListTargets(
         capableEnvironments.map((e) => e.environmentId),
         filterProjects,
-        search.hideProjects,
+        listHiddenProjects,
         listInput,
       );
   const list = useIssueList(targets);
@@ -527,7 +552,13 @@ export function IssuesPage() {
         </EmptyTitle>
       </EmptyHeader>
       <EmptyContent>
-        <Button variant="outline" onClick={() => updateSearch({ hideProjects: undefined })}>
+        <Button
+          variant="outline"
+          onClick={() => {
+            setSidebarScopeKeys([]);
+            updateSearch({ hideProjects: undefined });
+          }}
+        >
           <T>Show all projects</T>
         </Button>
       </EmptyContent>
@@ -737,8 +768,8 @@ export function IssuesPage() {
                   onLabels={(label) => updateSearch({ label })}
                   assignee={search.assignee}
                   onAssignee={(assignee) => updateSearch({ assignee })}
-                  projects={filterProjects}
-                  hiddenProjects={hiddenProjects}
+                  projects={scopedProjects}
+                  hiddenProjects={issueProjectKeys(search.hideProjects)}
                   onHiddenProjects={(hideProjects) => updateSearch({ hideProjects })}
                 />
                 <SavedViewsMenu
@@ -765,6 +796,30 @@ export function IssuesPage() {
                     options={hostOptions}
                     onChange={(host) => updateSearch({ host: host || undefined })}
                   />
+                ) : null}
+                {sidebarScope ? (
+                  <Tooltip>
+                    <TooltipTrigger
+                      render={
+                        <Button
+                          variant="outline"
+                          aria-label={gt("Clear project filter: {project}", {
+                            project: sidebarScope.label,
+                          })}
+                          onClick={() => setSidebarScopeKeys([])}
+                        />
+                      }
+                    >
+                      {scopedProjects[0] ? (
+                        <ProjectFavicon project={scopedProjects[0]} className="size-3.5" />
+                      ) : null}
+                      <span className="max-w-40 truncate">{sidebarScope.label}</span>
+                      <XIcon aria-hidden />
+                    </TooltipTrigger>
+                    <TooltipPopup>
+                      <T>Follows the sidebar's project filter</T>
+                    </TooltipPopup>
+                  </Tooltip>
                 ) : null}
                 <Button
                   size="icon"

@@ -3,7 +3,15 @@ import { describe, expect, it } from "vite-plus/test";
 import type { EnvironmentProject } from "@t3tools/client-runtime/state/models";
 import { EnvironmentId, ProjectId } from "@t3tools/contracts";
 
-import { issueFilterProjects, issueListTargets, issuesSearchFromUrl } from "./issuesSearch.logic";
+import { buildSidebarProjectSnapshots } from "~/sidebarProjectGrouping";
+
+import {
+  issueFilterProjects,
+  issueHiddenProjects,
+  issueListTargets,
+  issuesSearchFromUrl,
+  sidebarProjectScope,
+} from "./issuesSearch.logic";
 
 describe("issuesSearchFromUrl", () => {
   it("replaces a malformed filter instead of letting the raw value through", () => {
@@ -56,6 +64,74 @@ describe("issueListTargets", () => {
       { environmentId: laptop, input },
       { environmentId: vps, input },
     ]);
+  });
+});
+
+describe("sidebarProjectScope", () => {
+  it("narrows the issues page to the one project the sidebar is scoped to", () => {
+    const laptop = EnvironmentId.make("laptop");
+    const vps = EnvironmentId.make("vps");
+    const project = (
+      environmentId: EnvironmentId,
+      id: string,
+      repository: string,
+      archivedAt: string | null = null,
+    ) =>
+      ({
+        id: ProjectId.make(id),
+        environmentId,
+        title: repository,
+        workspaceRoot: `/work/${id}`,
+        repositoryIdentity: {
+          canonicalKey: `github.com/acme/${repository}`,
+          name: repository,
+        },
+        isScratch: false,
+        archivedAt,
+        pinnedAt: null,
+        createdAt: "2026-01-01T00:00:00.000Z",
+        updatedAt: "2026-01-01T00:00:00.000Z",
+      }) as unknown as EnvironmentProject;
+    const projects = [
+      project(laptop, "web", "web"),
+      project(vps, "web-vps", "web"),
+      project(laptop, "api", "api"),
+      project(laptop, "old", "old", "2026-02-01T00:00:00.000Z"),
+    ];
+    const settings = {
+      sidebarProjectGroupingMode: "repository",
+      sidebarProjectGroupingOverrides: {},
+    } as const;
+    // The keys the sidebar stores are its own group keys.
+    const keyOf = (repository: string) =>
+      buildSidebarProjectSnapshots({
+        projects,
+        settings,
+        groupScratchProjects: true,
+        primaryEnvironmentId: null,
+        resolveEnvironmentLabel: () => null,
+      }).find((group) => group.repositoryIdentity?.name === repository)!.projectKey;
+
+    const scope = sidebarProjectScope(projects, settings, [keyOf("web")]);
+    expect(scope?.label).toBe("web");
+    // Both clones of the repository stay; every other project is left out of the listing.
+    const hidden = [[laptop, ProjectId.make("removed")]] as const;
+    expect(issueHiddenProjects(hidden, projects, scope)).toEqual([
+      [laptop, "removed"],
+      [laptop, "api"],
+      [laptop, "old"],
+    ]);
+
+    // Two projects, none, a project that is gone or archived: the page lists as it did.
+    expect(sidebarProjectScope(projects, settings, [keyOf("web"), keyOf("api")])).toBeNull();
+    expect(sidebarProjectScope(projects, settings, [])).toBeNull();
+    expect(sidebarProjectScope(projects, settings, ["github.com/acme/gone"])).toBeNull();
+    expect(sidebarProjectScope(projects, settings, [keyOf("old")])).toBeNull();
+    // A gone project next to a live one leaves the sidebar on the live one, and the page too.
+    expect(
+      sidebarProjectScope(projects, settings, [keyOf("api"), "github.com/acme/gone"])?.label,
+    ).toBe("api");
+    expect(issueHiddenProjects(hidden, projects, null)).toBe(hidden);
   });
 });
 

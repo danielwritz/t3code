@@ -1,13 +1,20 @@
 import { pullRequestFilterProjects } from "@t3tools/client-runtime/pull-request-project-filter";
 import type { EnvironmentProject } from "@t3tools/client-runtime/state/models";
+import type { ProjectGroupingSettings } from "@t3tools/client-runtime/state/project-grouping";
 import {
   ISSUE_LIST_MAX_EXCLUDED_PROJECTS,
   type EnvironmentId,
   type IssueListInput,
   type ProjectId,
+  type ScopedProjectRef,
 } from "@t3tools/contracts";
 
 import type { IssueListTarget } from "@t3tools/client-runtime/state/issues";
+
+import {
+  buildSidebarProjectSnapshots,
+  resolveSidebarProjectScopeKeys,
+} from "~/sidebarProjectGrouping";
 
 import type { IssuesSearch } from "./IssuesPage";
 
@@ -72,6 +79,58 @@ const projectKey = (project: { readonly id: ProjectId; readonly environmentId: E
 
 export const issueProjectKeys = (pairs: IssuesSearch["hideProjects"]): ReadonlySet<string> =>
   new Set((pairs ?? []).map((pair) => JSON.stringify(pair)));
+
+export interface SidebarProjectScope {
+  readonly key: string;
+  readonly label: string;
+  readonly projects: ReadonlyArray<ScopedProjectRef>;
+}
+
+/** The sidebar's project scope when it is exactly one project, resolved as the sidebar does. */
+export function sidebarProjectScope(
+  projects: ReadonlyArray<EnvironmentProject>,
+  settings: ProjectGroupingSettings,
+  keys: ReadonlyArray<string>,
+): SidebarProjectScope | null {
+  if (keys.length === 0) return null;
+  const groups = buildSidebarProjectSnapshots({
+    projects,
+    settings,
+    groupScratchProjects: true,
+    primaryEnvironmentId: null,
+    resolveEnvironmentLabel: () => null,
+  });
+  const chosen = resolveSidebarProjectScopeKeys({
+    groups,
+    keys,
+    settings,
+    canClearMissingScope: true,
+  }).flatMap((key) => groups.find((group) => group.projectKey === key && !group.archived) ?? []);
+  const group = chosen.length === 1 ? chosen[0]! : null;
+  return group === null
+    ? null
+    : { key: group.projectKey, label: group.displayName, projects: group.memberProjectRefs };
+}
+
+/** The saved hidden projects, plus every project outside the sidebar's scope. */
+export function issueHiddenProjects(
+  hidden: IssuesSearch["hideProjects"],
+  projects: ReadonlyArray<{ readonly id: ProjectId; readonly environmentId: EnvironmentId }>,
+  scope: SidebarProjectScope | null,
+): IssuesSearch["hideProjects"] {
+  if (scope === null) return hidden;
+  const inScope = new Set(
+    scope.projects.map((ref) =>
+      projectKey({ environmentId: ref.environmentId, id: ref.projectId }),
+    ),
+  );
+  return [
+    ...(hidden ?? []),
+    ...projects
+      .filter((project) => !inScope.has(projectKey(project)))
+      .map((project) => [project.environmentId, project.id] as const),
+  ];
+}
 
 /**
  * Each environment leaves out its hidden projects, named from the saved pairs so a listing sent
