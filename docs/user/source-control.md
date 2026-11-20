@@ -371,6 +371,8 @@ DevOps or Forgejo, grouped per tracker account. Open it from the sidebar's utili
 **Open issues** in the command palette. Filter by open or closed, by your involvement
 (assigned, opened by you, mentioning you), and by tracker. Under **Projects**, uncheck the
 projects you do not want to see; the list remembers them, and a project you add later shows.
+When the sidebar's project filter is set to one project, the list shows only that project's
+issues, and the project's chip beside the filters clears the sidebar filter.
 The search box asks the tracker itself where it can search. Press **Load more** at the end of a group to read further back.
 The **Views** menu saves and restores a search, filter, and sort setup, as it does for pull
 requests.
