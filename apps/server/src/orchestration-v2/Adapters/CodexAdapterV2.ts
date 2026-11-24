@@ -1706,6 +1706,8 @@ function codexThreadRuntimeParams(input: {
   readonly stdioMcpServers?: ReadonlyArray<string>;
   readonly modelSelection?: { readonly model: string };
   readonly runtimePolicy?: ProviderAdapter.ProviderAdapterV2RuntimePolicy;
+  // personal:skill-sets seam codex thread project config input
+  readonly projectConfig?: Readonly<Record<string, Schema.Json>>;
 }): {
   readonly cwd?: string;
   readonly model?: string;
@@ -1751,6 +1753,8 @@ function codexThreadRuntimeParams(input: {
               omit_tools_from: ["code_mode", "deferred"],
             },
           }),
+      // personal:skill-sets seam codex thread project config merge
+      ...input.projectConfig,
     },
   };
 }
@@ -8174,14 +8178,17 @@ export const makeCodexAdapterV2 = Effect.fn("makeCodexAdapterV2")(function* (
               Effect.all([
                 readMcpSession(providerThread.appThreadId),
                 readStdioMcpServers(undefined),
+                // personal:skill-sets seam codex loaded thread project config
+                skillSetLaunch.threadConfig(providerThread.appThreadId),
               ]).pipe(
-                Effect.flatMap(([mcpSession, stdioMcpServers]) =>
+                Effect.flatMap(([mcpSession, stdioMcpServers, projectConfig]) =>
                   resumeNativeThread(threadId, {
                     excludeTurns: true,
                     ...codexThreadRuntimeParams({
                       threadId: providerThread.appThreadId,
                       mcpSession,
                       stdioMcpServers,
+                      projectConfig,
                     }),
                   }),
                 ),
@@ -8355,14 +8362,17 @@ export const makeCodexAdapterV2 = Effect.fn("makeCodexAdapterV2")(function* (
                 Effect.all([
                   mcpSessions.read(threadInput.threadId),
                   readStdioMcpServers(threadInput.runtimePolicy.cwd),
+                  // personal:skill-sets seam codex start thread project config
+                  skillSetLaunch.threadConfig(threadInput.threadId, threadInput.runtimePolicy.cwd),
                 ]),
               ),
-              Effect.flatMap(([mcpSession, stdioMcpServers]) =>
+              Effect.flatMap(([mcpSession, stdioMcpServers, projectConfig]) =>
                 client.request("thread/start", {
                   ...codexThreadRuntimeParams({
                     threadId: threadInput.threadId,
                     mcpSession,
                     stdioMcpServers,
+                    projectConfig,
                     modelSelection: threadInput.modelSelection,
                     runtimePolicy: threadInput.runtimePolicy,
                   }),
@@ -8408,6 +8418,11 @@ export const makeCodexAdapterV2 = Effect.fn("makeCodexAdapterV2")(function* (
                   threadId: appThreadId,
                   mcpSession: yield* readMcpSession(appThreadId),
                   stdioMcpServers: yield* readStdioMcpServers(threadInput.runtimePolicy?.cwd),
+                  // personal:skill-sets seam codex resume thread project config
+                  projectConfig: yield* skillSetLaunch.threadConfig(
+                    appThreadId,
+                    threadInput.runtimePolicy?.cwd,
+                  ),
                   ...(threadInput.modelSelection === undefined
                     ? {}
                     : { modelSelection: threadInput.modelSelection }),
@@ -9420,6 +9435,10 @@ export const makeCodexAdapterV2 = Effect.fn("makeCodexAdapterV2")(function* (
                     threadId: threadInput.providerThread.appThreadId,
                     mcpSession: yield* readMcpSession(threadInput.providerThread.appThreadId),
                     stdioMcpServers: yield* readStdioMcpServers(undefined),
+                    // personal:skill-sets seam codex rollback thread project config
+                    projectConfig: yield* skillSetLaunch.threadConfig(
+                      threadInput.providerThread.appThreadId,
+                    ),
                   }),
                 });
               }
@@ -9468,6 +9487,11 @@ export const makeCodexAdapterV2 = Effect.fn("makeCodexAdapterV2")(function* (
                   threadId: threadInput.targetThreadId,
                   mcpSession: yield* mcpSessions.read(threadInput.targetThreadId),
                   stdioMcpServers: yield* readStdioMcpServers(threadInput.runtimePolicy?.cwd),
+                  // personal:skill-sets seam codex fork thread project config
+                  projectConfig: yield* skillSetLaunch.threadConfig(
+                    threadInput.targetThreadId,
+                    threadInput.runtimePolicy?.cwd,
+                  ),
                   ...(threadInput.modelSelection === undefined
                     ? {}
                     : { modelSelection: threadInput.modelSelection }),

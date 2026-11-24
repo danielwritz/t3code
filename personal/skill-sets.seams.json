@@ -770,6 +770,41 @@
     "file": "apps/server/src/orchestration-v2/Adapters/CodexAdapterV2.ts"
   },
   {
+    "file": "apps/server/src/orchestration-v2/Adapters/CodexAdapterV2.ts",
+    "marker": "personal:skill-sets seam codex thread project config input",
+    "connects": "per-thread ignore-project config parameter"
+  },
+  {
+    "file": "apps/server/src/orchestration-v2/Adapters/CodexAdapterV2.ts",
+    "marker": "personal:skill-sets seam codex thread project config merge",
+    "connects": "merges the ignore-project config into thread config"
+  },
+  {
+    "file": "apps/server/src/orchestration-v2/Adapters/CodexAdapterV2.ts",
+    "marker": "personal:skill-sets seam codex loaded thread project config",
+    "connects": "ignore-project config when an unloaded thread is resumed"
+  },
+  {
+    "file": "apps/server/src/orchestration-v2/Adapters/CodexAdapterV2.ts",
+    "marker": "personal:skill-sets seam codex start thread project config",
+    "connects": "ignore-project config on thread/start"
+  },
+  {
+    "file": "apps/server/src/orchestration-v2/Adapters/CodexAdapterV2.ts",
+    "marker": "personal:skill-sets seam codex resume thread project config",
+    "connects": "ignore-project config on thread/resume"
+  },
+  {
+    "file": "apps/server/src/orchestration-v2/Adapters/CodexAdapterV2.ts",
+    "marker": "personal:skill-sets seam codex rollback thread project config",
+    "connects": "ignore-project config on the rollback resume"
+  },
+  {
+    "file": "apps/server/src/orchestration-v2/Adapters/CodexAdapterV2.ts",
+    "marker": "personal:skill-sets seam codex fork thread project config",
+    "connects": "ignore-project config on thread/fork"
+  },
+  {
     "marker": "personal:skill-sets seam session identity import",
     "connects": "session identity import",
     "file": "apps/server/src/orchestration-v2/ProviderSessionManager.ts"

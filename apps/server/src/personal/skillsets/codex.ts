@@ -4,32 +4,74 @@ import * as FileSystem from "effect/FileSystem";
 import * as Option from "effect/Option";
 import * as Path from "effect/Path";
 import * as Schema from "effect/Schema";
+import * as Scope from "effect/Scope";
+import * as Semaphore from "effect/Semaphore";
 import * as HostProcess from "@t3tools/shared/HostProcess";
 import * as ChildProcessSpawner from "effect/process/ChildProcessSpawner";
 import * as SkillSets from "./runtime.ts";
 import type { SkillSetThread } from "./resolver.ts";
 import { withSessionInputIdentity } from "./sessionIdentity.ts";
 import {
-  codexIsolationOverrides,
+  codexSkillRules,
   discoverCodexSkillInventory,
+  writeCodexConfig,
   type CodexSkillInventory,
 } from "./codexIsolation.ts";
+import {
+  codexIgnoreProjectConfig,
+  codexOwnedEntries,
+  codexProfileConfigEdits,
+  codexProfileDisablesHooks,
+  codexUntrustedProjectsArg,
+  type CodexConfigEdit,
+  type CodexProjectInventory,
+} from "./codexProfile.ts";
+import { acceptOwnedEntries } from "./home.ts";
+import { machinePolicyHooksEnvironment, type ResolvedAgentProfile } from "./profile.ts";
 import { resolveCodexLaunchArgs } from "../../provider/codexLaunchArgs.ts";
 import { KNOWN_SHARED_DIRECTORIES } from "../../provider/Drivers/CodexHomeLayout.ts";
 import * as ServerSettings from "../../serverSettings.ts";
 
-const launchIdentity = (home: string, args: string, cwd: string) =>
-  JSON.stringify([home, args, cwd]);
+const launchIdentity = (home: string, args: string, cwd: string, profile?: ResolvedAgentProfile) =>
+  JSON.stringify([home, args, cwd, profile?.contentHash ?? null]);
 const decodeSettings = Schema.decodeEffect(CodexSettings);
+type ThreadConfig = Readonly<Record<string, Schema.Json>>;
+const noThreadConfig = (_threadId: string | null, _cwd?: string | null) =>
+  Effect.succeed<ThreadConfig>({});
 
-export const makeCodexSkillSets = Effect.fn("SkillSets.makeCodexLaunch")(function* <E = never>(
+/** The generated `config.toml` per built home, so a rebuild writes it back instead of the raw copy. */
+const generatedConfigs = new Map<
+  string,
+  { readonly real: string | null; readonly edits: string; readonly contents: string }
+>();
+const homeLocks = new Map<string, Semaphore.Semaphore>();
+const homeLock = (key: string) => {
+  let lock = homeLocks.get(key);
+  if (!lock) homeLocks.set(key, (lock = Semaphore.makeUnsafe(1)));
+  return lock;
+};
+
+const textKey = (...parts: readonly unknown[]) => JSON.stringify(parts);
+
+/** Codex app-server calls; tests replace them. Failures are defects the launch logs and survives. */
+type Discover = (
+  settings: CodexSettings,
+  environment: NodeJS.ProcessEnv,
+  cwd: string,
+) => Effect.Effect<CodexSkillInventory>;
+type WriteConfig = (
+  settings: CodexSettings,
+  environment: NodeJS.ProcessEnv,
+  cwd: string,
+  filePath: string,
+  edits: readonly CodexConfigEdit[],
+) => Effect.Effect<void>;
+
+export const makeCodexSkillSets = Effect.fn("SkillSets.makeCodexLaunch")(function* (
   instanceId: ProviderInstanceId,
   environment: NodeJS.ProcessEnv = {},
-  discover?: (
-    settings: CodexSettings,
-    environment: NodeJS.ProcessEnv,
-    cwd: string,
-  ) => Effect.Effect<CodexSkillInventory, E>,
+  discover?: Discover,
+  writeConfig?: WriteConfig,
 ) {
   const service = yield* Effect.serviceOption(SkillSets.SkillSets);
   const path = yield* Path.Path;
@@ -38,6 +80,31 @@ export const makeCodexSkillSets = Effect.fn("SkillSets.makeCodexLaunch")(functio
   const cwd = yield* HostProcess.WorkingDirectory;
   const spawner = yield* Effect.serviceOption(ChildProcessSpawner.ChildProcessSpawner);
   const settingsService = yield* Effect.serviceOption(ServerSettings.ServerSettingsService);
+  const withCodex = <A, X>(
+    effect: Effect.Effect<
+      A,
+      X,
+      ChildProcessSpawner.ChildProcessSpawner | FileSystem.FileSystem | Path.Path | Scope.Scope
+    >,
+  ): Effect.Effect<A> =>
+    Option.isSome(spawner)
+      ? effect.pipe(
+          Effect.provideService(ChildProcessSpawner.ChildProcessSpawner, spawner.value),
+          Effect.provideService(FileSystem.FileSystem, fs),
+          Effect.provideService(Path.Path, path),
+          Effect.scoped,
+          Effect.timeout("20 seconds"),
+          Effect.orDie,
+        )
+      : Effect.die("Codex app-server unavailable");
+  const runDiscovery: Discover =
+    discover ??
+    ((settings, env, workspace) =>
+      withCodex(discoverCodexSkillInventory(settings, env, workspace)));
+  const runConfigWrite: WriteConfig =
+    writeConfig ??
+    ((settings, env, workspace, filePath, edits) =>
+      withCodex(writeCodexConfig(settings, env, workspace, filePath, edits)));
   const selection = Effect.fn("SkillSets.codexSelection")(function* (thread: SkillSetThread) {
     const settings = Option.isSome(settingsService)
       ? yield* settingsService.value.getSettings.pipe(Effect.option)
@@ -70,14 +137,29 @@ export const makeCodexSkillSets = Effect.fn("SkillSets.makeCodexLaunch")(functio
       environment,
       identity: undefined as string | undefined,
       skillSetId: undefined as string | undefined,
+      profile: undefined as ResolvedAgentProfile | undefined,
+      threadConfig: noThreadConfig,
     };
     if (Option.isNone(service)) return upstream;
     const realHome = settings.homePath || environment.CODEX_HOME || path.join(home, ".codex");
+    const realConfig = yield* fs
+      .readFileString(path.join(realHome, "config.toml"))
+      .pipe(Effect.orElseSucceed(() => null));
+    // One built home per working directory: the skill disable list depends on the project's aliases.
+    const homeKey = textKey(instanceId, realHome, path.resolve(workspace));
+    const generatedKey = (profileId: string) => textKey(homeKey, profileId);
     const instance = {
-      instanceId,
+      instanceId: homeKey,
       realHome,
       skillsEntry: "skills",
       privateEntries: ["models_cache.json"],
+      owned: (profile: ResolvedAgentProfile) => {
+        const generated = generatedConfigs.get(generatedKey(profile.profileId));
+        return codexOwnedEntries(
+          profile,
+          generated && generated.real === realConfig ? generated.contents : realConfig,
+        );
+      },
     };
     const resolve = service.value
       .resolveHome("codex", instance, thread)
@@ -88,9 +170,9 @@ export const makeCodexSkillSets = Effect.fn("SkillSets.makeCodexLaunch")(functio
           ),
         ),
       );
-    let resolved = yield* resolve;
-    if (!resolved) return upstream;
     return yield* Effect.gen(function* () {
+      let resolved = yield* resolve;
+      if (!resolved) return upstream;
       // Match the existing shadow-home layout so new archives and writer locks stay shared across sets.
       let addedRuntimeDirectory = false;
       for (const entry of KNOWN_SHARED_DIRECTORIES) {
@@ -100,9 +182,10 @@ export const makeCodexSkillSets = Effect.fn("SkillSets.makeCodexLaunch")(functio
       }
       if (addedRuntimeDirectory) resolved = yield* resolve;
       if (!resolved) return upstream;
+      const built = resolved;
       // Preserve the instance's private login identity. Codex resolves auth symlinks before atomic replacement.
       for (const entry of ["auth.json", "auth.lock"]) {
-        const destination = path.join(resolved.homePath, entry);
+        const destination = path.join(built.homePath, entry);
         const exists = yield* fs.readLink(destination).pipe(Effect.option);
         if (
           Option.isSome(exists) &&
@@ -112,33 +195,19 @@ export const makeCodexSkillSets = Effect.fn("SkillSets.makeCodexLaunch")(functio
         if (Option.isSome(exists)) yield* fs.remove(destination);
         yield* fs.symlink(path.join(realHome, entry), destination);
       }
-      const launchEnvironment = {
+      const profile = built.profile;
+      const launchEnvironment: NodeJS.ProcessEnv = {
         ...environment,
         CODEX_SQLITE_HOME: environment.CODEX_SQLITE_HOME ?? realHome,
         T3CODE_CODEX_LAUNCH_ARGS: undefined,
+        ...(profile ? machinePolicyHooksEnvironment(profile) : {}),
       };
       let launchSettings = {
         ...settings,
-        homePath: resolved.homePath,
+        homePath: built.homePath,
         launchArgs: resolveCodexLaunchArgs(settings.launchArgs, environment),
       };
-      const inventory = yield* Effect.gen(function* () {
-        if (discover) return yield* discover(launchSettings, launchEnvironment, workspace);
-        if (Option.isSome(spawner)) {
-          return yield* discoverCodexSkillInventory(
-            launchSettings,
-            launchEnvironment,
-            workspace,
-          ).pipe(
-            Effect.provideService(ChildProcessSpawner.ChildProcessSpawner, spawner.value),
-            Effect.provideService(FileSystem.FileSystem, fs),
-            Effect.provideService(Path.Path, path),
-            Effect.scoped,
-            Effect.timeout("20 seconds"),
-          );
-        }
-        return yield* Effect.fail("discovery unavailable");
-      }).pipe(
+      const inventory = yield* runDiscovery(launchSettings, launchEnvironment, workspace).pipe(
         Effect.catchCause((cause) =>
           Effect.logWarning(
             "Codex user-skill isolation discovery failed; external user skills may remain visible",
@@ -152,27 +221,96 @@ export const makeCodexSkillSets = Effect.fn("SkillSets.makeCodexLaunch")(functio
         );
         return upstream;
       }
-      if (inventory) {
-        const override = yield* codexIsolationOverrides(
-          inventory.skills,
-          resolved.skills,
-          inventory.preservedPaths,
-        ).pipe(
-          Effect.provideService(FileSystem.FileSystem, fs),
-          Effect.provideService(Path.Path, path),
-        );
-        launchSettings = {
-          ...launchSettings,
-          launchArgs: `${launchSettings.launchArgs} ${override}`.trim(),
-        };
+      if (profile) {
+        const generated = generatedConfigs.get(generatedKey(profile.profileId));
+        const current = generated?.real === realConfig ? generated : undefined;
+        if (!inventory) {
+          // Without discovery the copy may still be the raw personal config; never run on that.
+          if (!current) return upstream;
+        } else {
+          const skillRules = yield* codexSkillRules(
+            inventory.skills,
+            built.skills,
+            inventory.preservedPaths,
+          ).pipe(
+            Effect.provideService(FileSystem.FileSystem, fs),
+            Effect.provideService(Path.Path, path),
+          );
+          const edits = codexProfileConfigEdits({
+            profile,
+            realHome,
+            homePath: built.homePath,
+            skillRules,
+            hooks: inventory.hooks ?? [],
+            hooksState: inventory.hooksState,
+            userPlugins: inventory.userPlugins,
+          });
+          const editsKey = textKey(edits);
+          if (current?.edits !== editsKey) {
+            const configPath = path.join(built.homePath, "config.toml");
+            yield* runConfigWrite(launchSettings, launchEnvironment, workspace, configPath, edits);
+            yield* Effect.promise(() => acceptOwnedEntries(built.homePath, ["config.toml"]));
+            generatedConfigs.set(generatedKey(profile.profileId), {
+              real: realConfig,
+              edits: editsKey,
+              contents: yield* fs.readFileString(configPath),
+            });
+          }
+          const flags = [
+            codexProfileDisablesHooks(profile, inventory.hooks ?? []) ? "--disable hooks" : "",
+            // The session owner's switch is in the process identity, so the whole process can follow it.
+            profile.ignoreProjectInstructions
+              ? codexUntrustedProjectsArg(inventory.projectDirectories ?? [workspace])
+              : "",
+          ].filter(Boolean);
+          if (flags.length)
+            launchSettings = {
+              ...launchSettings,
+              launchArgs: [launchSettings.launchArgs, ...flags].join(" ").trim(),
+            };
+        }
       }
+      const projects = new Map<string, CodexProjectInventory>();
+      if (inventory?.project) projects.set(path.resolve(workspace), inventory.project);
+      const threadConfig = Effect.fn("SkillSets.codexThreadConfig")(
+        function* (threadId: string | null, threadCwd?: string | null) {
+          if (!profile) return {};
+          const effective =
+            threadId === null || !service.value.resolveProfile
+              ? profile
+              : yield* service.value.resolveProfile("codex", {
+                  skillSetId: profile.profileId,
+                  threadId,
+                });
+          if (!effective?.ignoreProjectInstructions) return {};
+          const directory = path.resolve(threadCwd ?? workspace);
+          let project = projects.get(directory);
+          if (!project) {
+            project = (yield* runDiscovery(launchSettings, launchEnvironment, directory)).project;
+            if (project) projects.set(directory, project);
+          }
+          return project ? codexIgnoreProjectConfig(project) : { project_doc_max_bytes: 0 };
+        },
+        (effect) =>
+          effect.pipe(
+            Effect.catchCause((cause) =>
+              Effect.logWarning(
+                "Could not apply the Codex ignore-project switch; the repo stays visible",
+                cause,
+              ).pipe(Effect.as<ThreadConfig>({})),
+            ),
+          ),
+      );
       return {
         settings: launchSettings,
         environment: launchEnvironment,
-        identity: launchIdentity(resolved.homePath, launchSettings.launchArgs, workspace),
+        identity: launchIdentity(built.homePath, launchSettings.launchArgs, workspace, profile),
         skillSetId: (yield* selection(thread)).id,
+        profile,
+        threadConfig,
       };
     }).pipe(
+      homeLock(homeKey).withPermit,
       Effect.catchCause((cause) =>
         Effect.logWarning(
           "Could not prepare Codex skill-set home; using instance home",
@@ -228,10 +366,11 @@ interface ProbeInput {
   readonly environment?: NodeJS.ProcessEnv;
 }
 
-export const makeCodexSkillSetProbe = Effect.fn("SkillSets.codexProbe")(function* <A, E, R>(
-  instanceId: ProviderInstanceId,
-  probe: (input: ProbeInput) => Effect.Effect<A, E, R>,
-) {
+export const makeCodexSkillSetProbe = Effect.fn("SkillSets.codexProbe")(function* <
+  S extends { readonly scope?: string | undefined },
+  E,
+  R,
+>(instanceId: ProviderInstanceId, probe: (input: ProbeInput) => Effect.Effect<readonly S[], E, R>) {
   const sets = yield* makeCodexSkillSets(instanceId);
   return (request: ProbeInput & { readonly thread?: SkillSetThread | undefined }) =>
     Effect.gen(function* () {
@@ -242,7 +381,7 @@ export const makeCodexSkillSetProbe = Effect.fn("SkillSets.codexProbe")(function
         launchArgs: input.launchArgs ?? "",
       });
       const launch = yield* sets.launch(settings, thread, input.cwd, input.environment);
-      return yield* probe(
+      const skills = yield* probe(
         launch.identity === undefined
           ? input
           : {
@@ -252,5 +391,9 @@ export const makeCodexSkillSetProbe = Effect.fn("SkillSets.codexProbe")(function
               environment: launch.environment,
             },
       );
+      // The thread itself drops repo skills (codexIgnoreProjectConfig); its menus follow.
+      return launch.profile?.ignoreProjectInstructions
+        ? skills.filter((skill) => skill.scope !== "repo")
+        : skills;
     });
 });

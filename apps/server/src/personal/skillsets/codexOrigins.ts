@@ -12,6 +12,25 @@ class CodexProjectSkillScanLimitError extends Schema.TaggedError<CodexProjectSki
   }
 }
 
+/** The working directory and its parents up to the project root, as Codex finds it by marker. */
+export const codexProjectDirectories = Effect.fn("SkillSets.codexProjectDirectories")(function* (
+  cwd: string,
+  markers: readonly string[],
+) {
+  const fs = yield* FileSystem.FileSystem;
+  const path = yield* Path.Path;
+  const ancestors: string[] = [];
+  let directory = path.resolve(cwd);
+  while (true) {
+    ancestors.push(directory);
+    for (const marker of markers)
+      if (yield* fs.exists(path.join(directory, marker))) return ancestors;
+    const parent = path.dirname(directory);
+    if (markers.length === 0 || parent === directory) return ancestors.slice(0, 1);
+    directory = parent;
+  }
+});
+
 // Codex deduplicates canonical paths before returning scopes, hiding some project aliases.
 export const codexProjectSkillPaths = Effect.fn("SkillSets.codexProjectSkillPaths")(function* (
   cwd: string,

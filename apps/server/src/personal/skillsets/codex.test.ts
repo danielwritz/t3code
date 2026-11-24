@@ -7,7 +7,7 @@ import * as FileSystem from "effect/FileSystem";
 import * as Path from "effect/Path";
 import * as Stream from "effect/Stream";
 import { makeCodexSkillSets } from "./codex.ts";
-import { codexIsolationOverrides } from "./codexIsolation.ts";
+import { codexSkillRules } from "./codexIsolation.ts";
 import * as SkillSets from "./runtime.ts";
 import { resolveHome } from "./resolver.ts";
 import { buildSkillSetHome } from "./home.ts";
@@ -42,23 +42,25 @@ describe("Codex skill-set launch", () => {
         const preserved = yield* codexProjectSkillPaths(cwd, ["project.marker"]);
         expect(preserved).toEqual([yield* fs.realPath(path.join(target, "SKILL.md"))]);
         expect(yield* codexProjectSkillPaths(cwd, [])).toEqual([]);
-        const override = yield* codexIsolationOverrides(
-          [
-            {
-              name: "project-alias",
-              path: path.join(target, "SKILL.md"),
-              scope: "user",
-              enabled: true,
-            },
-            {
-              name: "outside",
-              path: path.join(root, "outside", "SKILL.md"),
-              scope: "user",
-              enabled: true,
-            },
-          ],
-          [],
-          preserved,
+        const override = JSON.stringify(
+          yield* codexSkillRules(
+            [
+              {
+                name: "project-alias",
+                path: path.join(target, "SKILL.md"),
+                scope: "user",
+                enabled: true,
+              },
+              {
+                name: "outside",
+                path: path.join(root, "outside", "SKILL.md"),
+                scope: "user",
+                enabled: true,
+              },
+            ],
+            [],
+            preserved,
+          ),
         );
         expect(override).not.toContain("canonical-skill");
         expect(override).toContain("outside");
@@ -219,20 +221,23 @@ describe("Codex skill-set launch", () => {
             enabled: true,
           },
         ];
-        const override = yield* codexIsolationOverrides(inventory, [{ targetPath: picked }]);
+        const override = JSON.stringify(
+          yield* codexSkillRules(inventory, [{ targetPath: picked }]),
+        );
         expect(override).toContain("extra.md");
         expect(override).not.toContain("project.md");
         expect(override).not.toContain("plugin.md");
         expect(override).not.toContain("alias.md");
         expect(override).not.toContain("SKILL.md");
-        const reenabled = yield* codexIsolationOverrides(
+        const reenabled = yield* codexSkillRules(
           inventory.map((skill) =>
             skill.name === "picked" ? { ...skill, enabled: false } : skill,
           ),
           [{ targetPath: picked }],
         );
-        expect(reenabled.match(/SKILL.md/g)).toHaveLength(1);
-        expect(reenabled).toContain("enabled=true");
+        expect(reenabled.filter((rule) => rule.path.endsWith("SKILL.md"))).toEqual([
+          { path: yield* fs.realPath(document), enabled: true },
+        ]);
       }).pipe(Effect.scoped, Effect.provide(NodeServices.layer)),
   );
 });
