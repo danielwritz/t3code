@@ -368,5 +368,75 @@
     "file": "packages/client-runtime/src/rpc/client.ts",
     "marker": "personal:skill-sets seam client subscription",
     "connects": "allows status updates through the shared connected-environment subscribe helper"
+  },
+  {
+    "file": "apps/server/src/provider/Drivers/AntigravityDriver.ts",
+    "marker": "personal:skill-sets seam antigravity imports",
+    "connects": "antigravity imports"
+  },
+  {
+    "file": "apps/server/src/provider/Drivers/AntigravityDriver.ts",
+    "marker": "personal:skill-sets seam antigravity dependency",
+    "connects": "antigravity dependency"
+  },
+  {
+    "file": "apps/server/src/provider/Drivers/AntigravityDriver.ts",
+    "marker": "personal:skill-sets seam antigravity service",
+    "connects": "antigravity service"
+  },
+  {
+    "file": "apps/server/src/provider/Drivers/AntigravityDriver.ts",
+    "marker": "personal:skill-sets seam antigravity spawn input",
+    "connects": "antigravity spawn input"
+  },
+  {
+    "file": "apps/server/src/provider/Drivers/AntigravityDriver.ts",
+    "marker": "personal:skill-sets seam antigravity spawn profile",
+    "connects": "antigravity spawn profile"
+  },
+  {
+    "file": "apps/server/src/provider/Drivers/AntigravityDriver.ts",
+    "marker": "personal:skill-sets seam antigravity runtime pick",
+    "connects": "antigravity runtime pick"
+  },
+  {
+    "file": "apps/server/src/provider/Drivers/AntigravityDriver.ts",
+    "marker": "personal:skill-sets seam antigravity session identity",
+    "connects": "antigravity session identity"
+  },
+  {
+    "file": "apps/server/src/provider/Drivers/AntigravityDriver.ts",
+    "marker": "personal:skill-sets seam antigravity menu context",
+    "connects": "antigravity menu context"
+  },
+  {
+    "file": "apps/server/src/provider/Drivers/AntigravitySkills.ts",
+    "marker": "personal:skill-sets seam antigravity skill roots",
+    "connects": "antigravity skill roots"
+  },
+  {
+    "file": "apps/server/src/provider/Drivers/AntigravitySkills.ts",
+    "marker": "personal:skill-sets seam antigravity directory selection",
+    "connects": "antigravity directory selection"
+  },
+  {
+    "file": "apps/server/src/provider/Drivers/AntigravitySkills.ts",
+    "marker": "personal:skill-sets seam antigravity skill config",
+    "connects": "antigravity skill config"
+  },
+  {
+    "file": "apps/server/src/provider/ProviderRegistry.test.ts",
+    "marker": "personal:skill-sets seam registry test dependency import",
+    "connects": "registry test dependency import"
+  },
+  {
+    "file": "apps/server/src/provider/ProviderRegistry.test.ts",
+    "marker": "personal:skill-sets seam registry test dependency",
+    "connects": "registry test dependency"
+  },
+  {
+    "file": "apps/server/src/provider/Drivers/AntigravitySkills.ts",
+    "marker": "personal:skill-sets seam antigravity user home",
+    "connects": "antigravity user home"
   }
 ]

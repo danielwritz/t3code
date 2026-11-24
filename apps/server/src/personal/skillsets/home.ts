@@ -98,7 +98,7 @@ export async function buildSkillSetHome(input: HomeInput): Promise<string> {
         throw error;
       },
     )) {
-      if (entry !== skillParts[index + 1])
+      if (entry !== skillParts[index + 1] && !input.privateEntries?.includes(skillParts[0]!))
         await link(NodePath.join(sourceParent, entry), NodePath.join(outputParent, entry));
     }
   }

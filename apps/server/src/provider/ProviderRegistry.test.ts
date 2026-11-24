@@ -71,6 +71,8 @@ import * as ProviderInstanceRegistryHydration from "./ProviderInstanceRegistryHy
 import * as PortScanner from "../preview/PortScanner.ts";
 import * as ServerConfig from "../config.ts";
 import * as ServerSettingsModule from "../serverSettings.ts";
+// personal:skill-sets seam registry test dependency import
+import * as SkillSets from "../personal/skillsets/runtime.ts";
 import * as SqlitePersistence from "../persistence/Sqlite.ts";
 import {
   readProviderStatusCache,
@@ -562,6 +564,11 @@ const buildRegistryOverSnapshot = Effect.fn("buildRegistryOverSnapshot")(functio
 });
 
 const layerTestNodeServices = Layer.mergeAll(
+  // personal:skill-sets seam registry test dependency
+  Layer.mock(SkillSets.SkillSets)({
+    resolveHome: () => Effect.undefined,
+    statuses: Effect.succeed([]),
+  }),
   ProviderLatestVersions.layer,
   NodeServices.layer,
   NodeCrypto.layer,

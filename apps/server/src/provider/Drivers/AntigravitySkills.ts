@@ -228,6 +228,8 @@ export const discoverAntigravitySkills = Effect.fn("discoverAntigravitySkills")(
   readonly userHome: string;
   /** The instance's GEMINI_HOME, where agy loads plugins from. */
   readonly profileDirectory: string;
+  // personal:skill-sets seam antigravity skill roots
+  readonly userGeminiHome?: string;
 }): Effect.fn.Return<
   ReadonlyArray<ServerProviderSkill>,
   AntigravitySkillsProbeError,
@@ -235,9 +237,12 @@ export const discoverAntigravitySkills = Effect.fn("discoverAntigravitySkills")(
 > {
   const fileSystem = yield* FileSystem.FileSystem;
   const path = yield* Path.Path;
+  // personal:skill-sets seam antigravity user home
+  const userGemini = input.userGeminiHome ?? path.join(input.userHome, ".gemini");
   const [configSkills, cliSkills] = antigravityUserSkillDirectories(
     path,
-    path.join(input.userHome, ".gemini"),
+    // personal:skill-sets seam antigravity directory selection
+    userGemini,
   );
   const roots = [
     { directory: configSkills, scope: "user" },
@@ -390,8 +395,9 @@ export const discoverAntigravitySkills = Effect.fn("discoverAntigravitySkills")(
       scope: "project",
     },
     {
-      configPath: path.join(input.userHome, ".gemini", "config", "skills.json"),
-      baseDir: path.join(input.userHome, ".gemini", "config"),
+      // personal:skill-sets seam antigravity skill config
+      configPath: path.join(userGemini, "config", "skills.json"),
+      baseDir: path.join(userGemini, "config"),
       scope: "user",
     },
   ]) {
