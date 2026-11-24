@@ -168,6 +168,10 @@ it.layer(NodeServices.layer)("Antigravity skill sets", (it) => {
             { name: "beta", path: "/beta/SKILL.md", scope: "user", enabled: true },
           ],
         });
+        yield* fs.writeFileString(
+          path.join(root, "set", "alpha", "SKILL.md"),
+          "---\nname: alpha\ndescription: Run this: when asked\n---\n",
+        );
         const menu = yield* Effect.gen(function* () {
           return yield* antigravitySkillSetSnapshot({
             service: yield* SkillSets.SkillSets,

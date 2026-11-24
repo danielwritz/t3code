@@ -92,3 +92,15 @@ export function isSkillSetSettingsKey(key: string): boolean {
     key === "skillSetSyncIntervalMinutes"
   );
 }
+
+export function skillSetParentThreadId(thread: {
+  readonly creationSource: string;
+  readonly lineage: {
+    readonly parentThreadId: import("./baseSchemas.ts").ThreadId | null;
+    readonly relationshipToParent: string | null;
+  };
+}) {
+  return thread.creationSource === "provider" && thread.lineage.relationshipToParent === "subagent"
+    ? thread.lineage.parentThreadId
+    : null;
+}

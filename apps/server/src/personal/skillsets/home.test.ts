@@ -17,6 +17,8 @@ describe("skill set home", () => {
     await NodeFSP.mkdir(target);
     await NodeFSP.mkdir(foreign, { recursive: true });
     await NodeFSP.writeFile(NodePath.join(foreign, "keep"), "untouched");
+    await NodeFSP.writeFile(NodePath.join(output, "runtime-state"), "retained");
+    await NodeFSP.writeFile(NodePath.join(home, "runtime-state"), "source");
     for (const name of ["alpha", "beta"]) {
       const result = await buildSkillSetHome({
         realHome: home,
@@ -24,11 +26,14 @@ describe("skill set home", () => {
         skillsEntry: "skills",
         skills: [{ name, targetPath: target }],
       });
-      expect(result).toEqual({ homePath: output, foreignEntries: ["synced"] });
+      expect(result).toEqual({ homePath: output, foreignEntries: ["runtime-state", "synced"] });
       expect(await NodeFSP.realpath(NodePath.join(output, "skills", name))).toBe(
         await NodeFSP.realpath(target),
       );
       expect(await NodeFSP.readFile(NodePath.join(foreign, "keep"), "utf8")).toBe("untouched");
+      expect(await NodeFSP.readFile(NodePath.join(output, "runtime-state"), "utf8")).toBe(
+        "retained",
+      );
     }
   });
   it("repairs links, sees new home files, follows linked sources and removes disabled skills", async () => {

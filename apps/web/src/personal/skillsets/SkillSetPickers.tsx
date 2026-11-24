@@ -1,3 +1,5 @@
+import { SkillSetRepoImage } from "./SkillSetRepoImage";
+import { formatRelativeTime, parseTimestampDate } from "~/timestampFormat";
 import { createElement } from "react";
 import { lucideIconByName } from "~/lib/lucideIconByName";
 import { projectIconColorClassName } from "~/projectIconColors";
@@ -22,9 +24,15 @@ import {
 } from "~/components/ui/menu";
 import { m, type MessageResolver } from "~/i18n/messages";
 import { cn } from "~/lib/utils";
-import { useSkillSets, type SkillSet, type SkillSetLogo as Logo } from "./skillSetsStore";
+import {
+  useSkillSets,
+  AttachedSkillSetChipScope,
+  type SkillSet,
+  type SkillSetLogo as Logo,
+} from "./skillSetsStore";
 
-export function SkillSetLogo({ logo, className }: { logo: Logo; className?: string }) {
+export function SkillSetLogo({ logo, className }: { logo: Logo; className?: string | undefined }) {
+  if (logo.kind === "repo-image") return <SkillSetRepoImage logo={logo} className={className} />;
   if (logo.kind === "emoji")
     return (
       <span aria-hidden className={cn("size-5 shrink-0", className)}>
@@ -58,8 +66,20 @@ export const syncLine = (set: SkillSet, resolve: MessageResolver = m) => {
   return [
     state,
     set.repo.commit,
-    status?.commitDate,
-    status?.lastChecked ? resolve(msg("Checked {date}", { date: status.lastChecked })) : null,
+    status?.commitDate
+      ? parseTimestampDate(status.commitDate)?.toLocaleDateString(undefined, {
+          month: "short",
+          day: "numeric",
+          year: "numeric",
+        })
+      : null,
+    status?.lastChecked
+      ? resolve(
+          msg("Checked {date}", {
+            date: formatRelativeTime(status.lastChecked, undefined, resolve)?.label ?? "",
+          }),
+        )
+      : null,
     status?.error,
   ]
     .filter(Boolean)
@@ -169,5 +189,19 @@ export function SkillSetComposerChip() {
         </MenuItem>
       </MenuPopup>
     </Menu>
+  );
+}
+
+export function AttachedSkillSetChip({
+  environmentId,
+  threadId,
+}: {
+  environmentId: import("@t3tools/contracts").EnvironmentId;
+  threadId: import("@t3tools/contracts").ThreadId;
+}) {
+  return (
+    <AttachedSkillSetChipScope environmentId={environmentId} threadId={threadId}>
+      <SkillSetComposerChip />
+    </AttachedSkillSetChipScope>
   );
 }

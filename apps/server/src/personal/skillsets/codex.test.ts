@@ -6,7 +6,7 @@ import * as Schema from "effect/Schema";
 import * as FileSystem from "effect/FileSystem";
 import * as Path from "effect/Path";
 import * as Stream from "effect/Stream";
-import { makeCodexSkillSets, codexForeignHomeEntries } from "./codex.ts";
+import { makeCodexSkillSets } from "./codex.ts";
 import { codexIsolationOverrides } from "./codexIsolation.ts";
 import * as SkillSets from "./runtime.ts";
 import { resolveHome } from "./resolver.ts";
@@ -170,9 +170,9 @@ describe("Codex skill-set launch", () => {
           path.join(selected.settings.homePath, "future-runtime-state"),
           "fixture",
         );
-        expect(yield* codexForeignHomeEntries(selected.settings.homePath)).toEqual([
-          "future-runtime-state",
-        ]);
+        expect((yield* sets.launch(settings, {})).settings.homePath).toBe(
+          selected.settings.homePath,
+        );
         keyring = true;
         expect((yield* sets.launch(settings, {})).settings).toBe(settings);
         keyring = false;
@@ -224,8 +224,15 @@ describe("Codex skill-set launch", () => {
         expect(override).not.toContain("project.md");
         expect(override).not.toContain("plugin.md");
         expect(override).not.toContain("alias.md");
-        expect(override.match(/SKILL.md/g)).toHaveLength(1);
-        expect(override).toContain("enabled=true");
+        expect(override).not.toContain("SKILL.md");
+        const reenabled = yield* codexIsolationOverrides(
+          inventory.map((skill) =>
+            skill.name === "picked" ? { ...skill, enabled: false } : skill,
+          ),
+          [{ targetPath: picked }],
+        );
+        expect(reenabled.match(/SKILL.md/g)).toHaveLength(1);
+        expect(reenabled).toContain("enabled=true");
       }).pipe(Effect.scoped, Effect.provide(NodeServices.layer)),
   );
 });

@@ -1,3 +1,5 @@
+// personal:skill-sets seam logo resolver
+import { resolveSkillSetLogo } from "./personal/skillsets/runtime.ts";
 // personal:skill-sets seam launch wire helper
 import { skillSetPick } from "@t3tools/contracts";
 // personal:skill-sets seam menus import
@@ -3181,6 +3183,16 @@ export const layerWsRpc = (
               return yield* issueAssetUrl({
                 resource: input.resource,
                 workspaceRoot: input.resource.cwd,
+              });
+            }
+            // personal:skill-sets seam logo asset
+            if (input.resource._tag === "skill-set-logo") {
+              const logo = yield* resolveSkillSetLogo(input.resource.id);
+              if (!logo)
+                return yield* new AssetWorkspaceContextNotFoundError({ resource: input.resource });
+              return yield* issueAssetUrl({
+                resource: { _tag: "project-favicon", cwd: logo.cwd },
+                projectFaviconPath: logo.path,
               });
             }
             if (input.resource._tag === "project-favicon") {

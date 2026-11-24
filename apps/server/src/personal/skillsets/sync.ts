@@ -51,7 +51,22 @@ async function scanSkills(root: string): Promise<SkillSetSkill[]> {
     );
     const match = /^---\r?\n([\s\S]*?)\r?\n---(?:\r?\n|$)/.exec(text);
     if (!match) continue;
-    const data: unknown = parse(match[1]!);
+    let data: unknown;
+    try {
+      data = parse(match[1]!);
+    } catch {
+      // Match the provider's accepted plain scalars containing ': ' without changing YAML blocks.
+      const repaired = match[1]!.replace(
+        /^([\w-]+:[ \t]*)([^\r\n]*)/gm,
+        (line, prefix: string, value: string) => {
+          const scalar = value.split(/[ \t]+#/)[0] ?? "";
+          if (!/:[ \t]/.test(scalar) || /^(?:["'[\]{}|>&*!#%@`]|[-?:](?:[ \t]|$))/.test(scalar))
+            return line;
+          return `${prefix}${JSON.stringify(scalar)}${value.slice(scalar.length)}`;
+        },
+      );
+      data = parse(repaired);
+    }
     if (!data || typeof data !== "object") continue;
     const front = data as Record<string, unknown>;
     skills.push({

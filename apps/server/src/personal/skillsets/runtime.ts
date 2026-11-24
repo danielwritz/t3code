@@ -7,6 +7,7 @@ import * as Queue from "effect/Queue";
 import type { SkillSetStatus } from "@t3tools/contracts";
 import * as ServerConfig from "../../config.ts";
 import * as ServerSettings from "../../serverSettings.ts";
+import { findSkillSetLogo } from "./logo.ts";
 import { SkillSetSync } from "./sync.ts";
 import {
   resolveHome,
@@ -105,4 +106,21 @@ export const skillSetRpcHandlers = Effect.gen(function* () {
     "skillSets.sync": ({ id }: { readonly id: string }) => service.syncNow(id),
     "skillSets.subscribe": () => service.changes,
   };
+});
+
+export const resolveSkillSetLogo = Effect.fn("SkillSets.resolveLogo")(function* (id: string) {
+  const settings = yield* (yield* ServerSettings.ServerSettingsService).getSettings.pipe(
+    Effect.orElseSucceed(() => undefined),
+  );
+  if (!settings) return undefined;
+  const config = settings.skillSets[id];
+  if (!config || (config.logo && config.logo.kind !== "repo-image")) return undefined;
+  const state = yield* ServerConfig.ServerConfig;
+  const checkout = new SkillSetSync(state.stateDir, () => settings).checkout(id, config);
+  return yield* Effect.promise(() =>
+    findSkillSetLogo(
+      checkout,
+      config.logo?.kind === "repo-image" ? config.logo.path : undefined,
+    ).catch(() => undefined),
+  );
 });

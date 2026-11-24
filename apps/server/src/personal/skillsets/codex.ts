@@ -100,14 +100,6 @@ export const makeCodexSkillSets = Effect.fn("SkillSets.makeCodexLaunch")(functio
       }
       if (addedRuntimeDirectory) resolved = yield* resolve;
       if (!resolved) return upstream;
-      const foreignEntries = yield* codexForeignHomeEntries(resolved.homePath).pipe(
-        Effect.provideService(FileSystem.FileSystem, fs),
-        Effect.provideService(Path.Path, path),
-      );
-      if (foreignEntries.length > 0)
-        yield* Effect.logWarning("Codex skill-set home contains unshared runtime entries", {
-          entries: foreignEntries,
-        });
       // Preserve the instance's private login identity. Codex resolves auth symlinks before atomic replacement.
       for (const entry of ["auth.json", "auth.lock"]) {
         const destination = path.join(resolved.homePath, entry);
@@ -226,21 +218,6 @@ export const makeCodexSkillSets = Effect.fn("SkillSets.makeCodexLaunch")(functio
       );
     },
   };
-});
-
-export const codexForeignHomeEntries = Effect.fn("SkillSets.codexForeignHomeEntries")(function* (
-  home: string,
-) {
-  const fs = yield* FileSystem.FileSystem;
-  const path = yield* Path.Path;
-  return yield* Effect.filter(yield* fs.readDirectory(home), (entry) =>
-    entry === "skills"
-      ? Effect.succeed(false)
-      : fs.readLink(path.join(home, entry)).pipe(
-          Effect.as(false),
-          Effect.orElseSucceed(() => true),
-        ),
-  );
 });
 
 interface ProbeInput {

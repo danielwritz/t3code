@@ -29,6 +29,7 @@ describe("V2 client presentation", () => {
         ...(skillSetId === undefined ? {} : { skillSetId }),
       });
       expect(shell.skillSetId).toBe(skillSetId);
+      expect(shell.creationSource).toBe(v2ThreadShell.creationSource);
     }
   });
   it("an async question allows snooze and wakes an older snooze", () => {

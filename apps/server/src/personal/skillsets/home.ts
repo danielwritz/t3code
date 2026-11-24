@@ -74,6 +74,14 @@ export async function buildSkillSetHome(input: HomeInput) {
   }
   await NodeFSP.mkdir(output, { recursive: true });
   if ((await NodeFSP.lstat(output)).isSymbolicLink()) throw new Error("Output cannot be a link");
+  const foreignEntries: string[] = [];
+  for (const entry of await NodeFSP.readdir(output)) {
+    if (
+      entry !== skillParts[0] &&
+      !(await NodeFSP.lstat(NodePath.join(output, entry))).isSymbolicLink()
+    )
+      foreignEntries.push(entry);
+  }
   const excluded = new Set([skillParts[0], ...(input.privateEntries ?? [])]);
   for (const name of input.privateEntries ?? []) {
     safeEntry(name);
@@ -82,7 +90,8 @@ export async function buildSkillSetHome(input: HomeInput) {
       await NodeFSP.rm(privatePath);
   }
   for (const entry of await NodeFSP.readdir(home)) {
-    if (!excluded.has(entry)) await link(NodePath.join(home, entry), NodePath.join(output, entry));
+    if (!excluded.has(entry) && !foreignEntries.includes(entry))
+      await link(NodePath.join(home, entry), NodePath.join(output, entry));
   }
   let sourceParent = home;
   let outputParent = output;
@@ -107,11 +116,12 @@ export async function buildSkillSetHome(input: HomeInput) {
   if (existing?.isSymbolicLink()) await NodeFSP.rm(skillsDir);
   await NodeFSP.mkdir(skillsDir, { recursive: true });
   const enabled = new Set(input.skills.map((skill) => skill.name));
-  const foreignEntries: string[] = [];
+  const foreignSkills = new Set<string>();
   for (const entry of await NodeFSP.readdir(skillsDir)) {
     const path = NodePath.join(skillsDir, entry);
     if (!(await NodeFSP.lstat(path)).isSymbolicLink()) {
       foreignEntries.push(entry);
+      foreignSkills.add(entry);
       continue;
     }
     if (!enabled.has(entry)) {
@@ -119,7 +129,7 @@ export async function buildSkillSetHome(input: HomeInput) {
     }
   }
   for (const skill of input.skills)
-    if (!foreignEntries.includes(skill.name))
+    if (!foreignSkills.has(skill.name))
       await link(skill.targetPath, NodePath.join(skillsDir, skill.name));
   return { homePath: output, foreignEntries };
 }

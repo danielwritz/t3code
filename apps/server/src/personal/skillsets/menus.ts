@@ -1,6 +1,6 @@
 // @effect-diagnostics nodeBuiltinImport:off -- Thread-local filesystem homes use native junction semantics.
 import * as Effect from "effect/Effect";
-import type { ProviderInstanceId, ThreadId } from "@t3tools/contracts";
+import { skillSetParentThreadId, type ProviderInstanceId, type ThreadId } from "@t3tools/contracts";
 import * as ProviderInstanceRegistry from "../../provider/ProviderInstanceRegistry.ts";
 import * as ProviderRegistry from "../../provider/ProviderRegistry.ts";
 import { upsertProviderWorkspaceSnapshot } from "../../provider/ProviderRegistry.ts";
@@ -25,7 +25,14 @@ const refreshSkillSetWorkspaceSnapshot = Effect.fn("refreshSkillSetWorkspaceSnap
   const scoped = yield* Effect.gen(function* () {
     const settings = yield* settingsService.getSettings;
     if (!settings.skillSetsEnabled) return undefined;
-    const thread = (yield* threads.getThreadRecords(input.threadId!, [])).thread;
+    let thread = (yield* threads.getThreadRecords(input.threadId!, [])).thread;
+    const visited = new Set<ThreadId>([thread.id]);
+    let parentId = skillSetParentThreadId(thread);
+    while (parentId !== null && !visited.has(parentId)) {
+      visited.add(parentId);
+      thread = (yield* threads.getThreadRecords(parentId, [])).thread;
+      parentId = skillSetParentThreadId(thread);
+    }
     const instance = yield* instances.getInstance(input.instanceId);
     if (!instance?.snapshotForCwd) return undefined;
     const snapshot = yield* instance.snapshotForCwd(input.scanCwd ?? input.cwd, thread);

@@ -823,5 +823,55 @@
     "file": "apps/server/src/provider/Drivers/AntigravitySkills.ts",
     "marker": "personal:skill-sets seam antigravity user home",
     "connects": "antigravity user home"
+  },
+  {
+    "file": "packages/contracts/src/assets.ts",
+    "marker": "personal:skill-sets seam logo resource",
+    "connects": "adds signed set logo resource"
+  },
+  {
+    "file": "apps/server/src/ws.ts",
+    "marker": "personal:skill-sets seam logo resolver",
+    "connects": "imports checkout logo resolver"
+  },
+  {
+    "file": "apps/server/src/ws.ts",
+    "marker": "personal:skill-sets seam logo asset",
+    "connects": "mints an image capability from the set checkout"
+  },
+  {
+    "file": "apps/server/src/assets/AssetAccess.ts",
+    "marker": "personal:skill-sets seam logo normalization guard",
+    "connects": "requires set IDs to resolve to checkout images before minting"
+  },
+  {
+    "file": "packages/client-runtime/src/state/models.ts",
+    "marker": "personal:skill-sets seam session ownership presentation type",
+    "connects": "retains native versus delegated thread ownership"
+  },
+  {
+    "file": "packages/client-runtime/src/state/models.ts",
+    "marker": "personal:skill-sets seam session ownership presentation",
+    "connects": "projects native ownership into thread controls"
+  },
+  {
+    "file": "apps/web/src/components/ChatView.tsx",
+    "marker": "personal:skill-sets seam attached thread chip import",
+    "connects": "imports native thread fixed set chip"
+  },
+  {
+    "file": "apps/web/src/components/ChatView.tsx",
+    "marker": "personal:skill-sets seam attached thread chip",
+    "connects": "shows the session owner set in the native child bar"
+  },
+  {
+    "file": "apps/web/test/fakeEnvironment.ts",
+    "marker": "personal:skill-sets seam refresh warm fake subscribers",
+    "connects": "publishes replacement fixture state to retained client subscriptions"
+  },
+  {
+    "file": "apps/web/test/fakeEnvironment.ts",
+    "marker": "personal:skill-sets seam warm fixture helper",
+    "connects": "imports replacement fixture publication"
   }
 ]

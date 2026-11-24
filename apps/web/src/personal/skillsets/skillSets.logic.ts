@@ -6,6 +6,7 @@ export function joinSkillSets(
   configs: Readonly<Record<string, SkillSetConfig>>,
   statuses: readonly SkillSetStatus[],
   defaultId: string | null,
+  environmentId?: import("@t3tools/contracts").EnvironmentId | null,
 ) {
   const byId = new Map(statuses.map((status) => [status.id, status]));
   return Object.entries(configs).map(([id, config]) => {
@@ -25,7 +26,17 @@ export function joinSkillSets(
       logo:
         config.logo && config.logo.kind !== "repo-image"
           ? config.logo
-          : { kind: "monogram" as const, text: identity.monogram, color: identity.color },
+          : {
+              kind: "repo-image" as const,
+              id,
+              environmentId: environmentId ?? null,
+              revision: JSON.stringify([config.logo, status?.commit, status?.lastChecked]),
+              fallback: {
+                kind: "monogram" as const,
+                text: identity.monogram,
+                color: identity.color,
+              },
+            },
       repo: {
         state: status?.state ?? "syncing",
         label: config.source.kind === "git" ? config.source.url : config.source.path,

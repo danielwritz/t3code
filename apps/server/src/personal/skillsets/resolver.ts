@@ -74,7 +74,7 @@ export async function resolveHome(
     }
     if (home.foreignEntries.length)
       deps.warn(
-        `Skill set ${id} retained provider-created skill entries: ${home.foreignEntries.join(", ")}`,
+        `Skill set ${id} retained provider-created entries: ${home.foreignEntries.join(", ")}`,
       );
     return {
       homePath: home.homePath,

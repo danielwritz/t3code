@@ -30,6 +30,21 @@ import {
 } from "../../../test/fakeEnvironment";
 import type { SkillSetConfig, SkillSetStatus } from "@t3tools/contracts";
 
+// The real signed image route is proved separately; captures use the fixture's image bytes.
+vi.mock(import("./SkillSetRepoImage"), () => ({
+  SkillSetRepoImage: ({
+    logo,
+    className,
+  }: Parameters<typeof import("./SkillSetRepoImage").SkillSetRepoImage>[0]) => {
+    const image = setup.skillSets.find((set) => set.id === logo.id)?.logo;
+    return image?.kind === "image" ? (
+      <img src={image.src} alt="" className={className} />
+    ) : (
+      <span className={className}>{logo.fallback.text}</span>
+    );
+  },
+}));
+
 // The fake environment reads its label when it loads, before this file's own code runs.
 vi.hoisted(() => {
   (globalThis as { __fakeEnvironmentLabel?: string }).__fakeEnvironmentLabel = "This PC";
@@ -132,8 +147,12 @@ const OTHERS = setup.thread.otherTitles.map((title, index) => ({
 
 const [firstProject, ...otherProjects] = setup.projects;
 
-function install(enabled = true, setsEnabled = true) {
-  return installFakeEnvironment([...OTHERS, MAIN], {
+function install(
+  enabled = true,
+  setsEnabled = true,
+  threads: ReadonlyArray<FakeThread> = [...OTHERS, MAIN],
+) {
+  return installFakeEnvironment(threads, {
     acceptCommands: true,
     ...(setup.providers.length > 0 ? { providers: setup.providers } : {}),
     skillSetStatuses: statuses,
@@ -146,7 +165,7 @@ function install(enabled = true, setsEnabled = true) {
             Object.entries(configs).map(([id, config]) => [id, { ...config, enabled: false }]),
           ),
       defaultSkillSetId: DEFAULT_SET.id,
-      skillSetSyncIntervalMinutes: 7,
+      skillSetSyncIntervalMinutes: hasPrivateSetup ? 15 : 7,
     },
     project: { title: firstProject!.title, projectIcon: firstProject!.projectIcon } as never,
     extraProjects: otherProjects.map((project) => ({
@@ -290,20 +309,21 @@ it("keeps the skill and slash menus scoped to the picked thread", async () => {
     .toBeVisible();
 });
 
-it("captures the settings list and expanded sets", async () => {
+it.each([
+  { name: "settings-1-list", set: null },
+  { name: "settings-2-pstack", set: OTHER_SET },
+  { name: "settings-3-daniel", set: DEFAULT_SET },
+])("captures $name", async ({ name, set }) => {
   using _clock = clock();
   using _environment = install();
   const { screen, router } = await openThread();
   await using _app = screen;
   await act(() => router.navigate({ to: "/settings/skill-sets" as never }));
-  const details = page.getByRole("button", { name: `${OTHER_SET.name} details` });
-  await expect.element(details).toBeVisible();
-  if (hasPrivateSetup) await shot("settings-1-list", SETTINGS_CLIP);
-  await details.click();
-  if (hasPrivateSetup) await shot("settings-2-pstack", SETTINGS_CLIP);
-  await details.click();
-  await page.getByRole("button", { name: `${DEFAULT_SET.name} details` }).click();
-  if (hasPrivateSetup) await shot("settings-3-daniel", SETTINGS_CLIP);
+  await expect
+    .element(page.getByRole("button", { name: `${OTHER_SET.name} details` }))
+    .toBeVisible();
+  if (set) await page.getByRole("button", { name: `${set.name} details` }).click();
+  if (hasPrivateSetup) await shot(name, SETTINGS_CLIP);
 });
 
 it("saves settings switches, disabled skills, registration and interval", async () => {
@@ -373,4 +393,20 @@ it.each([
     .first()
     .click();
   await expect.element(page.getByRole("tablist", { name: "Skill sets" })).not.toBeInTheDocument();
+});
+
+it("fixes provider-native child controls to their parent's pick", async () => {
+  const parent = { ...prototypeThread("native-owner", "Native owner"), skillSetId: DEFAULT_SET.id };
+  const child = {
+    ...prototypeThread("native-child", "Native child"),
+    providerSubagentOf: parent.id,
+    skillSetId: OTHER_SET.id,
+  };
+  using _environment = install(true, true, [parent, child]);
+  const { screen } = await mountApp(`/${ENVIRONMENT_ID}/${child.id}`);
+  await using _app = screen;
+  await expect.element(page.getByText("Native child", { exact: true }).first()).toBeVisible();
+  await expect
+    .element(page.getByRole("button", { name: `Skill set: ${DEFAULT_SET.name}` }))
+    .toBeDisabled();
 });

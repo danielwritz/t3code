@@ -66,7 +66,7 @@ it("falls back when off, unpicked, not ready or build fails, and omits disabled 
   await NodeFSP.mkdir(NodePath.join(result.skillsDir, "synced"));
   for (const _build of [1, 2]) {
     expect((await resolveHome(deps, "codex", instance, {}))?.homePath).toBe(result.homePath);
-    expect(warnings.at(-1)).toContain("retained provider-created skill entries: synced");
+    expect(warnings.at(-1)).toContain("retained provider-created entries: synced");
   }
   expect(
     await resolveHome(deps, "codex", { ...instance, realHome: NodePath.join(root, "missing") }, {}),

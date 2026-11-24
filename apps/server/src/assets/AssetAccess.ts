@@ -622,6 +622,9 @@ export const issueAssetUrl = Effect.fn("AssetAccess.issueAssetUrl")(function* (i
   let fileRevision: string | undefined;
 
   switch (input.resource._tag) {
+    // personal:skill-sets seam logo normalization guard
+    case "skill-set-logo":
+      return yield* new AssetWorkspaceContextNotFoundError({ resource: input.resource });
     case "media-file": {
       let requestedPath = expandHomePath(
         yield* toHostDrivePath(input.resource.path),

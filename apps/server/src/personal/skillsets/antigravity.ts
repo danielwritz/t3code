@@ -145,11 +145,25 @@ export const antigravitySkillSetSnapshot = Effect.fn("antigravitySkillSetSnapsho
       userGeminiHome: resolved.homePath,
     });
     const selected = new Map(resolved.skills.map((skill) => [skill.name, skill.commandOnly]));
-    const skills = discovered.map((skill) =>
-      selected.has(skill.name) && skill.scope === "user"
-        ? { ...skill, userInvocationOnly: selected.get(skill.name) }
-        : skill,
-    );
+    const path = yield* Path.Path;
+    const names = new Set(discovered.map((skill) => skill.name));
+    const skills = [
+      ...discovered.map((skill) =>
+        selected.has(skill.name) && skill.scope === "user"
+          ? { ...skill, userInvocationOnly: selected.get(skill.name) }
+          : skill,
+      ),
+      ...resolved.skills
+        .filter((skill) => !names.has(skill.name))
+        .map((skill) => ({
+          name: skill.name,
+          description: skill.description,
+          path: path.join(skill.targetPath, "SKILL.md"),
+          scope: "user",
+          enabled: true,
+          userInvocationOnly: skill.commandOnly,
+        })),
+    ].sort((left, right) => left.name.localeCompare(right.name));
     const original = yield* discoverAntigravitySkills(input);
     const statuses = yield* input.service.statuses;
     const skillNames = new Set(

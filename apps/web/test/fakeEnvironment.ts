@@ -1,3 +1,5 @@
+// personal:skill-sets seam warm fixture helper
+import { refreshFakeSkillSetSubscribers } from "../src/personal/skillsets/fakeFixtureRefresh";
 // personal:skill-sets seam fake runtime imports
 import { applyServerSettingsPatch } from "@t3tools/shared/serverSettings";
 import type {
@@ -808,6 +810,14 @@ export function installFakeEnvironment(
     if (/^\/(api|oauth|\.well-known)\//.test(url.pathname)) return json({}, 404);
     return realFetch(input, init);
   };
+  // personal:skill-sets seam refresh warm fake subscribers
+  refreshFakeSkillSetSubscribers(
+    { configSubscriber, skillStatusSubscriber, shellSubscriber },
+    serverConfig(),
+    skillStatuses,
+    { sequence, projects, threads },
+    shellOf,
+  );
   return {
     [Symbol.dispose]: () => {
       globalThis.fetch = realFetch;

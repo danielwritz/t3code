@@ -106,3 +106,36 @@ it("reports a missing local source as not ready rather than an empty set", async
   expect(sync.statuses()[0]?.ready).toBe(false);
   expect(sync.statuses()[0]?.error).toBeTruthy();
 });
+
+it("decodes YAML quoted and block descriptions without extra escaping", async () => {
+  const root = await NodeFSP.mkdtemp(NodePath.join(NodeOS.tmpdir(), "yaml-skills-"));
+  const descriptions = [
+    ['"Use \\"automate me\\" now"', 'Use "automate me" now'],
+    ["'It''s useful'", "It's useful"],
+    ['Use this: "automate me" when asked', 'Use this: "automate me" when asked'],
+    [">-\n  first line\n  second line", "first line second line"],
+    ["|-\n  first line\n  second line", "first line\nsecond line"],
+  ];
+  for (const [index, [yaml]] of descriptions.entries()) {
+    const folder = NodePath.join(root, "skills", `skill-${index}`);
+    await NodeFSP.mkdir(folder, { recursive: true });
+    await NodeFSP.writeFile(NodePath.join(folder, "SKILL.md"), `---\ndescription: ${yaml}\n---\n`);
+  }
+  const sync = new SkillSetSync(NodePath.join(root, "state"), () => ({
+    skillSetsEnabled: true,
+    skillSetSyncIntervalMinutes: 7,
+    skillSets: {
+      alpha: {
+        name: "Alpha",
+        source: { kind: "local", path: root },
+        enabled: true,
+        autoSync: false,
+        disabledSkills: [],
+      },
+    },
+  }));
+  await sync.tick();
+  expect(sync.statuses()[0]?.skills.map((skill) => skill.description)).toEqual(
+    descriptions.map(([, expected]) => expected),
+  );
+});

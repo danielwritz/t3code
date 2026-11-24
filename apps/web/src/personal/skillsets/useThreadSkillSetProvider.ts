@@ -7,7 +7,7 @@ import type {
 } from "@t3tools/contracts";
 import { useEffect, useEffectEvent } from "react";
 import { useAtomCommand } from "~/state/use-atom-command";
-import { useSkillSetRegistry } from "./skillSetsStore";
+import { useSkillSets } from "./skillSetsStore";
 import { threadSkillSetProviders, refreshThreadSkillSetProviders } from "./rpc";
 
 export function useThreadSkillSetProvider(
@@ -22,7 +22,7 @@ export function useThreadSkillSetProvider(
 ) {
   const { environmentId, gitCwd: cwd } = input;
   const threadId = input.routeKind === "draft" ? null : input.activeThreadId;
-  const { settings, statuses } = useSkillSetRegistry(environmentId);
+  const { settings, statuses, active } = useSkillSets();
   const instanceId: ProviderInstanceId | undefined = provider?.instanceId;
   const enabled =
     settings.skillSetsEnabled && threadId !== null && cwd !== null && instanceId !== undefined;
@@ -31,7 +31,7 @@ export function useThreadSkillSetProvider(
     threadId,
     instanceId,
     cwd,
-    input.activeThread?.skillSetId,
+    active?.id,
     settings.defaultSkillSetId,
     settings.skillSets,
     statuses.map(({ id, state, commit, lastChecked }) => [id, state, commit, lastChecked]),

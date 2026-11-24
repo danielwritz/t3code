@@ -97,7 +97,8 @@ export const codexIsolationOverrides = Effect.fn("SkillSets.codexIsolationOverri
     )
       rules.set(skill.path, false);
   }
-  for (const file of picked) rules.set(file, true);
+  // Already-enabled selections need no override; long checkout paths otherwise overflow Windows shims.
+  for (const file of picked) if (rules.has(file)) rules.set(file, true);
   const config = [...rules]
     .sort(([left], [right]) => left.localeCompare(right))
     .map(([file, enabled]) => `{path=${JSON.stringify(file)},enabled=${enabled}}`);

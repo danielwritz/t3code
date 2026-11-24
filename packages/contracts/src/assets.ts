@@ -26,7 +26,9 @@ export const NativeAppIconReference = Schema.Union([
 ]);
 export type NativeAppIconReference = typeof NativeAppIconReference.Type;
 
+// personal:skill-sets seam logo resource
 export const AssetResource = Schema.Union([
+  Schema.TaggedStruct("skill-set-logo", { id: TrimmedNonEmptyString }),
   Schema.TaggedStruct("workspace-file", {
     threadId: ThreadId,
     path: TrimmedNonEmptyString.check(Schema.isMaxLength(ASSET_PATH_MAX_LENGTH)),

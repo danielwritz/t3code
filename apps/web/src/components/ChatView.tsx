@@ -1,3 +1,5 @@
+// personal:skill-sets seam attached thread chip import
+import { AttachedSkillSetChip } from "~/personal/skillsets/SkillSetPickers";
 import { m } from "../i18n/messages";
 import { thrownErrorMessage } from "@t3tools/client-runtime/errors";
 import { useGT, useMessages } from "gt-react";
@@ -3808,12 +3810,19 @@ export default function ChatView(props: ChatViewProps) {
                                 status={providerSubagentStatus}
                                 onOpenParent={parentThreadLink?.open ?? null}
                                 actions={
-                                  selectedProviderEntry?.driverKind === "antigravity" ? (
-                                    <NativeChildWorkDialog
+                                  <>
+                                    {/* personal:skill-sets seam attached thread chip */}
+                                    <AttachedSkillSetChip
                                       environmentId={environmentId}
                                       threadId={threadId}
                                     />
-                                  ) : null
+                                    {selectedProviderEntry?.driverKind === "antigravity" ? (
+                                      <NativeChildWorkDialog
+                                        environmentId={environmentId}
+                                        threadId={threadId}
+                                      />
+                                    ) : null}
+                                  </>
                                 }
                               />
                             ) : null}

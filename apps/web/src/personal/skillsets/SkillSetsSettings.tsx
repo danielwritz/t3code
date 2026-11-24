@@ -98,12 +98,20 @@ function SkillSetDetail({
           <T>Change logo</T>
         </Button>
         <ProjectIconPickerDialog
-          current={set.logo}
+          current={set.logo.kind === "repo-image" ? set.logo.fallback : set.logo}
           projectName={set.name}
           open={iconOpen}
           onOpenChange={setIconOpen}
           onSelect={(logo) => update({ logo })}
         />
+        <Button
+          variant="ghost"
+          size="xs"
+          disabled={readOnly}
+          onClick={() => update({ logo: { kind: "repo-image", path: "" } })}
+        >
+          <T>Use repo image</T>
+        </Button>
       </Field>
       <Field label={gt("Name")}>
         <Input
