@@ -368,5 +368,90 @@
     "file": "packages/client-runtime/src/rpc/client.ts",
     "marker": "personal:skill-sets seam client subscription",
     "connects": "allows status updates through the shared connected-environment subscribe helper"
+  },
+  {
+    "marker": "personal:skill-sets seam codex launch import",
+    "connects": "codex launch import",
+    "file": "apps/server/src/orchestration-v2/Adapters/CodexAdapterV2.ts"
+  },
+  {
+    "marker": "personal:skill-sets seam codex launch context",
+    "connects": "codex launch context",
+    "file": "apps/server/src/orchestration-v2/Adapters/CodexAdapterV2.ts"
+  },
+  {
+    "marker": "personal:skill-sets seam codex launch home",
+    "connects": "codex launch home",
+    "file": "apps/server/src/orchestration-v2/Adapters/CodexAdapterV2.ts"
+  },
+  {
+    "marker": "personal:skill-sets seam codex spawn settings",
+    "connects": "codex spawn settings",
+    "file": "apps/server/src/orchestration-v2/Adapters/CodexAdapterV2.ts"
+  },
+  {
+    "marker": "personal:skill-sets seam codex spawn environment",
+    "connects": "codex spawn environment",
+    "file": "apps/server/src/orchestration-v2/Adapters/CodexAdapterV2.ts"
+  },
+  {
+    "marker": "personal:skill-sets seam codex restart identity",
+    "connects": "codex restart identity",
+    "file": "apps/server/src/orchestration-v2/Adapters/CodexAdapterV2.ts"
+  },
+  {
+    "marker": "personal:skill-sets seam session identity import",
+    "connects": "session identity import",
+    "file": "apps/server/src/orchestration-v2/ProviderSessionManager.ts"
+  },
+  {
+    "marker": "personal:skill-sets seam session identity memory",
+    "connects": "session identity memory",
+    "file": "apps/server/src/orchestration-v2/ProviderSessionManager.ts"
+  },
+  {
+    "marker": "personal:skill-sets seam session identity restart",
+    "connects": "session identity restart",
+    "file": "apps/server/src/orchestration-v2/ProviderSessionManager.ts"
+  },
+  {
+    "marker": "personal:skill-sets seam session identity remember",
+    "connects": "session identity remember",
+    "file": "apps/server/src/orchestration-v2/ProviderSessionManager.ts"
+  },
+  {
+    "marker": "personal:skill-sets seam codex menu import",
+    "connects": "codex menu import",
+    "file": "apps/server/src/provider/Drivers/CodexDriver.ts"
+  },
+  {
+    "marker": "personal:skill-sets seam codex menu home",
+    "connects": "codex menu home",
+    "file": "apps/server/src/provider/Drivers/CodexDriver.ts"
+  },
+  {
+    "marker": "personal:skill-sets seam codex managed menu import",
+    "connects": "codex managed menu import",
+    "file": "apps/server/src/provider/Drivers/CodexManagedProvider.ts"
+  },
+  {
+    "marker": "personal:skill-sets seam codex managed menu thread",
+    "connects": "codex managed menu thread",
+    "file": "apps/server/src/provider/Drivers/CodexManagedProvider.ts"
+  },
+  {
+    "marker": "personal:skill-sets seam codex managed menu home",
+    "connects": "codex managed menu home",
+    "file": "apps/server/src/provider/Drivers/CodexManagedProvider.ts"
+  },
+  {
+    "marker": "personal:skill-sets seam codex shared runtime directories",
+    "connects": "reuses the existing runtime directory list before building a selected home",
+    "file": "apps/server/src/provider/Drivers/CodexHomeLayout.ts"
+  },
+  {
+    "marker": "personal:skill-sets seam codex menu thread",
+    "connects": "passes the thread pick to Codex menu discovery",
+    "file": "apps/server/src/provider/Drivers/CodexDriver.ts"
   }
 ]

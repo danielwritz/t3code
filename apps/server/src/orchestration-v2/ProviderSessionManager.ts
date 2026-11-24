@@ -1,3 +1,5 @@
+// personal:skill-sets seam session identity import
+import { makeSessionInputIdentities } from "../personal/skillsets/sessionIdentity.ts";
 // personal:skill-sets seam session pick import
 import { skillSetPick } from "@t3tools/contracts";
 import { AgentScope } from "@t3tools/shared/AgentScope";
@@ -577,6 +579,8 @@ export const layerWithOptions = (
       const releaseRecordRetries = yield* FiberSet.make();
       const nextSubscriberId = yield* Ref.make(0);
       const sessionOpen = yield* KeyedLock.make<ProviderSessionId>();
+      // personal:skill-sets seam session identity memory
+      const sessionInputIdentities = makeSessionInputIdentities();
       const threadAttachment = yield* KeyedLock.make<string>();
       const threadAttachmentKey = (input: {
         readonly providerSessionId: ProviderSessionId;
@@ -3261,6 +3265,20 @@ export const layerWithOptions = (
               const key = sessionKey(input.providerSessionId);
               const live = (yield* Ref.get(sessions)).get(key);
               if (live !== undefined) yield* releaseForLinkedEnvironments(live);
+              // personal:skill-sets seam session identity restart
+              if (
+                live !== undefined &&
+                (yield* sessionInputIdentities.changed(
+                  live.runtime,
+                  input,
+                  live.busyTurns.size > 0,
+                ))
+              )
+                yield* releaseEntry({
+                  providerSessionId: input.providerSessionId,
+                  reason: "manual_shutdown",
+                  onlyIfIdleGeneration: live.idleGeneration,
+                });
               const existing = (yield* Ref.get(sessions)).get(key);
               if (existing !== undefined) {
                 const attached = existing.attachedThreadIds.has(input.threadId);
@@ -3365,6 +3383,8 @@ export const layerWithOptions = (
                     attributes: { provider: adapter.driver, operation: "open" },
                   }),
                 );
+              // personal:skill-sets seam session identity remember
+              yield* sessionInputIdentities.remember(runtime, input);
               const eventSubscribers = yield* Ref.make<
                 ReadonlyMap<number, Queue.Queue<ProviderSessionEventSignal, Cause.Done>>
               >(new Map());

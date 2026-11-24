@@ -1,3 +1,5 @@
+// personal:skill-sets seam codex menu import
+import { makeCodexSkillSetProbe } from "../../personal/skillsets/codex.ts";
 import { resolveProviderProbeTimeoutMs } from "@t3tools/provider-core/server/snapshotProbe";
 import { CodexSettings, ProviderDriverKind } from "@t3tools/contracts";
 import * as Digest from "effect/crypto/Digest";
@@ -324,9 +326,12 @@ export const CodexDriver: ProviderDriver<
       snapshot.getSnapshot.pipe(Effect.map((value) => value.models)),
     );
     const probeSkills = yield* makeCodexSkillsProbe().pipe(
+      // personal:skill-sets seam codex menu home
+      Effect.flatMap((probe) => makeCodexSkillSetProbe(instanceId, probe)),
       Effect.provideService(ChildProcessSpawner.ChildProcessSpawner, spawner),
     );
-    const snapshotForCwd = (cwd: string) =>
+    // personal:skill-sets seam codex menu thread
+    const snapshotForCwd: NonNullable<ProviderInstance["snapshotForCwd"]> = (cwd, thread) =>
       !effectiveConfig.enabled
         ? snapshot.getSnapshot
         : Effect.all([
@@ -337,6 +342,7 @@ export const CodexDriver: ProviderDriver<
               launchArgs: resolveCodexLaunchArgs(effectiveConfig.launchArgs, processEnv),
               cwd,
               environment: processEnv,
+              thread,
             }).pipe(Effect.timeout(resolveProviderProbeTimeoutMs("codex", 20_000, processEnv))),
           ]).pipe(
             Effect.map(([machineSnapshot, skills]) => ({ ...machineSnapshot, skills })),

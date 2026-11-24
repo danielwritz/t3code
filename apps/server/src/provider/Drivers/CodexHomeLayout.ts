@@ -15,7 +15,8 @@ export interface CodexHomeLayout {
   readonly continuationKey: string;
 }
 
-const KNOWN_SHARED_DIRECTORIES = [
+// personal:skill-sets seam codex shared runtime directories
+export const KNOWN_SHARED_DIRECTORIES = [
   "sessions",
   "archived_sessions",
   "sqlite",
