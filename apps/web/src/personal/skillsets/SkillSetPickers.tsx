@@ -5,13 +5,14 @@ import { lucideIconByName } from "~/lib/lucideIconByName";
 import { projectIconColorClassName } from "~/projectIconColors";
 import { useNavigate } from "@tanstack/react-router";
 import { msg, T, useGT } from "gt-react";
-import { PlusIcon, Settings2Icon } from "lucide-react";
+import { FileMinusIcon, PlusIcon, Settings2Icon } from "lucide-react";
 
 import { ComposerControl } from "~/components/chat/ComposerControl";
 import { useComposerMenuProps } from "~/components/chat/composerEventScope";
 import { ProjectMonogram } from "~/components/ProjectMonogram";
 import {
   Menu,
+  MenuCheckboxItem,
   MenuGroup,
   MenuGroupLabel,
   MenuItem,
@@ -30,6 +31,12 @@ import {
   type SkillSet,
   type SkillSetLogo as Logo,
 } from "./skillSetsStore";
+import {
+  isStockProfile,
+  setThreadIgnoresProject,
+  useProfileParts,
+  useThreadIgnoresProject,
+} from "./profileParts";
 
 export function SkillSetLogo({ logo, className }: { logo: Logo; className?: string | undefined }) {
   if (logo.kind === "repo-image") return <SkillSetRepoImage logo={logo} className={className} />;
@@ -86,6 +93,20 @@ export const syncLine = (set: SkillSet, resolve: MessageResolver = m) => {
     .join(" \u00b7 ");
 };
 
+function ProfileMenuDetail({ set }: { set: SkillSet }) {
+  const gt = useGT();
+  const parts = useProfileParts(set.id);
+  return (
+    <MenuItemDetail>
+      {isStockProfile(parts, set.skills.length)
+        ? gt("Stock agent")
+        : gt("{count, plural, one {{count} skill} other {{count} skills}}", {
+            count: set.skills.length,
+          })}
+    </MenuItemDetail>
+  );
+}
+
 function useOpenSkillSetSettings() {
   const navigate = useNavigate();
   return () => void navigate({ to: "/settings/skill-sets" as never });
@@ -100,7 +121,7 @@ export function SkillSetPickerTabs() {
   return (
     <div
       role="tablist"
-      aria-label={gt("Skill sets")}
+      aria-label={gt("Agent profiles")}
       className="flex shrink-0 items-end gap-0.5 border-b border-border/70 bg-muted/50 px-1.5 pt-1.5"
     >
       {sets.map((set) => {
@@ -127,7 +148,7 @@ export function SkillSetPickerTabs() {
       })}
       <button
         type="button"
-        aria-label={gt("Add skill set")}
+        aria-label={gt("Add agent profile")}
         onClick={openSettings}
         className="mb-1 ml-0.5 flex size-6 cursor-pointer items-center justify-center rounded-md text-muted-foreground hover:bg-foreground/10 hover:text-foreground"
       >
@@ -143,9 +164,10 @@ export function SkillSetPickerTabs() {
  */
 export function SkillSetComposerChip() {
   const gt = useGT();
-  const { settings, sets, active, setActive, permitted, available } = useSkillSets();
+  const { settings, sets, active, setActive, permitted, available, threadKey } = useSkillSets();
   const openSettings = useOpenSkillSetSettings();
   const composerMenuProps = useComposerMenuProps();
+  const { ignore, overridden } = useThreadIgnoresProject(active?.id, threadKey);
   if (!available || !settings.skillSetsEnabled || sets.length === 0) return null;
   return (
     <Menu>
@@ -153,18 +175,24 @@ export function SkillSetComposerChip() {
         render={
           <ComposerControl
             disabled={!permitted}
-            aria-label={gt("Skill set: {name}", { name: active?.name ?? gt("Skill set") })}
+            aria-label={gt("Agent profile: {name}", { name: active?.name ?? gt("Agent profile") })}
             className="gap-2"
           />
         }
       >
         {active ? <SkillSetLogo logo={active.logo} className="size-4" /> : null}
-        <span data-composer-control-label>{active?.name ?? gt("Skill set")}</span>
+        <span data-composer-control-label>{active?.name ?? gt("Agent profile")}</span>
+        {ignore ? (
+          <FileMinusIcon
+            aria-label={gt("Ignoring project instructions")}
+            className="size-3.5 text-muted-foreground"
+          />
+        ) : null}
       </MenuTrigger>
       <MenuPopup align="end" side="top" {...composerMenuProps}>
         <MenuGroup>
           <MenuGroupLabel>
-            <T>Skill set</T>
+            <T>Agent profile</T>
           </MenuGroupLabel>
           <MenuRadioGroup value={active?.id ?? ""} onValueChange={setActive}>
             {sets.map((set) => (
@@ -172,20 +200,33 @@ export function SkillSetComposerChip() {
                 <span className="flex items-center gap-3 py-1">
                   <SkillSetLogo logo={set.logo} className="size-5" />
                   <span>{set.name}</span>
-                  <MenuItemDetail>
-                    {gt("{count, plural, one {{count} skill} other {{count} skills}}", {
-                      count: set.skills.length,
-                    })}
-                  </MenuItemDetail>
+                  <ProfileMenuDetail set={set} />
                 </span>
               </MenuRadioItem>
             ))}
           </MenuRadioGroup>
         </MenuGroup>
         <MenuSeparator />
+        <MenuCheckboxItem
+          variant="switch"
+          checked={ignore}
+          disabled={!permitted || !threadKey || !active}
+          onCheckedChange={(checked) => {
+            if (threadKey) setThreadIgnoresProject(threadKey, checked);
+          }}
+          className="my-1"
+        >
+          <span className="flex flex-col py-0.5">
+            <T>Ignore project instructions</T>
+            <span className="text-xs text-muted-foreground">
+              {overridden ? <T>This thread only</T> : <T>Same as the profile</T>}
+            </span>
+          </span>
+        </MenuCheckboxItem>
+        <MenuSeparator />
         <MenuItem onClick={openSettings} className="my-1">
           <Settings2Icon />
-          <T>Manage skill sets</T>
+          <T>Manage agent profiles</T>
         </MenuItem>
       </MenuPopup>
     </Menu>

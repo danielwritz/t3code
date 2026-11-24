@@ -1,0 +1,41 @@
+{
+  "alpha": {
+    "instructions": {
+      "shared": {
+        "file": "instructions.md",
+        "lines": 40,
+        "preview": "# Working rules: plain language, tests first, small commits."
+      },
+      "claudeAgent": {
+        "file": "CLAUDE.md",
+        "lines": 52,
+        "preview": "# Working rules for Claude: plain language, tests first, small commits."
+      }
+    },
+    "plugins": {
+      "claudeAgent": ["example-review@example-market", "example-design@example-market"],
+      "codex": ["example-browser@example-bundled"]
+    },
+    "hooks": {
+      "claudeAgent": [
+        { "event": "PreToolUse", "matcher": "Bash", "command": "node hooks/command-guard.mjs" },
+        { "event": "UserPromptSubmit", "command": "node hooks/add-context.mjs" }
+      ],
+      "codex": [
+        { "event": "PreToolUse", "matcher": "Bash", "command": "node hooks/command-guard.mjs" }
+      ]
+    },
+    "mcp": [
+      { "name": "calendar", "transport": "stdio", "target": "node servers/calendar.mjs" },
+      { "name": "docs", "transport": "http", "target": "https://docs.example.com/mcp" }
+    ],
+    "ignoreProjectInstructions": false
+  },
+  "beta": {
+    "instructions": {},
+    "plugins": {},
+    "hooks": {},
+    "mcp": [],
+    "ignoreProjectInstructions": true
+  }
+}
