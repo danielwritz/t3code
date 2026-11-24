@@ -33,6 +33,8 @@ async function git(cwd: string, ...args: string[]) {
   return result.stdout.trim();
 }
 async function scanSkills(root: string): Promise<SkillSetSkill[]> {
+  if (!(await NodeFSP.stat(root)).isDirectory())
+    throw new Error("Skill set source is not a directory");
   const folder = NodePath.join(root, "skills");
   const skills: SkillSetSkill[] = [];
   for (const name of await NodeFSP.readdir(folder).catch((error: NodeJS.ErrnoException) => {

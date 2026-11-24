@@ -86,3 +86,23 @@ it("clones, pulls, preserves last good checkout on failure, and honours interval
   await localSync.tick();
   expect(localSync.statuses()[0]?.skills[0]?.name).toBe("linked");
 });
+it("reports a missing local source as not ready rather than an empty set", async () => {
+  const root = await NodeFSP.mkdtemp(NodePath.join(NodeOS.tmpdir(), "missing-set-"));
+  const sync = new SkillSetSync(NodePath.join(root, "state"), () => ({
+    skillSetsEnabled: true,
+    skillSetSyncIntervalMinutes: 7,
+    skillSets: {
+      alpha: {
+        name: "Alpha",
+        source: { kind: "local", path: NodePath.join(root, "missing") },
+        enabled: true,
+        autoSync: false,
+        disabledSkills: [],
+      },
+    },
+  }));
+  await sync.tick();
+  expect(sync.statuses()[0]?.state).toBe("error");
+  expect(sync.statuses()[0]?.ready).toBe(false);
+  expect(sync.statuses()[0]?.error).toBeTruthy();
+});
