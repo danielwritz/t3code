@@ -26,7 +26,11 @@ describe("skill set home", () => {
         skillsEntry: "skills",
         skills: [{ name, targetPath: target }],
       });
-      expect(result).toEqual({ homePath: output, foreignEntries: ["runtime-state", "synced"] });
+      expect(result).toEqual({
+        homePath: output,
+        foreignEntries: ["runtime-state", "synced"],
+        ownedChanges: [],
+      });
       expect(await NodeFSP.realpath(NodePath.join(output, "skills", name))).toBe(
         await NodeFSP.realpath(target),
       );

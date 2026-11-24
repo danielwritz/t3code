@@ -32,7 +32,7 @@ async function git(cwd: string, ...args: string[]) {
   });
   return result.stdout.trim();
 }
-async function scanSkills(root: string): Promise<SkillSetSkill[]> {
+export async function scanSkills(root: string): Promise<SkillSetSkill[]> {
   if (!(await NodeFSP.stat(root)).isDirectory())
     throw new Error("Skill set source is not a directory");
   const folder = NodePath.join(root, "skills");
@@ -78,6 +78,11 @@ async function scanSkills(root: string): Promise<SkillSetSkill[]> {
   }
   return skills.sort((a, b) => a.name.localeCompare(b.name));
 }
+export function skillSetCheckoutPath(stateDir: string, id: string, config: SkillSetConfig) {
+  return config.source.kind === "local"
+    ? config.source.path
+    : NodePath.join(stateDir, "skill-sets", "repos", key(id + JSON.stringify(config.source)));
+}
 /** Serialized per set; a failed fetch/fast-forward never replaces the last good inventory. */
 export class SkillSetSync {
   private readonly values = new Map<string, SkillSetStatus>();
@@ -110,14 +115,7 @@ export class SkillSetSync {
     for (const listener of this.listeners) listener(this.statuses());
   }
   checkout(id: string, config: SkillSetConfig) {
-    return config.source.kind === "local"
-      ? config.source.path
-      : NodePath.join(
-          this.stateDir,
-          "skill-sets",
-          "repos",
-          key(id + JSON.stringify(config.source)),
-        );
+    return skillSetCheckoutPath(this.stateDir, id, config);
   }
   async tick() {
     const settings = this.settings();
