@@ -1,3 +1,5 @@
+// personal:skill-sets seam codex managed menu import
+import { makeCodexSkillSetProbe } from "../../personal/skillsets/codex.ts";
 import {
   ProviderDriverKind,
   ProviderSetupError,
@@ -36,6 +38,8 @@ export const makeManagedCodexProvider = Effect.fn("makeManagedCodexProvider")(fu
   input: ProviderDriverCreateInput<CodexSettings>,
 ) {
   const { instanceId, enabled, displayName, accentColor, config } = input;
+  // personal:skill-sets seam codex managed menu home
+  const probeSkills = yield* makeCodexSkillSetProbe(instanceId, probeCodexSkillsForCwd);
   const http = yield* HttpClient.HttpClient;
   const spawner = yield* ChildProcessSpawner.ChildProcessSpawner;
   const fileSystem = yield* FileSystem.FileSystem;
@@ -303,7 +307,8 @@ export const makeManagedCodexProvider = Effect.fn("makeManagedCodexProvider")(fu
     orchestrationAdapter,
     textGeneration,
     auth: runtime.auth.controller,
-    snapshotForCwd: (cwd: string) =>
+    // personal:skill-sets seam codex managed menu thread
+    snapshotForCwd: (cwd, thread) =>
       enabled
         ? resolveRuntime.pipe(
             Effect.matchEffect({
@@ -316,12 +321,13 @@ export const makeManagedCodexProvider = Effect.fn("makeManagedCodexProvider")(fu
                   ),
                 ),
               onSuccess: (effective) =>
-                probeCodexSkillsForCwd({
+                probeSkills({
                   binaryPath: effective.config.binaryPath,
                   homePath: effective.config.homePath,
                   launchArgs: effective.config.launchArgs,
                   cwd,
                   environment: effective.environment,
+                  thread,
                 }).pipe(
                   Effect.flatMap((skills) =>
                     snapshot.getSnapshot.pipe(Effect.map((draft) => ({ ...draft, skills }))),

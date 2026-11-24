@@ -8,6 +8,12 @@ const fixture = JSON.parse(
   NodeFS.readFileSync(NodePath.join(here, "codexMultiAgentWire.json"), "utf8"),
 );
 const script = JSON.parse(NodeFS.readFileSync(process.env.T3_CODEX_COLLAB_SCRIPT, "utf8"));
+if (script.launchRecordsPath) {
+  NodeFS.appendFileSync(
+    script.launchRecordsPath,
+    `${JSON.stringify({ home: process.env.CODEX_HOME })}\n`,
+  );
+}
 
 const write = (message) => process.stdout.write(`${JSON.stringify(message)}\n`);
 let turnStartCount = 0;
@@ -74,6 +80,10 @@ rl.on("line", (line) => {
       id,
       result: { account: script.account ?? { type: "apiKey" }, requiresOpenaiAuth: false },
     });
+    return;
+  }
+  if (method === "config/read") {
+    write({ id, result: { config: {}, origins: {} } });
     return;
   }
   if (method === "account/rateLimits/read" && script.failRateLimitsRead) {

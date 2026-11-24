@@ -1,3 +1,4 @@
+import type { SessionInputIdentity } from "../personal/skillsets/sessionIdentity.ts";
 import * as NetAddress from "effect/net/NetAddress";
 import * as NodeCrypto from "@effect/platform-node/NodeCrypto";
 import * as NodeServices from "@effect/platform-node/NodeServices";
@@ -473,6 +474,7 @@ const makeProviderAdapter = Effect.fnUntraced(function* (
   state: Ref.Ref<TestProviderRuntimeState>,
   options: {
     readonly failEventStream?: boolean;
+    readonly sessionInputIdentity?: SessionInputIdentity["sessionInputIdentity"];
     readonly normalizeThreadLoadModelSelection?: (selection: ModelSelection) => ModelSelection;
     readonly capabilities?: OrchestrationV2ProviderCapabilities;
     readonly extensionStatuses?: OrchestrationV2ProviderSession["extensionStatuses"];
@@ -564,6 +566,9 @@ const makeProviderAdapter = Effect.fnUntraced(function* (
         }
 
         return {
+          ...(options.sessionInputIdentity === undefined
+            ? {}
+            : { sessionInputIdentity: options.sessionInputIdentity }),
           instanceId: ProviderInstanceId.make("codex"),
           driver: CODEX_DRIVER,
           providerSessionId: input.providerSessionId,
@@ -654,6 +659,7 @@ function layerTest(input: {
   readonly idleTimeoutMs?: number;
   readonly maxIdlePinMs?: number;
   readonly failEventStream?: boolean;
+  readonly sessionInputIdentity?: SessionInputIdentity["sessionInputIdentity"];
   readonly normalizeThreadLoadModelSelection?: (selection: ModelSelection) => ModelSelection;
   readonly capabilities?: OrchestrationV2ProviderCapabilities;
   readonly extensionStatuses?: OrchestrationV2ProviderSession["extensionStatuses"];
@@ -708,6 +714,9 @@ function layerTest(input: {
   const layerRegistry = Layer.unwrap(
     makeProviderAdapter(input.state, {
       failEventStream: input.failEventStream ?? false,
+      ...(input.sessionInputIdentity === undefined
+        ? {}
+        : { sessionInputIdentity: input.sessionInputIdentity }),
       ...(input.normalizeThreadLoadModelSelection === undefined
         ? {}
         : { normalizeThreadLoadModelSelection: input.normalizeThreadLoadModelSelection }),
@@ -1248,6 +1257,68 @@ it.effect("ProviderSessionManagerV2 opens provider sessions inside the installat
   }),
 );
 
+it.effect.each([true, false])(
+  "ProviderSessionManagerV2 reopens only changed opaque session identities (provided: %s)",
+  (provided) =>
+    Effect.gen(function* () {
+      const state = yield* Ref.make(emptyState);
+      yield* Effect.gen(function* () {
+        const sink = yield* EventSink.EventSinkV2;
+        const allocator = yield* IdAllocator.IdAllocatorV2;
+        const manager = yield* ProviderSessionManager.ProviderSessionManagerV2;
+        const now = yield* DateTime.now;
+        const threadId = ThreadId.make("identity-thread");
+        const providerSessionId = yield* allocator.allocate.providerSession({
+          providerInstanceId: modelSelection.instanceId,
+          threadId,
+        });
+        yield* sink.write({
+          events: [yield* makeThreadCreatedEvent({ idAllocator: allocator, threadId, now })],
+        });
+        const input = { threadId, providerSessionId, modelSelection, runtimePolicy };
+        const first = yield* manager.open({ ...input, skillSetId: "alpha" });
+        const again = yield* manager.open({ ...input, skillSetId: "alpha" });
+        assert.strictEqual(first, again);
+        const previous = makeProviderThread({
+          idAllocator: allocator,
+          threadId,
+          providerSessionId,
+          now,
+          nativeThreadId: "history-to-preserve",
+        });
+        const next = yield* manager.open({
+          ...input,
+          skillSetId: "beta",
+          initialNativeThreadId: "history-to-preserve",
+          resumeFromSession: first.providerSession,
+        });
+        assert.equal((yield* Ref.get(state)).openCount, provided ? 2 : 1);
+        assert.equal((yield* Ref.get(state)).closeCount, provided ? 1 : 0);
+        const resumed = yield* next.resumeThread({
+          threadId,
+          providerThread: previous,
+          modelSelection,
+          runtimePolicy,
+        });
+        assert.deepEqual(resumed.nativeThreadRef, previous.nativeThreadRef);
+        assert.equal((yield* Ref.get(state)).resumeCount, 1);
+      }).pipe(
+        Effect.provide(
+          layerTest({
+            state,
+            idleTimeoutMs: 60_000,
+            ...(provided
+              ? {
+                  sessionInputIdentity: (
+                    input: ProviderAdapter.ProviderAdapterV2OpenSessionInput,
+                  ) => Effect.succeed(input.skillSetId ?? undefined),
+                }
+              : {}),
+          }),
+        ),
+      );
+    }),
+);
 it.effect("ProviderSessionManagerV2 opens a duplicate session only once", () =>
   Effect.gen(function* () {
     const state = yield* Ref.make(emptyState);

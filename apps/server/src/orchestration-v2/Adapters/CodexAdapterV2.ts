@@ -1,3 +1,5 @@
+// personal:skill-sets seam codex launch import
+import { makeCodexSkillSets } from "../../personal/skillsets/codex.ts";
 import { pipe } from "effect/Function";
 import * as DocumentText from "../../provider/DocumentText.ts";
 import { brokenRuntimeError } from "../../provider/providerCompatibility.ts";
@@ -2119,6 +2121,11 @@ export const makeCodexAdapterV2 = Effect.fn("makeCodexAdapterV2")(function* (
     threadId === null ? Effect.undefined : mcpSessions.read(threadId);
   const { clientFactory, digest, fileSystem, idAllocator, serverConfig } = adapterOptions;
   const continuationRequests = adapterOptions.continuationRequests;
+  // personal:skill-sets seam codex launch context
+  const skillSets = yield* makeCodexSkillSets(
+    adapterOptions.instanceId,
+    adapterOptions.environment,
+  );
 
   return ProviderAdapter.ProviderAdapterV2.of({
     instanceId: adapterOptions.instanceId,
@@ -2146,13 +2153,22 @@ export const makeCodexAdapterV2 = Effect.fn("makeCodexAdapterV2")(function* (
                     }),
                 ),
               );
+        // personal:skill-sets seam codex launch home
+        const skillSetLaunch = yield* skillSets.launch(
+          resolvedRuntime?.config ?? adapterOptions.settings,
+          input,
+          undefined,
+          resolvedRuntime?.environment,
+        );
         const client = yield* clientFactory.open({
           instanceId: adapterOptions.instanceId,
           threadId: input.threadId,
           providerSessionId: input.providerSessionId,
           runtimePolicy: input.runtimePolicy,
-          settings: resolvedRuntime?.config ?? adapterOptions.settings,
-          environment: resolvedRuntime?.environment ?? adapterOptions.environment,
+          // personal:skill-sets seam codex spawn settings
+          settings: skillSetLaunch.settings,
+          // personal:skill-sets seam codex spawn environment
+          environment: skillSetLaunch.environment,
         });
         const codexZone = codexTimeZone(resolvedRuntime?.environment ?? adapterOptions.environment);
         const additionalContextByThread = yield* Ref.make(
@@ -9456,7 +9472,13 @@ export const makeCodexAdapterV2 = Effect.fn("makeCodexAdapterV2")(function* (
               ),
           ),
         };
-        return runtime;
+        // personal:skill-sets seam codex restart identity
+        return skillSets.track(
+          runtime,
+          resolvedRuntime?.config ?? adapterOptions.settings,
+          resolvedRuntime?.environment,
+          skillSetLaunch,
+        );
       },
       (effect, input) =>
         effect.pipe(
