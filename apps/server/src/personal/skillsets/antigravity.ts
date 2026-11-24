@@ -17,6 +17,7 @@ import {
   antigravityOwnedEntries,
   antigravityPluginConfig,
 } from "./antigravityProfile.ts";
+import { ignoreProjectWorkspace } from "./projectShadow.ts";
 import type { SkillSetThread } from "./resolver.ts";
 import * as SkillSets from "./runtime.ts";
 
@@ -247,8 +248,60 @@ export const makeAntigravitySkillSetIntegration = Effect.fn("makeAntigravitySkil
             : undefined,
         ),
       );
+    /** Lead decision 18: with "ignore project instructions" on, agy runs in a mirror of the project. */
+    const workspace = <
+      I extends {
+        readonly cwd: string;
+        readonly skillSetId?: string | null;
+        readonly threadId?: string;
+        readonly processEnvironment?: NodeJS.ProcessEnv;
+      },
+    >(
+      input: I,
+    ) =>
+      provide(
+        resolveAntigravitySkillSetProfile(
+          service,
+          instanceId,
+          profileDirectory,
+          { skillSetId: input.skillSetId, threadId: input.threadId },
+          userHome,
+        ),
+      ).pipe(
+        Effect.flatMap((resolved) =>
+          resolved?.profile?.ignoreProjectInstructions
+            ? Effect.promise(() =>
+                ignoreProjectWorkspace(
+                  input.cwd,
+                  path.join(path.dirname(path.dirname(resolved.homePath)), "workspaces"),
+                ),
+              ).pipe(
+                Effect.tap((mirror) =>
+                  mirror.created.length
+                    ? Effect.logWarning(
+                        "Files made inside the project mirror did not reach the project",
+                        { files: mirror.created },
+                      )
+                    : Effect.void,
+                ),
+                Effect.map((mirror): I => ({
+                  ...input,
+                  cwd: mirror.cwd,
+                  processEnvironment: { ...input.processEnvironment, ...mirror.environment },
+                })),
+              )
+            : Effect.succeed(input),
+        ),
+        Effect.catchCause((cause) =>
+          Effect.logWarning(
+            "Could not hide project instructions for Antigravity; using the project folder",
+            cause,
+          ).pipe(Effect.as(input)),
+        ),
+      );
     return {
       sessionInputIdentity: identity,
+      workspace,
       applyProfile: (profile: AntigravityProfile, thread: SkillSetThread) =>
         provide(applyAntigravitySkillSetProfile(service, instanceId, profile, thread, userHome)),
       snapshot: (

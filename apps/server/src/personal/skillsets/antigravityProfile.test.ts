@@ -1,6 +1,7 @@
 // @effect-diagnostics nodeBuiltinImport:off -- Real folders and links, as agy reads them.
 import * as NodeServices from "@effect/platform-node/NodeServices";
 import { expect, it } from "@effect/vitest";
+import * as NodeChildProcess from "node:child_process";
 import * as NodeFSP from "node:fs/promises";
 import * as NodePath from "node:path";
 import * as Effect from "effect/Effect";
@@ -54,7 +55,7 @@ const fixture = Effect.fn("fixture")(function* () {
   });
 });
 
-function serviceFor(root: string, profile: string) {
+function serviceFor(root: string, profile: string, ignoreProjectInstructions = false) {
   return Layer.mock(SkillSets.SkillSets)({
     statuses: Effect.succeed([]),
     resolveHome: (driver, instance, thread) =>
@@ -72,6 +73,7 @@ function serviceFor(root: string, profile: string) {
                   enabled: true,
                   autoSync: false,
                   disabledSkills: [],
+                  ignoreProjectInstructions,
                 },
               },
             },
@@ -270,5 +272,51 @@ it.layer(NodeServices.layer)("Antigravity agent profiles", (it) => {
         ),
       ).toBe(realHooks);
     }),
+  );
+
+  it.effect(
+    "ignoring project instructions runs agy in a mirror that git maps to the checkout",
+    () =>
+      Effect.gen(function* () {
+        const { root, instance, userHome, profile } = yield* fixture();
+        const project = NodePath.join(root, "project");
+        yield* Effect.promise(async () => {
+          await write(NodePath.join(project, "GEMINI.md"), "repo rules");
+          await write(
+            NodePath.join(project, ".agents", "skills", "repo", "SKILL.md"),
+            skill("repo"),
+          );
+          await write(NodePath.join(project, "src", "main.txt"), "main");
+          NodeChildProcess.execFileSync("git", ["init", "-q"], { cwd: project });
+        });
+        const input = {
+          cwd: project,
+          threadId: "thread-1",
+          processEnvironment: { KEEP: "1" } as NodeJS.ProcessEnv,
+        };
+        const run = (ignore: boolean) =>
+          Effect.gen(function* () {
+            const integration = yield* makeAntigravitySkillSetIntegration(
+              "instance",
+              instance,
+              userHome,
+            );
+            return yield* integration.workspace(input);
+          }).pipe(Effect.provide(serviceFor(root, profile, ignore)));
+        expect(yield* run(false)).toBe(input);
+        const mirrored = yield* run(true);
+        expect(mirrored.cwd).not.toBe(project);
+        expect(mirrored.threadId).toBe("thread-1");
+        expect(mirrored.processEnvironment.KEEP).toBe("1");
+        yield* Effect.promise(async () => {
+          expect((await NodeFSP.readdir(mirrored.cwd)).toSorted()).toEqual([".git", "src"]);
+          expect(await NodeFSP.realpath(mirrored.processEnvironment.GIT_WORK_TREE!)).toBe(
+            await NodeFSP.realpath(project),
+          );
+          expect(await NodeFSP.realpath(mirrored.processEnvironment.GIT_DIR!)).toBe(
+            await NodeFSP.realpath(NodePath.join(project, ".git")),
+          );
+        });
+      }),
   );
 });

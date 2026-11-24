@@ -1123,5 +1123,15 @@
     "file": "apps/server/src/provider/antigravityAuthSupport.ts",
     "marker": "personal:skill-sets seam antigravity user hooks",
     "connects": "brings the real ~/.gemini/config/hooks.json into T3's Antigravity home when no profile is picked"
+  },
+  {
+    "file": "apps/server/src/provider/Drivers/AntigravityDriver.ts",
+    "marker": "personal:skill-sets seam antigravity workspace",
+    "connects": "names the unswapped runtime input"
+  },
+  {
+    "file": "apps/server/src/provider/Drivers/AntigravityDriver.ts",
+    "marker": "personal:skill-sets seam antigravity workspace input",
+    "connects": "runs agy in a mirror of the project when the profile or thread ignores project instructions"
   }
 ]

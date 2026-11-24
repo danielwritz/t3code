@@ -84,6 +84,7 @@ export type AntigravityAdapterV2RuntimeInput = Omit<
 > & {
   // personal:skill-sets seam antigravity input
   readonly skillSetId?: string | null;
+  readonly threadId?: string;
   readonly processEnvironment?: NodeJS.ProcessEnv;
 };
 

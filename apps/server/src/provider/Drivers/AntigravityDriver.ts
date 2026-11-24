@@ -326,7 +326,8 @@ export const AntigravityDriver: ProviderDriver<
     });
 
     const makeRuntime = Effect.fn("AntigravityDriver.makeRuntime")(function* (
-      input: AntigravityAdapterV2RuntimeInput,
+      // personal:skill-sets seam antigravity workspace
+      threadInput: AntigravityAdapterV2RuntimeInput,
     ): Effect.fn.Return<
       AcpSessionRuntime.AcpSessionRuntime["Service"],
       AcpErrors.AcpError | ProviderSetupError,
@@ -334,6 +335,8 @@ export const AntigravityDriver: ProviderDriver<
     > {
       // `buildAntigravityAcpSpawnInput` sets `extendEnv: false`, so thread variables only reach the
       // agent's shell through `baseEnv`.
+      // personal:skill-sets seam antigravity workspace input
+      const input = yield* skillSetIntegration.workspace(threadInput);
       const { processEnvironment: threadEnvironment, ...runtimeInput } = input;
       const { executable, spawn } = yield* prepareSpawn(
         runtimeInput.cwd,
