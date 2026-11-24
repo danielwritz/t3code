@@ -2,6 +2,8 @@ import { OtlpHeadersFromString, OtlpProtocol } from "@t3tools/shared/observabili
 import * as Config from "effect/Config";
 import * as ConfigProvider from "effect/ConfigProvider";
 import * as Option from "effect/Option";
+// personal:skill-sets seam desktop update identity
+import { personalDesktopIdentity } from "../personal/identity.ts";
 
 const trimNonEmptyOption = (value: string): Option.Option<string> => {
   const trimmed = value.trim();
@@ -57,7 +59,10 @@ export const DesktopConfig = Config.all({
   ),
   desktopLauncherPath: trimmedString("T3CODE_DESKTOP_LAUNCHER_PATH"),
   appImagePath: trimmedString("APPIMAGE"),
-  disableAutoUpdate: optionalBoolean("T3CODE_DISABLE_AUTO_UPDATE"),
+  // personal:skill-sets seam permanent update opt out
+  disableAutoUpdate: optionalBoolean("T3CODE_DISABLE_AUTO_UPDATE").pipe(
+    Config.map((value) => personalDesktopIdentity?.disableAutoUpdate || value),
+  ),
   mockUpdates: optionalBoolean("T3CODE_DESKTOP_MOCK_UPDATES"),
   mockUpdateServerPort: Config.Port("T3CODE_DESKTOP_MOCK_UPDATE_SERVER_PORT").pipe(
     Config.withDefault(3000),

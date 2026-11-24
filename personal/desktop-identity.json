@@ -1,0 +1,10 @@
+{
+  "productName": "T3 Code (Daniel)",
+  "appId": "com.danielwritz.t3code-daniel",
+  "packageName": "t3code-daniel",
+  "userDataDirectory": "t3code-daniel",
+  "scheme": "t3code-daniel",
+  "iconSource": "assets/daniel/source.png",
+  "disableAutoUpdate": true,
+  "prepareServerCompileCache": false
+}

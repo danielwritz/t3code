@@ -3,6 +3,8 @@ import * as FileSystem from "effect/FileSystem";
 import * as Path from "effect/Path";
 import * as PlatformError from "effect/PlatformError";
 import * as Schema from "effect/Schema";
+// personal:skill-sets seam desktop profile identity
+import { personalDesktopIdentity } from "../personal/identity.ts";
 
 export class DesktopUserDataInitializationError extends Schema.TaggedError<DesktopUserDataInitializationError>()(
   "DesktopUserDataInitializationError",
@@ -39,6 +41,9 @@ export const resolveUserDataPath = Effect.fn("desktop.userData.resolveUserDataPa
   }) {
     const fs = yield* FileSystem.FileSystem;
     const path = yield* Path.Path;
+    // personal:skill-sets seam isolated profile without legacy migration
+    if (personalDesktopIdentity)
+      return path.join(input.appDataDirectory, personalDesktopIdentity.userDataDirectory);
     const names = input.isDevelopment
       ? { current: "t3code-dev", legacy: "T3 Code (Dev)" }
       : { current: "t3code-v2", legacy: "T3 Code (Alpha)" };

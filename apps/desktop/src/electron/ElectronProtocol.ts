@@ -13,7 +13,9 @@ import * as Scope from "effect/Scope";
 import * as Electron from "electron";
 
 export const DESKTOP_HOST = "app";
-const DESKTOP_PRODUCTION_SCHEME = "t3code";
+// personal:skill-sets seam personal protocol identity
+import { personalDesktopIdentity } from "../personal/identity.ts";
+const DESKTOP_PRODUCTION_SCHEME = personalDesktopIdentity?.scheme ?? "t3code";
 const DESKTOP_DEVELOPMENT_SCHEME = "t3code-dev";
 
 export function getDesktopScheme(isDevelopment: boolean): string {

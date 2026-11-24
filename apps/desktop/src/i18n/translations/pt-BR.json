@@ -31,6 +31,8 @@
   "4cd679200c978949": "Fechar o assistente de permissões",
   "ea4f056c8f6b5c15": "↑ Arraste o T3 Code para a lista acima",
   "4bcb0f4db00936b1": "Arraste o T3 Code para os Ajustes do Sistema ou clique para mostrar no Finder",
+  "e0bd641998ab83f5": "T3 Code is already running in another app. Quit the other T3 Code app before opening this one. Both apps use the same threads and settings, so only one can run at a time.",
+  "410d34cd51c71c8e": "This T3 data was updated by a newer T3 Code. Update T3 Code (Daniel) before opening it.",
   "278648c9ff6fb9ce": "Nenhuma autoridade confiável emitiu este certificado.",
   "cf346dcfb658d4d3": "Este certificado não é para este endereço.",
   "20665d9b0c7c3e52": "Este certificado expirou ou ainda não é válido.",

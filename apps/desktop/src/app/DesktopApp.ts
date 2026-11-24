@@ -5,6 +5,8 @@ import * as Option from "effect/Option";
 import * as Ref from "effect/Ref";
 import * as Schema from "effect/Schema";
 import * as Stream from "effect/Stream";
+// personal:skill-sets seam shared home message helper
+import { personalHomeOwnedMessage } from "../personal/homeOwnedMessage.ts";
 
 import * as NetService from "@t3tools/shared/Net";
 import * as SecureRandom from "effect/crypto/SecureRandom";
@@ -246,7 +248,8 @@ const startLocalBackend = Effect.gen(function* () {
     });
     yield* (yield* ElectronDialog.ElectronDialog).showErrorBox(
       m(msg("This T3 home is unavailable")),
-      DesktopHomeOwner.homeOwnedMessage(owner),
+      // personal:skill-sets seam clear shared home ownership message
+      personalHomeOwnedMessage() ?? DesktopHomeOwner.homeOwnedMessage(owner),
     );
     yield* (yield* ElectronApp.ElectronApp).quit;
     return false;
