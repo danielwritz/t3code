@@ -948,5 +948,25 @@
     "file": "scripts/build-desktop-artifact.ts",
     "marker": "personal:skill-sets seam match official Windows cache packaging",
     "connects": "match official Windows cache packaging"
+  },
+  {
+    "file": "apps/desktop/src/app/DesktopStartupRecovery.ts",
+    "marker": "personal:skill-sets seam newer data refusal presentation",
+    "connects": "newer data refusal presentation"
+  },
+  {
+    "file": "apps/desktop/src/app/DesktopStartupRecovery.ts",
+    "marker": "personal:skill-sets seam hide official recovery offers for newer data",
+    "connects": "hide official recovery offers for newer data"
+  },
+  {
+    "file": "apps/desktop/src/app/DesktopStartupRecovery.ts",
+    "marker": "personal:skill-sets seam newer data reason is in the headline",
+    "connects": "newer data reason is in the headline"
+  },
+  {
+    "file": "apps/desktop/src/app/DesktopStartupRecovery.ts",
+    "marker": "personal:skill-sets seam newer data recovery headline",
+    "connects": "newer data recovery headline"
   }
 ]

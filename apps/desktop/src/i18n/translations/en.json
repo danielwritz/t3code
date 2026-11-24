@@ -32,6 +32,7 @@
   "ea4f056c8f6b5c15": "↑ Drag T3 Code into the list above",
   "4bcb0f4db00936b1": "Drag T3 Code to System Settings, or click to reveal in Finder",
   "e0bd641998ab83f5": "T3 Code is already running in another app. Quit the other T3 Code app before opening this one. Both apps use the same threads and settings, so only one can run at a time.",
+  "410d34cd51c71c8e": "This T3 data was updated by a newer T3 Code. Update T3 Code (Daniel) before opening it.",
   "278648c9ff6fb9ce": "No trusted authority issued this certificate.",
   "cf346dcfb658d4d3": "This certificate is not for this address.",
   "20665d9b0c7c3e52": "This certificate has expired or is not valid yet.",

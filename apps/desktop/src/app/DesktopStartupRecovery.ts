@@ -19,6 +19,8 @@ import type { BackendStartupFailure } from "../backend/DesktopBackendManager.ts"
 import * as DesktopEnvironment from "./DesktopEnvironment.ts";
 import * as DesktopObservability from "./DesktopObservability.ts";
 import * as DesktopState from "./DesktopState.ts";
+// personal:skill-sets seam newer data refusal presentation
+import { personalStartupRefusal } from "../personal/startupRefusal.ts";
 
 const RELEASES_URL = "https://github.com/pingdotgg/t3code/releases";
 const LAST_STARTED_VERSION_FILE = "desktop-last-started-version";
@@ -147,9 +149,14 @@ function buildStartupRecoveryHtml(input: {
   readonly offer: StartupRecoveryOffer;
   readonly logDir: string;
 }): string {
-  const offer = describeOffer(input.offer);
+  // personal:skill-sets seam hide official recovery offers for newer data
+  const refusal = personalStartupRefusal(input.failure);
+  const offer = refusal?.offer ?? describeOffer(input.offer);
   const output = input.failure.output.trim();
-  const title = escapeHtml(m(msg("T3 Code could not start")));
+  // personal:skill-sets seam newer data reason is in the headline
+  const reason = refusal?.reason ?? input.failure.reason;
+  // personal:skill-sets seam newer data recovery headline
+  const title = escapeHtml(refusal?.headline ?? m(msg("T3 Code could not start")));
   return `<!doctype html><html><head><meta charset="utf-8"><meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'"><title>${title}</title><style>
 :root{color-scheme:light dark;--bg:#fff;--fg:#111;--muted:#666;--line:#ddd;--code:#f4f4f4}
 @media (prefers-color-scheme:dark){:root{--bg:#000;--fg:#fff;--muted:#999;--line:#333;--code:#111}}
@@ -162,7 +169,7 @@ h1{font-size:18px;margin:0}p{margin:0}.muted{color:var(--muted)}
 pre{flex:1;min-height:60px;margin:0;overflow:auto;background:var(--code);border:1px solid var(--line);border-radius:6px;padding:10px;font:11px/1.4 ui-monospace,Menlo,Consolas,monospace;white-space:pre-wrap;word-break:break-word}
 </style></head><body>
 <h1>${title}</h1>
-<p>${escapeHtml(input.failure.reason)}</p>
+<p>${escapeHtml(reason)}</p>
 <p>${escapeHtml(offer.text)}</p>
 <div class="actions">${offer.action}${actionLink("copy", m(msg("Copy details")))}${actionLink("quit", m(msg("Quit", { $context: "button, quits the app" })))}</div>
 <pre>${escapeHtml(output.length > 0 ? output : m(msg("The server wrote no output.")))}</pre>

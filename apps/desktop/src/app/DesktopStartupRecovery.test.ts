@@ -1,5 +1,6 @@
 import type { DesktopUpdateState } from "@t3tools/contracts";
 import { describe, expect, it } from "@effect/vitest";
+import { vi } from "vite-plus/test";
 import * as Deferred from "effect/Deferred";
 import * as Effect from "effect/Effect";
 import * as FileSystem from "effect/FileSystem";
@@ -18,6 +19,10 @@ import * as DesktopUpdates from "../updates/DesktopUpdates.ts";
 
 import { createInitialDesktopUpdateState } from "../updates/updateMachine.ts";
 import { listen, resolveStartupRecoveryOffer } from "./DesktopStartupRecovery.ts";
+
+vi.mock("../personal/identity.ts", () => ({
+  personalDesktopIdentity: { productName: "Test Fork" },
+}));
 
 const updateState = (patch: Partial<DesktopUpdateState>): DesktopUpdateState => ({
   ...createInitialDesktopUpdateState(
@@ -98,13 +103,17 @@ describe("resolveStartupRecoveryOffer", () => {
 });
 
 it.effect.each([
-  { visible: false, started: false, closeMain: false },
-  { visible: true, started: false, closeMain: false },
-  { visible: true, started: true, closeMain: false },
-  { visible: true, started: false, closeMain: true },
-])("closes recovery safely with closeMain=$closeMain", ({ visible, started, closeMain }) =>
+  { visible: false, started: false, closeMain: false, refusal: "none" },
+  { visible: true, started: false, closeMain: false, refusal: "none" },
+  { visible: true, started: true, closeMain: false, refusal: "none" },
+  { visible: true, started: false, closeMain: true, refusal: "none" },
+  { visible: false, started: false, closeMain: false, refusal: "marker" },
+  { visible: false, started: false, closeMain: false, refusal: "code" },
+  { visible: false, started: false, closeMain: false, refusal: "other-code" },
+])("closes recovery safely ($refusal)", (scenario) =>
   Effect.scoped(
     Effect.gen(function* () {
+      const { visible, started, closeMain, refusal } = scenario;
       const checked = yield* Deferred.make<void>();
       const remembered = yield* Deferred.make<void>();
       const shouldRecover = !visible || !started;
@@ -168,7 +177,11 @@ it.effect.each([
             } as unknown as ElectronWindow.ElectronWindow["Service"]),
             Layer.succeed(DesktopUpdates.DesktopUpdates, {
               subscribe: Effect.succeed({
-                latest: updateState({ status: "disabled" }),
+                latest: updateState(
+                  refusal === "none"
+                    ? { status: "disabled" }
+                    : { status: "available", availableVersion: "0.1.4" },
+                ),
                 changes: Stream.empty,
               }),
               check: () => Deferred.succeed(checked, undefined),
@@ -180,14 +193,34 @@ it.effect.each([
       if (started) yield* Deferred.await(remembered);
       yield* SubscriptionRef.set(state.primaryBackendStartup, {
         _tag: "Failing",
-        reason: "Server failed before readiness",
+        reason:
+          refusal === "code"
+            ? "The server could not start (code=79)."
+            : refusal === "other-code"
+              ? "The server could not start (code=790)."
+              : "Server failed before readiness",
         managedPolicy: false,
-        output: "Failure details",
+        output:
+          refusal === "marker"
+            ? "Failure details\nT3_SKILL_SETS_GUARD=data-newer\n"
+            : "Failure details",
       });
       yield* Deferred.await(checked);
       expect(loaded.length).toBe(shouldRecover ? 1 : 0);
       if (shouldRecover) {
         expect(decodeURIComponent(loaded[0]!)).toContain("Failure details");
+        const html = decodeURIComponent(loaded[0]!);
+        if (refusal === "marker" || refusal === "code") {
+          expect(html).toContain(
+            "<h1>This T3 data was updated by a newer T3 Code. Update T3 Code (Daniel) before opening it.</h1>",
+          );
+          expect(html).not.toContain('href="https://startup-recovery.invalid/update"');
+          expect(html).not.toContain('href="https://startup-recovery.invalid/reinstall"');
+          expect(html).not.toContain('href="https://startup-recovery.invalid/releases"');
+        } else if (refusal === "other-code") {
+          expect(html).toContain("<h1>T3 Code could not start</h1>");
+          expect(html).toContain('href="https://startup-recovery.invalid/update"');
+        }
         if (closeMain) yield* Ref.set(mainRef, Option.none());
         yield* SubscriptionRef.set(state.primaryBackendStartup, { _tag: "Ready" });
         yield* Deferred.await(remembered);
