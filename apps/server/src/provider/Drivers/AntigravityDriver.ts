@@ -81,7 +81,10 @@ import {
 } from "@t3tools/provider-core/server/driver";
 import { mergeProviderInstanceEnvironment } from "@t3tools/provider-core/server/instanceEnvironment";
 import { withInstanceIdentity } from "@t3tools/provider-core/server/instanceIdentity";
-import { discoverAntigravitySkills, resolveAntigravityUserHome } from "./AntigravitySkills.ts";
+import { resolveAntigravityUserHome } from "./AntigravitySkills.ts";
+// personal:skill-sets seam antigravity imports
+import * as SkillSets from "../../personal/skillsets/runtime.ts";
+import { makeAntigravitySkillSetIntegration } from "../../personal/skillsets/antigravity.ts";
 
 const DRIVER = ProviderDriverKind.make("antigravity");
 const decodeSettings = Schema.decodeSync(AntigravitySettings);
@@ -120,7 +123,9 @@ export type AntigravityDriverEnv =
   | McpProviderSessions.McpProviderSessions
   | ModelCatalog.ModelCatalog
   | Path.Path
-  | ProviderEventLoggers.ProviderEventLoggers;
+  | ProviderEventLoggers.ProviderEventLoggers
+  // personal:skill-sets seam antigravity dependency
+  | SkillSets.SkillSets;
 
 export const AntigravityDriver: ProviderDriver<
   AntigravitySettings,
@@ -186,6 +191,12 @@ export const AntigravityDriver: ProviderDriver<
       ),
     );
     const profileDirectory = directories.profile;
+    // personal:skill-sets seam antigravity service
+    const skillSetIntegration = yield* makeAntigravitySkillSetIntegration(
+      instanceId,
+      profileDirectory,
+      userHome,
+    );
     // Only a session reports whether agy offers Auto, so keep the last answer across restarts.
     const runtimeModesPath = path.join(profileDirectory, "t3-runtime-modes.json");
     const rememberedRuntimeModes = yield* fileSystem.readFileString(runtimeModesPath).pipe(
@@ -227,6 +238,8 @@ export const AntigravityDriver: ProviderDriver<
     const prepareSpawn = Effect.fn("AntigravityDriver.prepareSpawn")(function* (
       cwd: string,
       baseEnv: NodeJS.ProcessEnv,
+      // personal:skill-sets seam antigravity spawn input
+      thread: { readonly skillSetId?: string | null } = {},
     ): Effect.fn.Return<
       {
         readonly executable: AntigravityInstallation.AntigravityExecutable;
@@ -302,7 +315,8 @@ export const AntigravityDriver: ProviderDriver<
         executable,
         spawn: buildAntigravityAcpSpawnInput({
           installation: executable,
-          profile,
+          // personal:skill-sets seam antigravity spawn profile
+          profile: yield* skillSetIntegration.applyProfile(profile, thread),
           cwd,
           baseEnv,
           auth,
@@ -326,6 +340,8 @@ export const AntigravityDriver: ProviderDriver<
         threadEnvironment === undefined
           ? processEnvironment
           : { ...processEnvironment, ...threadEnvironment },
+        // personal:skill-sets seam antigravity runtime pick
+        runtimeInput,
       );
       const runtime = yield* makeAntigravityAcpRuntime({
         ...runtimeInput,
@@ -648,7 +664,10 @@ export const AntigravityDriver: ProviderDriver<
           provider: DRIVER,
           threadId,
         }),
-    });
+    }).pipe(
+      // personal:skill-sets seam antigravity session identity
+      Effect.map(skillSetIntegration.wrapAdapter),
+    );
     const textGeneration = yield* makeAntigravityTextGeneration({
       profileDirectory,
       defaultModel,
@@ -719,13 +738,13 @@ export const AntigravityDriver: ProviderDriver<
       accentColor,
       enabled,
       snapshot: provider.snapshot,
-      snapshotForCwd: (cwd) =>
+      // personal:skill-sets seam antigravity menu context
+      snapshotForCwd: (cwd, thread) =>
         !enabled
           ? provider.snapshot.getSnapshot
-          : discoverAntigravitySkills({ cwd, userHome, profileDirectory }).pipe(
+          : skillSetIntegration.snapshot(cwd, thread, provider.snapshotForCwd).pipe(
               Effect.provideService(FileSystem.FileSystem, fileSystem),
               Effect.provideService(Path.Path, path),
-              Effect.flatMap((skills) => provider.snapshotForCwd(cwd, skills)),
               Effect.mapError(
                 (cause) =>
                   new ProviderDriverError({

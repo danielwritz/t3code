@@ -23,6 +23,7 @@ import { HttpClient } from "effect/http";
 import * as BackgroundPolicy from "../../background/BackgroundPolicy.ts";
 import * as ServerConfig from "../../config.ts";
 import * as ServerSettings from "../../serverSettings.ts";
+import * as SkillSets from "../../personal/skillsets/runtime.ts";
 import * as AntigravityInstallation from "../AntigravityInstallation.ts";
 import {
   ANTIGRAVITY_AUTH_STDOUT_PREFIX,
@@ -291,6 +292,12 @@ const layerDeps = ServerConfig.layerTest(process.cwd(), {
     ),
   ),
   Layer.provideMerge(ServerSettings.layerTest()),
+  Layer.provideMerge(
+    Layer.mock(SkillSets.SkillSets)({
+      resolveHome: () => Effect.undefined,
+      statuses: Effect.succeed([]),
+    }),
+  ),
   Layer.provideMerge(
     Layer.mock(BackgroundPolicy.BackgroundPolicy)({
       shouldRunScopeWork: () => Effect.succeed(false),
