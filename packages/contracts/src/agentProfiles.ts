@@ -33,6 +33,8 @@ export const AgentProfileItemDetail = Schema.Struct({
   event: Schema.optionalKey(Schema.String),
   matcher: Schema.optionalKey(Schema.String),
   commands: Schema.optionalKey(Schema.Array(Schema.String)),
+  /** Machine-policy hooks: the id the guard scripts read (the script's file name). */
+  guardId: Schema.optionalKey(Schema.String),
   transport: Schema.optionalKey(Schema.Literals(["stdio", "http", "sse"])),
   command: Schema.optionalKey(Schema.String),
   args: Schema.optionalKey(Schema.Array(Schema.String)),

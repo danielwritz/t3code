@@ -327,6 +327,7 @@ export function resolveAgentProfile(input: {
             event: item.detail.event ?? "",
             ...(item.detail.matcher === undefined ? {} : { matcher: item.detail.matcher }),
             commands: item.detail.commands ?? [],
+            guardId: machinePolicyHookId(item.detail.commands ?? []),
           },
         ]
       : [],
@@ -362,16 +363,56 @@ export interface MachinePolicyHookOff {
   readonly event: string;
   readonly matcher?: string;
   readonly commands: readonly string[];
+  /** The id the guard scripts match (`machinePolicyHookId`). */
+  readonly guardId: string;
 }
-/** Environment value naming the machine-policy hooks a profile switched off (lead decision 14). */
-export const MACHINE_POLICY_HOOKS_OFF_ENV = "T3_PROFILE_MACHINE_HOOKS_OFF";
+
+const INTERPRETERS = new Set([
+  "node",
+  "bun",
+  "deno",
+  "python",
+  "python3",
+  "py",
+  "bash",
+  "sh",
+  "pwsh",
+  "powershell",
+  "cmd",
+]);
+const scriptName = (path: string) => {
+  const base = path.split(/[\\/]/).at(-1) ?? "";
+  const dot = base.lastIndexOf(".");
+  return dot > 0 ? base.slice(0, dot) : base;
+};
 /**
- * Process environment for a provider started with this profile: a JSON array of
- * `MachinePolicyHookOff`. A guard script that finds its own command there exits as "allow".
- * Always set (an empty array when nothing is off) so an inherited value never leaks in.
+ * A machine-policy hook's id, shared with the guard scripts: the file name, without extension, of
+ * the script its first command runs (`node "...\outside-post-guard.mjs"` is `outside-post-guard`).
+ */
+export function machinePolicyHookId(commands: readonly string[]): string {
+  const tokens = [...(commands[0] ?? "").matchAll(/"([^"]*)"|'([^']*)'|(\S+)/g)].map(
+    (match) => match[1] ?? match[2] ?? match[3] ?? "",
+  );
+  const [first, ...rest] = tokens;
+  if (first === undefined) return "";
+  if (!INTERPRETERS.has(scriptName(first).toLowerCase())) return scriptName(first);
+  // Skip switches: `-File`, `--flag`, and short Windows ones such as `/c`.
+  const script = rest.find((token) => !token.startsWith("-") && !/^\/\w{1,2}$/.test(token));
+  return script === undefined ? scriptName(first) : scriptName(script);
+}
+
+/** Environment variable the guard scripts read (lead decision 14, guard slice contract). */
+export const MACHINE_POLICY_HOOKS_OFF_ENV = "T3_PROFILE_HOOKS_OFF";
+/**
+ * Process environment for a provider started with this profile: the guard ids of the
+ * machine-policy hooks switched off, comma-separated. Always set, empty when nothing is off
+ * ("check as usual"), so an inherited value never leaks into a profile session.
  */
 export function machinePolicyHooksEnvironment(
   profile: Pick<ResolvedAgentProfile, "machinePolicyHooksOff">,
 ): Record<typeof MACHINE_POLICY_HOOKS_OFF_ENV, string> {
-  return { [MACHINE_POLICY_HOOKS_OFF_ENV]: JSON.stringify(profile.machinePolicyHooksOff) };
+  const ids = [...new Set(profile.machinePolicyHooksOff.map((hook) => hook.guardId))].filter((id) =>
+    /^[\w.-]+$/.test(id),
+  );
+  return { [MACHINE_POLICY_HOOKS_OFF_ENV]: ids.join(",") };
 }

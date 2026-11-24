@@ -17,6 +17,12 @@ import {
   type HookGroup,
   type McpServerSpec,
 } from "./profileParts.ts";
+import { machinePolicyHookId } from "./profile.ts";
+
+function policyHookDetail(group: HookGroup, policyFile: string) {
+  const detail = hookDetail(group);
+  return { ...detail, path: policyFile, guardId: machinePolicyHookId(detail.commands ?? []) };
+}
 
 /** Where each provider keeps its setup. Every path is only read. */
 export interface InventoryPaths {
@@ -180,7 +186,7 @@ class Reader {
         [keyPrefix, ...group.path, group.index].filter((part) => part !== "").join(":"),
         `${group.path.join(" / ")} #${group.index + 1}`,
         policyFile ? { kind: "hook", group, policyFile } : { kind: "hook", group },
-        policyFile ? { ...hookDetail(group), path: policyFile } : hookDetail(group),
+        policyFile ? policyHookDetail(group, policyFile) : hookDetail(group),
         { machinePolicy: policyFile !== undefined },
       );
   }

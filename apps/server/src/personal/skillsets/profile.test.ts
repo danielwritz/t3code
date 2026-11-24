@@ -7,6 +7,7 @@ import type { AgentProfileProvider } from "@t3tools/contracts";
 import { readMachineInventory } from "./inventory.ts";
 import {
   MACHINE_POLICY_HOOKS_OFF_ENV,
+  machinePolicyHookId,
   machinePolicyHooksEnvironment,
   profileItems,
   profileView,
@@ -221,13 +222,30 @@ describe("agent profile model", () => {
         event: "PreToolUse",
         matcher: "Bash",
         commands: ["node machine-guard.mjs"],
+        guardId: "machine-guard",
       },
     ]);
+    expect(empty.items.find((item) => item.provider === "codex")?.detail.guardId).toBe(
+      "machine-guard",
+    );
     expect(empty.codex.hooksFile).toBeNull();
     expect(empty.antigravity.machinePolicyHooksOff).toEqual([]);
+    expect(MACHINE_POLICY_HOOKS_OFF_ENV).toBe("T3_PROFILE_HOOKS_OFF");
+    expect(machinePolicyHooksEnvironment(empty.codex)).toEqual({
+      [MACHINE_POLICY_HOOKS_OFF_ENV]: "machine-guard",
+    });
     expect(
-      JSON.parse(machinePolicyHooksEnvironment(empty.codex)[MACHINE_POLICY_HOOKS_OFF_ENV]),
-    ).toEqual(empty.codex.machinePolicyHooksOff);
+      machinePolicyHooksEnvironment({
+        machinePolicyHooksOff: [
+          ...empty.codex.machinePolicyHooksOff,
+          ...empty.claude.machinePolicyHooksOff,
+          ...empty.codex.machinePolicyHooksOff,
+        ],
+      }),
+    ).toEqual({ [MACHINE_POLICY_HOOKS_OFF_ENV]: "machine-guard,policy" });
+    expect(machinePolicyHooksEnvironment(empty.antigravity)).toEqual({
+      [MACHINE_POLICY_HOOKS_OFF_ENV]: "",
+    });
     const on = await resolveAll(
       root,
       { disabledSkills: [], enabledItems: ["policy:codex:hook:policy:hooks.json:PreToolUse:0"] },
@@ -237,8 +255,24 @@ describe("agent profile model", () => {
     expect(on.codex.hooksFile).toBeNull();
     expect(on.codex.contentHash).not.toBe(empty.codex.contentHash);
     expect(machinePolicyHooksEnvironment(on.codex)).toEqual({
-      [MACHINE_POLICY_HOOKS_OFF_ENV]: "[]",
+      [MACHINE_POLICY_HOOKS_OFF_ENV]: "",
     });
+  });
+
+  it("names a machine-policy hook by the file name of the script its command runs", () => {
+    expect(
+      machinePolicyHookId([
+        'node "C:\\Program Files\\OutsidePostGuard\\bin\\outside-post-guard.mjs"',
+      ]),
+    ).toBe("outside-post-guard");
+    expect(machinePolicyHookId(["node D:\\tools\\bin\\run-guard.mjs --profile codex"])).toBe(
+      "run-guard",
+    );
+    expect(machinePolicyHookId(["/usr/local/bin/check-post.sh --strict"])).toBe("check-post");
+    expect(machinePolicyHookId(["pwsh -File 'C:\\guards\\gate.ps1'"])).toBe("gate");
+    expect(machinePolicyHookId(["node /opt/guards/post-gate.mjs"])).toBe("post-gate");
+    expect(machinePolicyHookId(["cmd /c C:\\guards\\gate.cmd"])).toBe("gate");
+    expect(machinePolicyHookId([])).toBe("");
   });
 
   it("lets the profile's own file win over a reference for the same provider", async () => {
