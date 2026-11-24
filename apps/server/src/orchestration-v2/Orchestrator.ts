@@ -1,3 +1,5 @@
+// personal:skill-sets seam foundation 1
+import { skillSetPick } from "@t3tools/contracts";
 import type {
   OrchestrationV2ThreadLinkMetadata,
   GuestShareId,
@@ -4125,6 +4127,8 @@ const makeOrchestrator = Effect.fn("orchestrationV2.Orchestrator.layer")(functio
       interactionMode: command.interactionMode,
       branch: command.branch,
       worktreePath: command.worktreePath,
+      // personal:skill-sets seam foundation 2
+      ...skillSetPick(command),
       activeProviderThreadId: null,
       pullRequests: [],
       ...(command.linkOrigin === undefined ? {} : { linkOrigin: command.linkOrigin }),
@@ -5226,6 +5230,8 @@ const makeOrchestrator = Effect.fn("orchestrationV2.Orchestrator.layer")(functio
                 : {}),
             ...(command.branch === undefined ? {} : { branch: command.branch }),
             ...(command.worktreePath === undefined ? {} : { worktreePath: command.worktreePath }),
+            // personal:skill-sets seam foundation 3
+            ...skillSetPick(command),
             ...(command.linkedPullRequest === undefined
               ? {}
               : {

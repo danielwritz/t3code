@@ -1,3 +1,5 @@
+// personal:skill-sets seam session pick import
+import { skillSetPick } from "@t3tools/contracts";
 import { AgentScope } from "@t3tools/shared/AgentScope";
 import * as KeyedLock from "@t3tools/shared/KeyedLock";
 import { resolveProjectSettings } from "@t3tools/shared/projectSettings";
@@ -245,6 +247,8 @@ export type ProviderSessionManagerV2Error = typeof ProviderSessionManagerV2Error
 export interface ProviderSessionManagerV2Shape {
   readonly shutdown: Effect.Effect<void>;
   readonly open: (input: {
+    // personal:skill-sets seam session input
+    readonly skillSetId?: string | null;
     readonly threadId: ThreadId;
     readonly providerSessionId: ProviderSessionId;
     readonly modelSelection: ModelSelection;
@@ -3309,6 +3313,8 @@ export const layerWithOptions = (
                 .execute(
                   input.modelSelection.instanceId,
                   adapter.openSession({
+                    // personal:skill-sets seam session pick
+                    ...skillSetPick(input),
                     threadId: input.threadId,
                     providerSessionId: input.providerSessionId,
                     modelSelection: input.modelSelection,

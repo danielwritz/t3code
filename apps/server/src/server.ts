@@ -1,3 +1,5 @@
+// personal:skill-sets seam runtime import
+import * as SkillSets from "./personal/skillsets/runtime.ts";
 import * as ProviderEventLoggers from "@t3tools/provider-core/server/ProviderEventLoggers";
 import type { RelayManagedEndpointRuntimeConfig } from "@t3tools/contracts/relay";
 import * as Random from "effect/Random";
@@ -726,6 +728,8 @@ const layerServerRestart = Layer.effect(
   }),
 );
 
+// personal:skill-sets seam runtime layer
+const layerSkillSets = SkillSets.layer.pipe(Layer.provide(layerServerSettings));
 const layerRuntimeCoreDependenciesBase = Layer.mergeAll(
   AgentAwarenessRelay.layer,
   ProviderHostPathWatcher.layer.pipe(Layer.provide(layerDesktopTelemetryReceiver)),
@@ -800,7 +804,8 @@ const layerRuntimeCoreDependenciesBase = Layer.mergeAll(
   ),
   // One gate for the server, below hydration so the Claude adapter sees it: layers memoize by
   // reference, so the runtime layer shares it.
-  Layer.provideMerge(ProviderInstallationGate.layer),
+  // personal:skill-sets seam runtime provide
+  Layer.provideMerge(Layer.merge(ProviderInstallationGate.layer, layerSkillSets)),
   // Provider hydration builds the Claude runner, which reports agents to the same scanner the
   // terminal and preview layers share.
   Layer.provideMerge(layerPortScanner),

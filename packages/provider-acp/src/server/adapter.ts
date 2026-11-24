@@ -1,3 +1,5 @@
+// personal:skill-sets seam acp pick import
+import { skillSetPick } from "@t3tools/contracts";
 // @effect-diagnostics nodeBuiltinImport:off
 
 import {
@@ -243,6 +245,8 @@ const ACP_PROMPT_ACTIVITY_UPDATES: ReadonlySet<string> = new Set([
 ]);
 
 export interface AcpAdapterV2RuntimeInput {
+  // personal:skill-sets seam acp input
+  readonly skillSetId?: string | null;
   readonly cwd: string;
   readonly runtimePolicy: ProviderAdapter.ProviderAdapterV2RuntimePolicy;
   readonly extraRoots?: ReadonlyArray<string>;
@@ -2921,6 +2925,8 @@ export const makeAcpAdapterV2 = Effect.fn("makeAcpAdapterV2")(function* (
             handleRuntimeTerminationAtGeneration(runtimeGeneration),
         ): AcpAdapterV2RuntimeInput => {
           return {
+            // personal:skill-sets seam acp pick
+            ...skillSetPick(input),
             cwd: input.runtimePolicy.cwd ?? process.cwd(),
             runtimePolicy: input.runtimePolicy,
             ...(input.runtimePolicy.workspace === undefined

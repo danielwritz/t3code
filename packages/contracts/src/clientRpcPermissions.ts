@@ -19,6 +19,10 @@ import { WS_METHODS } from "./rpc.ts";
 
 /** Incremental client enforcement; the server still authorizes every request. */
 export const CLIENT_GUARDED_RPC_SCOPES = {
+  // personal:skill-sets seam foundation 1
+  "skillSets.status": AuthOrchestrationReadScope,
+  "skillSets.subscribe": AuthOrchestrationReadScope,
+  "skillSets.sync": AuthSettingsWriteScope,
   [WS_METHODS.providerAuthRemoveMethod]: AuthProvidersManageScope,
   // An MCP sign-in stores a credential for the agent, as an account sign-in does.
   [WS_METHODS.providerMcpSignInStart]: AuthProvidersManageScope,

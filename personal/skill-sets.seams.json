@@ -118,5 +118,255 @@
     "file": "apps/web/test/fakeEnvironment.ts",
     "marker": "personal:skill-sets seam",
     "connects": "an extra project spreads after workspaceRoot, so it can set workspaceRoot"
+  },
+  {
+    "file": "apps/server/src/orchestration-v2/Orchestrator.ts",
+    "marker": "personal:skill-sets seam foundation 1",
+    "connects": "imports the shared thread-pick projection"
+  },
+  {
+    "file": "apps/server/src/orchestration-v2/Orchestrator.ts",
+    "marker": "personal:skill-sets seam foundation 2",
+    "connects": "stores the pick on thread creation"
+  },
+  {
+    "file": "apps/server/src/orchestration-v2/Orchestrator.ts",
+    "marker": "personal:skill-sets seam foundation 3",
+    "connects": "updates the pick in thread metadata commands"
+  },
+  {
+    "file": "apps/server/src/orchestration-v2/ProjectionStore.ts",
+    "marker": "personal:skill-sets seam foundation 1",
+    "connects": "imports the shared thread-pick projection"
+  },
+  {
+    "file": "apps/server/src/orchestration-v2/ProjectionStore.ts",
+    "marker": "personal:skill-sets seam foundation 2",
+    "connects": "carries the pick in projection-derived shells"
+  },
+  {
+    "file": "apps/server/src/orchestration-v2/ProjectionStore.ts",
+    "marker": "personal:skill-sets seam foundation 3",
+    "connects": "carries the pick in SQL-derived shells"
+  },
+  {
+    "file": "apps/server/src/provider/ProviderInstanceRegistry.ts",
+    "marker": "personal:skill-sets seam foundation 1",
+    "connects": "preserves the optional thread context when restamping snapshots"
+  },
+  {
+    "file": "apps/server/src/ws.ts",
+    "marker": "personal:skill-sets seam foundation 1",
+    "connects": "imports skill-set RPC handler bindings"
+  },
+  {
+    "file": "apps/server/src/ws.ts",
+    "marker": "personal:skill-sets seam foundation 2",
+    "connects": "binds the shared scoped skill-set service"
+  },
+  {
+    "file": "apps/server/src/ws.ts",
+    "marker": "personal:skill-sets seam foundation 3",
+    "connects": "registers status, sync and subscription handlers"
+  },
+  {
+    "file": "packages/contracts/src/clientRpcPermissions.ts",
+    "marker": "personal:skill-sets seam foundation 1",
+    "connects": "declares client and server authority for skill-set RPCs"
+  },
+  {
+    "file": "packages/contracts/src/index.ts",
+    "marker": "personal:skill-sets seam foundation 1",
+    "connects": "exports skill-set wire contracts"
+  },
+  {
+    "file": "packages/contracts/src/orchestrationV2.ts",
+    "marker": "personal:skill-sets seam foundation 1",
+    "connects": "imports optional thread-pick schema fields"
+  },
+  {
+    "file": "packages/contracts/src/orchestrationV2.ts",
+    "marker": "personal:skill-sets seam foundation 2",
+    "connects": "adds the pick to durable app threads"
+  },
+  {
+    "file": "packages/contracts/src/orchestrationV2.ts",
+    "marker": "personal:skill-sets seam foundation 3",
+    "connects": "adds the pick to client thread shells"
+  },
+  {
+    "file": "packages/contracts/src/orchestrationV2.ts",
+    "marker": "personal:skill-sets seam foundation 4",
+    "connects": "accepts the pick on thread.create"
+  },
+  {
+    "file": "packages/contracts/src/orchestrationV2.ts",
+    "marker": "personal:skill-sets seam foundation 5",
+    "connects": "accepts the pick on thread.metadata.update"
+  },
+  {
+    "file": "packages/contracts/src/rpc.ts",
+    "marker": "personal:skill-sets seam foundation 1",
+    "connects": "imports thread ID for thread-aware menu refresh"
+  },
+  {
+    "file": "packages/contracts/src/rpc.ts",
+    "marker": "personal:skill-sets seam foundation 2",
+    "connects": "imports skill-set RPC definitions"
+  },
+  {
+    "file": "packages/contracts/src/rpc.ts",
+    "marker": "personal:skill-sets seam foundation 3",
+    "connects": "accepts thread ID in provider refresh requests"
+  },
+  {
+    "file": "packages/contracts/src/rpc.ts",
+    "marker": "personal:skill-sets seam foundation 4",
+    "connects": "registers skill-set RPC definitions in the WS group"
+  },
+  {
+    "file": "packages/contracts/src/settings.ts",
+    "marker": "personal:skill-sets seam foundation 1",
+    "connects": "imports skill-set settings schemas and scope predicate"
+  },
+  {
+    "file": "packages/contracts/src/settings.ts",
+    "marker": "personal:skill-sets seam foundation 2",
+    "connects": "adds defaulted skill-set settings"
+  },
+  {
+    "file": "packages/contracts/src/settings.ts",
+    "marker": "personal:skill-sets seam foundation 3",
+    "connects": "adds skill-set patch schemas"
+  },
+  {
+    "file": "packages/provider-core/src/server/driver.ts",
+    "marker": "personal:skill-sets seam foundation 1",
+    "connects": "adds optional thread context to snapshotForCwd"
+  },
+  {
+    "file": "packages/shared/src/serverSettings.ts",
+    "marker": "personal:skill-sets seam foundation 1",
+    "connects": "extracts the per-entry skill-set patch before deep merge"
+  },
+  {
+    "file": "packages/shared/src/serverSettings.ts",
+    "marker": "personal:skill-sets seam foundation 2",
+    "connects": "merges skill-set entries with null removal"
+  },
+  {
+    "file": "apps/server/src/ws.ts",
+    "marker": "personal:skill-sets seam menus import",
+    "connects": "request-local thread menu scanning"
+  },
+  {
+    "file": "apps/server/src/ws.ts",
+    "marker": "personal:skill-sets seam menus thread",
+    "connects": "request-local thread menu scanning"
+  },
+  {
+    "file": "apps/server/src/ws.ts",
+    "marker": "personal:skill-sets seam menus services",
+    "connects": "request-local thread menu scanning"
+  },
+  {
+    "file": "apps/server/src/observability/RpcInstrumentation.ts",
+    "marker": "personal:skill-sets seam rpc metrics",
+    "connects": "labels status and sync RPC metrics"
+  },
+  {
+    "file": "packages/contracts/src/settings.ts",
+    "marker": "personal:skill-sets seam scopes",
+    "connects": "uses provider authority for skill-set settings"
+  },
+  {
+    "file": "apps/server/src/server.ts",
+    "marker": "personal:skill-sets seam runtime import",
+    "connects": "imports the scoped skill-set service"
+  },
+  {
+    "file": "apps/server/src/server.ts",
+    "marker": "personal:skill-sets seam runtime layer",
+    "connects": "shares one scoped sync and resolver service with drivers and RPC"
+  },
+  {
+    "file": "apps/server/src/ws.test.ts",
+    "marker": "personal:skill-sets seam test service import",
+    "connects": "imports the optional-feature test service"
+  },
+  {
+    "file": "apps/server/src/ws.test.ts",
+    "marker": "personal:skill-sets seam test service",
+    "connects": "provides the service in existing WS fixtures"
+  },
+  {
+    "file": "apps/server/src/server.ts",
+    "marker": "personal:skill-sets seam runtime provide",
+    "connects": "makes the scoped service available to provider hydration and the WS server"
+  },
+  {
+    "file": "packages/provider-core/src/server/ProviderAdapter.ts",
+    "marker": "personal:skill-sets seam session input",
+    "connects": "carries the thread pick before a provider process starts"
+  },
+  {
+    "file": "apps/server/src/orchestration-v2/ProviderSessionManager.ts",
+    "marker": "personal:skill-sets seam session input",
+    "connects": "carries the thread pick before a provider process starts"
+  },
+  {
+    "file": "apps/server/src/orchestration-v2/ProviderSessionManager.ts",
+    "marker": "personal:skill-sets seam session pick import",
+    "connects": "imports the shared optional pick projection"
+  },
+  {
+    "file": "apps/server/src/orchestration-v2/ProviderSessionManager.ts",
+    "marker": "personal:skill-sets seam session pick",
+    "connects": "forwards the current pick when opening a session"
+  },
+  {
+    "file": "apps/server/src/orchestration-v2/ProviderTurnStartService.ts",
+    "marker": "personal:skill-sets seam session pick import",
+    "connects": "imports the shared optional pick projection"
+  },
+  {
+    "file": "apps/server/src/orchestration-v2/ProviderTurnStartService.ts",
+    "marker": "personal:skill-sets seam session pick",
+    "connects": "forwards the current pick when opening a session"
+  },
+  {
+    "file": "apps/server/src/orchestration-v2/CheckpointRollbackService.ts",
+    "marker": "personal:skill-sets seam session pick import",
+    "connects": "imports the shared optional pick projection"
+  },
+  {
+    "file": "apps/server/src/orchestration-v2/CheckpointRollbackService.ts",
+    "marker": "personal:skill-sets seam session pick",
+    "connects": "forwards the current pick when opening a session"
+  },
+  {
+    "file": "packages/provider-acp/src/server/adapter.ts",
+    "marker": "personal:skill-sets seam acp pick import",
+    "connects": "imports the shared optional pick projection"
+  },
+  {
+    "file": "packages/provider-acp/src/server/adapter.ts",
+    "marker": "personal:skill-sets seam acp input",
+    "connects": "makes the pick available to ACP runtime builders"
+  },
+  {
+    "file": "packages/provider-acp/src/server/adapter.ts",
+    "marker": "personal:skill-sets seam acp pick",
+    "connects": "forwards session picks to ACP runtime creation"
+  },
+  {
+    "file": "apps/server/src/orchestration-v2/Adapters/AntigravityAdapterV2.ts",
+    "marker": "personal:skill-sets seam antigravity input",
+    "connects": "keeps the pick on the runtime input forwarded by the ACP flavor"
+  },
+  {
+    "file": "packages/client-runtime/src/rpc/client.ts",
+    "marker": "personal:skill-sets seam client subscription",
+    "connects": "allows status updates through the shared connected-environment subscribe helper"
   }
 ]

@@ -401,6 +401,8 @@ export function applyServerSettingsPatch(
     backgroundActivity,
     worktreeCleanup: worktreeCleanupPatch,
     // Merged per entry below; its `null` removals must not reach deepMerge.
+    // personal:skill-sets seam foundation 1
+    skillSets: skillSetsPatch,
     usageLimitSources: usageLimitSourcesPatch,
     textGenerators: textGeneratorsPatch,
     secretProviders: secretProvidersPatch,
@@ -611,6 +613,10 @@ export function applyServerSettingsPatch(
       : {}),
     ...(patch.defaultProjectScripts !== undefined
       ? { defaultProjectScripts: patch.defaultProjectScripts }
+      : {}),
+    // personal:skill-sets seam foundation 2
+    ...(skillSetsPatch !== undefined
+      ? { skillSets: mergeSettingsEntries(current.skillSets, skillSetsPatch) }
       : {}),
     ...(usageLimitSourcesPatch !== undefined
       ? {

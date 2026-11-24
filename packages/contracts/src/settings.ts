@@ -1,3 +1,5 @@
+// personal:skill-sets seam foundation 1
+import { skillSetSettingsFields, skillSetPatchFields, isSkillSetSettingsKey } from "./skillSets.ts";
 import { EasDeviceHostConfigs, SimlockDeviceHostConfigs, SshDeviceHostConfigs } from "./device.ts";
 import {
   AuthOrchestrationOperateScope,
@@ -1378,6 +1380,8 @@ export const CloudSpeechCredentials = Schema.Struct({
 });
 
 export const ServerSettings = Schema.Struct({
+  // personal:skill-sets seam foundation 2
+  ...skillSetSettingsFields,
   // Null means unmigrated; empty is authoritative and must not resurrect cleared preferences.
   favorites: Schema.NullOr(ModelFavorites).pipe(Schema.withDecodingDefault(Effect.succeed(null))),
   providerModelPreferences: Schema.NullOr(ProviderModelPreferences).pipe(
@@ -1823,6 +1827,8 @@ const ModelSelectionPatch = Schema.Struct({
 });
 
 export const ServerSettingsPatch = Schema.Struct({
+  // personal:skill-sets seam foundation 3
+  ...skillSetPatchFields,
   setModelFavorites: Schema.optionalKey(
     Schema.Array(Schema.Struct({ ...ModelFavorite.fields, favorite: Schema.Boolean })),
   ),
@@ -2036,6 +2042,8 @@ export function requiredScopesForServerSettingsPatch(
       key === "providers" ||
       key === "providerInstances" ||
       key === "usageLimitSources" ||
+      // personal:skill-sets seam scopes
+      isSkillSetSettingsKey(key) ||
       key === "textGenerators" ||
       key === "secretProviders"
     ) {

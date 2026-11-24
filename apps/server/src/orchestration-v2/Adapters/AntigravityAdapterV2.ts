@@ -80,7 +80,11 @@ const AntigravityProviderCapabilitiesV2 = {
 export type AntigravityAdapterV2RuntimeInput = Omit<
   AntigravityAcpRuntimeInput,
   "spawn" | "childProcessSpawner"
-> & { readonly processEnvironment?: NodeJS.ProcessEnv };
+> & {
+  // personal:skill-sets seam antigravity input
+  readonly skillSetId?: string | null;
+  readonly processEnvironment?: NodeJS.ProcessEnv;
+};
 
 export interface AntigravityAdapterV2Options {
   readonly instanceId: ProviderInstanceId;

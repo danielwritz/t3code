@@ -1,3 +1,7 @@
+// personal:skill-sets seam foundation 1
+import { ThreadId } from "./baseSchemas.ts";
+// personal:skill-sets seam foundation 2
+import { skillSetRpcs } from "./skillSets.ts";
 import {
   OrchestrationV2SearchThreadError,
   OrchestrationV2SearchThreadInput,
@@ -767,6 +771,8 @@ const WsServerGetConfigRpc = Rpc.make(WS_METHODS.serverGetConfig, {
 
 export const WsServerRefreshProvidersRpc = Rpc.make(WS_METHODS.serverRefreshProviders, {
   payload: Schema.Struct({
+    // personal:skill-sets seam foundation 3
+    threadId: Schema.optional(ThreadId),
     instanceId: Schema.optional(ProviderInstanceId),
     cwd: Schema.optional(TrimmedNonEmptyString),
     fresh: Schema.optional(Schema.Boolean),
@@ -2459,6 +2465,8 @@ export class RpcScopeAuthorization extends RpcMiddleware.Service<RpcScopeAuthori
 ) {}
 
 export const WsRpcGroup = RpcGroup.make(
+  // personal:skill-sets seam foundation 4
+  ...skillSetRpcs,
   WsIssuesListRpc,
   WsIssuesDetailRpc,
   WsIssuesCommentsRpc,

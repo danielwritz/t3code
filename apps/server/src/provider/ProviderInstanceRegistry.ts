@@ -110,7 +110,13 @@ const withLivePresentation = (instance: ProviderInstance, created: ProviderInsta
       streamChanges: Stream.suspend(() => snapshot.streamChanges).pipe(Stream.map(restamp)),
     },
     ...(snapshotForCwd
-      ? { snapshotForCwd: (cwd: string) => snapshotForCwd(cwd).pipe(Effect.map(restamp)) }
+      ? {
+          // personal:skill-sets seam foundation 1
+          snapshotForCwd: (
+            cwd: string,
+            thread?: { readonly skillSetId?: string | null | undefined },
+          ) => snapshotForCwd(cwd, thread).pipe(Effect.map(restamp)),
+        }
       : {}),
   };
   const setPresentation = (entry: ProviderInstanceConfig) => {

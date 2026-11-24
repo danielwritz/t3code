@@ -48,6 +48,8 @@ export interface ProviderInstance {
   readonly snapshot: ManagedServerProvider;
   readonly snapshotForCwd?: (
     cwd: string,
+    // personal:skill-sets seam foundation 1
+    thread?: { readonly skillSetId?: string | null | undefined },
   ) => Effect.Effect<ProviderWorkspaceSnapshot, ProviderDriverError>;
   /**
    * Cwds whose workspace skills or models may have changed. The registry rescans only cwds already

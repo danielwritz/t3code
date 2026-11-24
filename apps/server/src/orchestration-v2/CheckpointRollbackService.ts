@@ -1,3 +1,5 @@
+// personal:skill-sets seam session pick import
+import { skillSetPick } from "@t3tools/contracts";
 import {
   CheckpointId,
   CheckpointScopeId,
@@ -397,6 +399,8 @@ export const layer: Layer.Layer<
       });
       const existingSession = context.providerSession;
       const session = yield* sessions.open({
+        // personal:skill-sets seam session pick
+        ...skillSetPick(context.thread),
         threadId: input.threadId,
         providerSessionId: providerThread.providerSessionId,
         modelSelection,

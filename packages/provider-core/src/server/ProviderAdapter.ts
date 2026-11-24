@@ -565,6 +565,8 @@ export const ProviderAdapterV2Error = Schema.Union([
 export type ProviderAdapterV2Error = typeof ProviderAdapterV2Error.Type;
 
 export interface ProviderAdapterV2OpenSessionInput {
+  // personal:skill-sets seam session input
+  readonly skillSetId?: string | null;
   readonly threadId: ThreadId;
   readonly providerSessionId: ProviderSessionId;
   readonly modelSelection: ModelSelection;

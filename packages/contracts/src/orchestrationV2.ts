@@ -1,3 +1,5 @@
+// personal:skill-sets seam foundation 1
+import { skillSetThreadFields } from "./skillSets.ts";
 import { OrchestrationMessageContext } from "./composerContext.ts";
 import { withRecordIdTable } from "./orchestrationV2IdTable.ts";
 import * as DateTime from "effect/DateTime";
@@ -498,6 +500,8 @@ const OrchestrationV2LastTitleRegeneration = Schema.Struct({
 });
 
 export const OrchestrationV2AppThread = Schema.Struct({
+  // personal:skill-sets seam foundation 2
+  ...skillSetThreadFields,
   ...OrchestrationV2CreationFields,
   id: ThreadId,
   projectId: ProjectId,
@@ -2398,6 +2402,8 @@ export type OrchestrationV2LatestVisibleMessageSummary =
   typeof OrchestrationV2LatestVisibleMessageSummary.Type;
 
 export const OrchestrationV2ThreadShell = Schema.Struct({
+  // personal:skill-sets seam foundation 3
+  ...skillSetThreadFields,
   ...OrchestrationV2CreationFields,
   id: ThreadId,
   projectId: ProjectId,
@@ -3308,6 +3314,8 @@ export const OrchestrationV2Command = Schema.Union([
   }),
   Schema.Struct({
     type: Schema.Literal("thread.create"),
+    // personal:skill-sets seam foundation 4
+    ...skillSetThreadFields,
     ...OrchestrationV2CreationFields,
     commandId: CommandId,
     threadId: ThreadId,
@@ -3469,6 +3477,8 @@ export const OrchestrationV2Command = Schema.Union([
   }),
   Schema.Struct({
     type: Schema.Literal("thread.metadata.update"),
+    // personal:skill-sets seam foundation 5
+    ...skillSetThreadFields,
     commandId: CommandId,
     threadId: ThreadId,
     title: Schema.optional(TrimmedNonEmptyString),

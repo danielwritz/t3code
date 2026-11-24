@@ -1,3 +1,5 @@
+// personal:skill-sets seam session pick import
+import { skillSetPick } from "@t3tools/contracts";
 import { classifyCodexManagedError } from "../provider/CodexManagedErrors.ts";
 import { modelSelectionsEqual } from "@t3tools/shared/model";
 import { projectComposerContextForProvider } from "@t3tools/shared/composerContextReferences";
@@ -1029,6 +1031,8 @@ export const layer: Layer.Layer<
         !(yield* providerSessions.isLive(providerSessionId));
       const sessionResult = yield* Effect.result(
         providerSessions.open({
+          // personal:skill-sets seam session pick
+          ...skillSetPick(projection.thread),
           threadId: projection.thread.id,
           providerSessionId,
           modelSelection: run.modelSelection,

@@ -1,3 +1,7 @@
+// personal:skill-sets seam menus import
+import { skillSetMenuRefresh } from "./personal/skillsets/menus.ts";
+// personal:skill-sets seam foundation 1
+import { skillSetRpcHandlers } from "./personal/skillsets/runtime.ts";
 import { GitCommandError, OrchestrationDispatchCommandError } from "@t3tools/contracts";
 // @effect-diagnostics-next-line nodeBuiltinImport:off -- A synchronous digest inside the pure provider mapping.
 import * as NodeCrypto from "node:crypto";
@@ -2005,7 +2009,13 @@ export const layerWsRpc = (
         return yield* mutateProjectWithClone(projectService, projectCloneTracker, mutation);
       });
 
+      // personal:skill-sets seam foundation 2
+      const skillSets = yield* skillSetRpcHandlers;
+      // personal:skill-sets seam menus services
+      const refreshSkillSetWorkspaceSnapshot = yield* skillSetMenuRefresh;
       const handlers = ServerWsRpcGroup.of({
+        // personal:skill-sets seam foundation 3
+        ...skillSets,
         [WS_METHODS.issuesList]: (input) => issues.list(input),
         [WS_METHODS.issuesDetail]: (input) => issues.detail(input),
         [WS_METHODS.issuesComments]: (input) => issues.comments(input),
@@ -2557,10 +2567,12 @@ export const layerWsRpc = (
               yield* usageLimitSources.refresh;
             }
             let providers = yield* input.cwd !== undefined && input.instanceId !== undefined
-              ? providerRegistry.refreshWorkspaceSnapshot({
+              ? refreshSkillSetWorkspaceSnapshot({
                   instanceId: input.instanceId,
                   cwd: input.cwd,
                   scanCwd: yield* projectService.workspaceScanDirectory(input.cwd),
+                  // personal:skill-sets seam menus thread
+                  threadId: input.threadId,
                   fresh: input.fresh === true,
                 })
               : input.reloadSecrets === true
