@@ -192,6 +192,19 @@ describe("agent profile model", () => {
     expect(profile.claude.instructions?.text).toBe("edited rules");
   });
 
+  it("keeps Codex notify in the hook list but out of the generated hooks.json", async () => {
+    const machine = await makeFakeMachine();
+    const root = await folder({ "refs.json": JSON.stringify([{ ref: "codex:hook:notify" }]) });
+    const profile = await resolveAll(
+      root,
+      { disabledSkills: [] },
+      await readMachineInventory(machine.paths),
+    );
+    expect(profile.codex.hooks.map((hook) => hook.path)).toEqual([["notify"]]);
+    expect(profile.codex.hooks[0]?.group).toEqual(["notifier", "turn-ended"]);
+    expect(profile.codex.hooksFile).toBeNull();
+  });
+
   it("lists machine-policy hooks as switches that are off in an empty profile", async () => {
     const machine = await makeFakeMachine();
     const inventory = await readMachineInventory(machine.paths);

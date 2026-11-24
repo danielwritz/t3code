@@ -267,7 +267,10 @@ export interface ResolvedAgentProfile {
   readonly skills: readonly SkillSetSkill[];
   readonly plugins: readonly string[];
   readonly hooks: ReadonlyArray<HookGroup & { readonly itemId: string }>;
-  /** `hooks` in the provider's own format (see `assembleHooks`); null when the profile has none. */
+  /**
+   * `hooks` in the provider's own format (see `assembleHooks`); null when there are none. Codex
+   * `notify` (path `["notify"]`) is in `hooks` only: it belongs in `config.toml`.
+   */
   readonly hooksFile: Record<string, unknown> | null;
   /**
    * Machine-policy hooks of this provider that the profile has switched off. The machine still
@@ -308,6 +311,10 @@ export function resolveAgentProfile(input: {
       ? [{ ...item.payload!.group, itemId: item.id }]
       : [],
   );
+  // Codex `notify` is a config.toml key, not a hooks.json entry.
+  const fileHooks = hooks.filter(
+    (hook) => !(input.provider === "codex" && hook.path.length === 1 && hook.path[0] === "notify"),
+  );
   const machinePolicyHooksOff = input.items.flatMap((item): MachinePolicyHookOff[] =>
     item.origin === "machine-policy" &&
     !item.enabled &&
@@ -337,7 +344,7 @@ export function resolveAgentProfile(input: {
     skills: [...skills.values()],
     plugins,
     hooks,
-    hooksFile: hooks.length ? assembleHooks(input.provider, hooks) : null,
+    hooksFile: fileHooks.length ? assembleHooks(input.provider, fileHooks) : null,
     machinePolicyHooksOff,
     mcpServers,
   };
