@@ -6,6 +6,8 @@ import * as Option from "effect/Option";
 import * as Schema from "effect/Schema";
 
 import * as DesktopEnvironment from "./DesktopEnvironment.ts";
+// personal:skill-sets seam personal source tree icon
+import { personalDesktopIdentity } from "../personal/identity.ts";
 
 export interface DesktopIconPaths {
   readonly ico: Option.Option<string>;
@@ -79,6 +81,12 @@ function resolveSourceTreeIconPath(
   ext: keyof DesktopIconPaths,
 ): string | undefined {
   if (environment.isPackaged || ext === "icns") return undefined;
+  // personal:skill-sets seam resolve personal source tree icon
+  if (personalDesktopIdentity)
+    return environment.path.join(
+      environment.rootDir,
+      ext === "ico" ? "assets/daniel/icon.ico" : personalDesktopIdentity.iconSource,
+    );
   const brand = environment.isDevelopment ? "dev" : "prod";
   const fileNames = sourceTreeIconFileNames[brand];
   const fileName =

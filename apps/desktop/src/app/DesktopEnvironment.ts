@@ -10,6 +10,8 @@ import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
 import * as Path from "effect/Path";
+// personal:skill-sets seam desktop display identity
+import { personalDesktopIdentity } from "../personal/identity.ts";
 
 import * as DesktopAppSettings from "../settings/DesktopAppSettings.ts";
 import * as DesktopConfig from "./DesktopConfig.ts";
@@ -106,7 +108,8 @@ export function resolveDesktopAppBranding(input: {
   return {
     baseName: APP_BASE_NAME,
     stageLabel,
-    displayName: `${APP_BASE_NAME} (${stageLabel})`,
+    // personal:skill-sets seam personal display name
+    displayName: personalDesktopIdentity?.productName ?? `${APP_BASE_NAME} (${stageLabel})`,
   };
 }
 
@@ -227,8 +230,12 @@ const make = Effect.fn("desktop.environment.make")(function* (
     otlpProtocol: config.otlpProtocol,
     branding,
     displayName,
-    appUserModelId: Option.getOrElse(config.appUserModelIdOverride, () =>
-      isDevelopment ? "com.t3tools.t3code.dev" : "com.t3tools.t3code",
+    appUserModelId: Option.getOrElse(
+      config.appUserModelIdOverride,
+      () =>
+        // personal:skill-sets seam personal taskbar identity
+        personalDesktopIdentity?.appId ??
+        (isDevelopment ? "com.t3tools.t3code.dev" : "com.t3tools.t3code"),
     ),
     linuxDesktopEntryName: resolveLinuxDesktopEntryName(isDevelopment),
     linuxApplicationsDir,

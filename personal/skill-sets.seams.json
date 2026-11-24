@@ -823,5 +823,130 @@
     "file": "apps/server/src/provider/Drivers/AntigravitySkills.ts",
     "marker": "personal:skill-sets seam antigravity user home",
     "connects": "antigravity user home"
+  },
+  {
+    "file": "apps/desktop/src/app/DesktopApp.ts",
+    "marker": "personal:skill-sets seam shared home message helper",
+    "connects": "shared home message helper"
+  },
+  {
+    "file": "apps/desktop/src/app/DesktopApp.ts",
+    "marker": "personal:skill-sets seam clear shared home ownership message",
+    "connects": "clear shared home ownership message"
+  },
+  {
+    "file": "apps/desktop/src/app/DesktopAppIdentity.ts",
+    "marker": "personal:skill-sets seam desktop application name",
+    "connects": "desktop application name"
+  },
+  {
+    "file": "apps/desktop/src/app/DesktopAppIdentity.ts",
+    "marker": "personal:skill-sets seam personal application name",
+    "connects": "personal application name"
+  },
+  {
+    "file": "apps/desktop/src/app/DesktopConfig.ts",
+    "marker": "personal:skill-sets seam desktop update identity",
+    "connects": "desktop update identity"
+  },
+  {
+    "file": "apps/desktop/src/app/DesktopConfig.ts",
+    "marker": "personal:skill-sets seam permanent update opt out",
+    "connects": "permanent update opt out"
+  },
+  {
+    "file": "apps/desktop/src/app/DesktopEnvironment.ts",
+    "marker": "personal:skill-sets seam desktop display identity",
+    "connects": "desktop display identity"
+  },
+  {
+    "file": "apps/desktop/src/app/DesktopEnvironment.ts",
+    "marker": "personal:skill-sets seam personal display name",
+    "connects": "personal display name"
+  },
+  {
+    "file": "apps/desktop/src/app/DesktopEnvironment.ts",
+    "marker": "personal:skill-sets seam personal taskbar identity",
+    "connects": "personal taskbar identity"
+  },
+  {
+    "file": "apps/desktop/src/app/DesktopUserData.ts",
+    "marker": "personal:skill-sets seam desktop profile identity",
+    "connects": "desktop profile identity"
+  },
+  {
+    "file": "apps/desktop/src/app/DesktopUserData.ts",
+    "marker": "personal:skill-sets seam isolated profile without legacy migration",
+    "connects": "isolated profile without legacy migration"
+  },
+  {
+    "file": "apps/desktop/src/electron/ElectronProtocol.ts",
+    "marker": "personal:skill-sets seam personal protocol identity",
+    "connects": "personal protocol identity"
+  },
+  {
+    "file": "apps/desktop/vite.config.ts",
+    "marker": "personal:skill-sets seam desktop build identity",
+    "connects": "desktop build identity"
+  },
+  {
+    "file": "apps/desktop/vite.config.ts",
+    "marker": "personal:skill-sets seam embed desktop identity",
+    "connects": "embed desktop identity"
+  },
+  {
+    "file": "scripts/build-desktop-artifact.ts",
+    "marker": "personal:skill-sets seam desktop packaging identity",
+    "connects": "desktop packaging identity"
+  },
+  {
+    "file": "scripts/build-desktop-artifact.ts",
+    "marker": "personal:skill-sets seam desktop icon packaging helpers",
+    "connects": "desktop icon packaging helpers"
+  },
+  {
+    "file": "scripts/build-desktop-artifact.ts",
+    "marker": "personal:skill-sets seam personal icon assets",
+    "connects": "personal icon assets"
+  },
+  {
+    "file": "scripts/build-desktop-artifact.ts",
+    "marker": "personal:skill-sets seam personal installer name",
+    "connects": "personal installer name"
+  },
+  {
+    "file": "scripts/build-desktop-artifact.ts",
+    "marker": "personal:skill-sets seam personal installer app id",
+    "connects": "personal installer app id"
+  },
+  {
+    "file": "scripts/build-desktop-artifact.ts",
+    "marker": "personal:skill-sets seam personal builds have no update feed",
+    "connects": "personal builds have no update feed"
+  },
+  {
+    "file": "scripts/build-desktop-artifact.ts",
+    "marker": "personal:skill-sets seam generate and stage personal icons",
+    "connects": "generate and stage personal icons"
+  },
+  {
+    "file": "scripts/build-desktop-artifact.ts",
+    "marker": "personal:skill-sets seam personal install directory",
+    "connects": "personal install directory"
+  },
+  {
+    "file": "apps/desktop/src/app/DesktopAssets.ts",
+    "marker": "personal:skill-sets seam personal source tree icon",
+    "connects": "personal source tree icon"
+  },
+  {
+    "file": "apps/desktop/src/app/DesktopAssets.ts",
+    "marker": "personal:skill-sets seam resolve personal source tree icon",
+    "connects": "resolve personal source tree icon"
+  },
+  {
+    "file": "scripts/build-desktop-artifact.ts",
+    "marker": "personal:skill-sets seam match official Windows cache packaging",
+    "connects": "match official Windows cache packaging"
   }
 ]

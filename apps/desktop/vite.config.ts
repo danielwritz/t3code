@@ -1,5 +1,7 @@
 import "vite-plus/test/config";
 import * as NodeOS from "node:os";
+// personal:skill-sets seam desktop build identity
+import { personalDesktopIdentity } from "../../scripts/lib/personal-desktop-identity.ts";
 
 import { defaultInclude, defineConfig } from "vite-plus";
 import { Rolldown } from "vite-plus/pack";
@@ -22,6 +24,8 @@ const devElectronCommand =
     ? "node scripts/dev-electron.mjs"
     : "exec node scripts/dev-electron.mjs";
 const publicConfigDefine = {
+  // personal:skill-sets seam embed desktop identity
+  __T3CODE_PERSONAL_DESKTOP_IDENTITY__: JSON.stringify(personalDesktopIdentity) ?? "undefined",
   __T3CODE_BUILD_CLERK_PUBLISHABLE_KEY__: JSON.stringify(
     repoEnv.T3CODE_CLERK_PUBLISHABLE_KEY?.trim() ?? "",
   ),

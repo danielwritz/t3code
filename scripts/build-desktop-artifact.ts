@@ -41,6 +41,14 @@ import {
   selectCliRuntimeExternalDependencies,
 } from "./lib/cli-external-packages.ts";
 import { loadRepoEnv } from "./lib/public-config.ts";
+// personal:skill-sets seam desktop packaging identity
+import { personalDesktopIdentity } from "./lib/personal-desktop-identity.ts";
+// personal:skill-sets seam desktop icon packaging helpers
+import {
+  personalDesktopIconAssets,
+  resolvePersonalDesktopAfterPack,
+  stagePersonalDesktopIcons,
+} from "./lib/personal-desktop-packaging.ts";
 import { selectDesktopRuntimeExternalDependencies } from "./lib/desktop-external-packages.ts";
 import { resolveCatalogDependencies } from "./lib/resolve-catalog.ts";
 import { resolveTaggedSourceVersion } from "./lib/tagged-source-version.ts";
@@ -2767,6 +2775,8 @@ export function resolveDesktopWebAssetBrand(version: string): WebAssetBrand {
 }
 
 export function resolveDesktopBuildIconAssets(version: string): DesktopBuildIconAssets {
+  // personal:skill-sets seam personal icon assets
+  if (personalDesktopIconAssets) return personalDesktopIconAssets;
   if (resolveDesktopUpdateChannel(version) === "nightly") {
     return {
       macIconPng: BRAND_ASSET_PATHS.nightlyMacIconPng,
@@ -2798,6 +2808,8 @@ export function resolvePackageManagerUserAgent(packageManager: string): string {
 }
 
 export function resolveDesktopProductName(version: string): string {
+  // personal:skill-sets seam personal installer name
+  if (personalDesktopIdentity) return personalDesktopIdentity.productName;
   return resolveDesktopUpdateChannel(version) === "nightly"
     ? "T3 Code (Nightly)"
     : (desktopPackageJson.productName ?? "T3 Code");
@@ -2820,8 +2832,13 @@ export const createBuildConfig = Effect.fn("createBuildConfig")(function* (
   arch?: typeof BuildArch.Type,
 ) {
   const buildConfig: Record<string, unknown> = {
-    afterPack: (yield* Path.Path).join(yield* RepoRoot, "scripts/prepare-server-compile-cache.cjs"),
-    appId: DESKTOP_APP_ID,
+    // personal:skill-sets seam match official Windows cache packaging
+    afterPack: (yield* Path.Path).join(
+      yield* RepoRoot,
+      resolvePersonalDesktopAfterPack(platform, personalDesktopIdentity),
+    ),
+    // personal:skill-sets seam personal installer app id
+    appId: personalDesktopIdentity?.appId ?? DESKTOP_APP_ID,
     productName: resolveDesktopProductName(version),
     artifactName: "T3-Code-${version}-${arch}.${ext}",
     electronLanguages: [...DESKTOP_ELECTRON_LANGUAGES],
@@ -2852,7 +2869,8 @@ export const createBuildConfig = Effect.fn("createBuildConfig")(function* (
   const updateChannel = resolveDesktopUpdateChannel(version);
   // Missing publish config infers a GitHub feed from tokens; staging has no repository, so manifest generation would crash.
   buildConfig.publish = null;
-  if (!isDesktopPreviewVersion(version)) {
+  // personal:skill-sets seam personal builds have no update feed
+  if (!personalDesktopIdentity && !isDesktopPreviewVersion(version)) {
     const publishConfig = yield* resolveGitHubPublishConfig(updateChannel);
     if (publishConfig) {
       buildConfig.publish = [publishConfig];
@@ -3049,6 +3067,8 @@ const assertPlatformBuildResources = Effect.fn("assertPlatformBuildResources")(f
   }
 
   if (platform === "win") {
+    // personal:skill-sets seam generate and stage personal icons
+    yield* stagePersonalDesktopIcons(yield* RepoRoot, stageResourcesDir);
     yield* stageWindowsIcons(stageResourcesDir, iconAssets.windowsIconIco);
   }
 });
@@ -3958,7 +3978,8 @@ const buildDesktopArtifactUnlocked = Effect.fn("buildDesktopArtifactUnlocked")(f
       ? path.join(stageAppDir, WINDOWS_SERVER_RESOURCE_SOURCE_DIR, WINDOWS_SERVER_ASAR_RESOURCE)
       : undefined;
   const stagePackageJson: StagePackageJson = {
-    name: "t3code",
+    // personal:skill-sets seam personal install directory
+    name: personalDesktopIdentity?.packageName ?? "t3code",
     version: appVersion,
     buildVersion: appVersion,
     t3codeCommitHash: commitHash,

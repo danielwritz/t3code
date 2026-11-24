@@ -31,6 +31,7 @@
   "4cd679200c978949": "Закрыть помощник разрешений",
   "ea4f056c8f6b5c15": "↑ Перетащите T3 Code в список выше",
   "4bcb0f4db00936b1": "Перетащите T3 Code в Системные настройки или нажмите, чтобы показать в Finder",
+  "e0bd641998ab83f5": "T3 Code is already running in another app. Quit the other T3 Code app before opening this one. Both apps use the same threads and settings, so only one can run at a time.",
   "278648c9ff6fb9ce": "Этот сертификат выдан недоверенным центром.",
   "cf346dcfb658d4d3": "Этот сертификат выдан не для этого адреса.",
   "20665d9b0c7c3e52": "Срок действия этого сертификата истёк или ещё не начался.",

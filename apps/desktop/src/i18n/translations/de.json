@@ -31,6 +31,7 @@
   "4cd679200c978949": "Berechtigungshilfe schließen",
   "ea4f056c8f6b5c15": "↑ Ziehe T3 Code in die Liste oben",
   "4bcb0f4db00936b1": "Ziehe T3 Code in die Systemeinstellungen oder klicke, um es im Finder anzuzeigen",
+  "e0bd641998ab83f5": "T3 Code is already running in another app. Quit the other T3 Code app before opening this one. Both apps use the same threads and settings, so only one can run at a time.",
   "278648c9ff6fb9ce": "Keine vertrauenswürdige Stelle hat dieses Zertifikat ausgestellt.",
   "cf346dcfb658d4d3": "Dieses Zertifikat gilt nicht für diese Adresse.",
   "20665d9b0c7c3e52": "Dieses Zertifikat ist abgelaufen oder noch nicht gültig.",
