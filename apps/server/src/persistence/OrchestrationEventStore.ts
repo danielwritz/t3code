@@ -1,3 +1,5 @@
+// personal:skill-sets seam side events import
+import { makeThreadState } from "../personal/skillsets/threadState.ts";
 import {
   ApplicationEventMetadata,
   ApplicationProjectEvent,
@@ -180,7 +182,6 @@ interface ApplicationEventRow {
 }
 
 const decodeV2EventJson = Schema.decodeUnknownEffect(OrchestrationV2DomainEventJson);
-const encodeV2EventJson = Schema.encodeEffect(OrchestrationV2DomainEventJson);
 const decodeV2StoredEvent = Schema.decodeUnknownEffect(OrchestrationV2StoredEvent);
 // decodeV2EventJson already validated the event; decoding it again here is the hot cost in replay.
 const decodeV2StoredEventHeader = Schema.decodeUnknownEffect(
@@ -303,6 +304,8 @@ function toPersistenceSqlOrDecodeError(sqlOperation: string, decodeOperation: st
 
 const makeEventStore = Effect.gen(function* () {
   const sql = yield* SqlClient.SqlClient;
+  // personal:skill-sets seam side events codec
+  const { encodeEvent: encodeV2EventJson } = yield* makeThreadState(sql, true).pipe(Effect.orDie);
   const committedEvents = yield* PubSub.unbounded<ApplicationStoredEvent>();
   const promptHints = new Map<string, number>();
   const restoredPayloadJson = sql`CASE

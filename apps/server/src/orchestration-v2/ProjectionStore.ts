@@ -1,3 +1,5 @@
+// personal:skill-sets seam side thread codecs import
+import { makeThreadState } from "../personal/skillsets/threadState.ts";
 // personal:skill-sets seam foundation 1
 import { skillSetPick } from "@t3tools/contracts";
 import type { ProjectThreadAwarenessV2Input } from "@t3tools/shared/agentAwareness";
@@ -1355,9 +1357,6 @@ const encodeIdList = Schema.encodeSync(Schema.fromJsonString(Schema.Array(Schema
 const matchesNothing = (...filters: ReadonlyArray<ReadonlyArray<unknown> | undefined>) =>
   filters.some((values) => values?.length === 0);
 
-const encodeThreadPayload = Schema.encodeEffect(
-  Schema.fromJsonString(OrchestrationV2AppThreadJsonSchema),
-);
 const encodeThreadUpdatedAt = Schema.encodeEffect(
   OrchestrationV2AppThreadJsonSchema.fields.updatedAt,
 );
@@ -1448,9 +1447,6 @@ const decodePullRequestThread = Schema.decodeUnknownEffect(
   Schema.fromJsonString(PullRequestThread),
 );
 
-const decodeThreadPayload = Schema.decodeUnknownEffect(
-  Schema.fromJsonString(OrchestrationV2AppThreadJsonSchema),
-);
 const decodeRunPayload = Schema.decodeUnknownEffect(
   Schema.fromJsonString(OrchestrationV2RunJsonSchema),
 );
@@ -2360,6 +2356,9 @@ export const layer: Layer.Layer<ProjectionStoreV2, never, SqlClient.SqlClient> =
   ProjectionStoreV2,
   Effect.gen(function* () {
     const sql = yield* SqlClient.SqlClient;
+    // personal:skill-sets seam side thread codec bindings
+    const { encodeThread: encodeThreadPayload, decodeThread: decodeThreadPayload } =
+      yield* makeThreadState(sql).pipe(Effect.orDie);
 
     // SQLite uses the partial conversation index of migration 082 only for this exact predicate.
     const CONVERSATION_INDEX_EXCLUDED_TYPES = sql.literal(

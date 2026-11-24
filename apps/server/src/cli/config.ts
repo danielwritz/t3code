@@ -10,6 +10,8 @@ import { DesktopBackendBootstrap, PortSchema } from "@t3tools/contracts";
 import * as Config from "effect/Config";
 import * as Duration from "effect/Duration";
 import * as Effect from "effect/Effect";
+// personal:skill-sets seam migration guard import
+import { guardHomeAtStartup } from "../personal/skillsets/migrationGuard.ts";
 import * as FileSystem from "effect/FileSystem";
 import * as LogLevel from "effect/LogLevel";
 import * as Option from "effect/Option";
@@ -331,6 +333,8 @@ export const resolveServerConfig = Effect.fn("config.resolveServerConfig")(funct
   const derivedPaths = yield* ServerConfig.deriveServerPaths(baseDir, devUrl, {
     baseDirIsExplicit: Option.isSome(explicitBaseDir),
   });
+  // personal:skill-sets seam migration guard start
+  yield* guardHomeAtStartup(derivedPaths.dbPath);
   // An interactive CLI must not start over a discovered server. Lifetime locking
   // and supervisor handoff are separate; this preflight cannot arbitrate two starts.
   if (options?.rejectRunningServer && mode === "web") {

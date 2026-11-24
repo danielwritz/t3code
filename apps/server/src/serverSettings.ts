@@ -1,3 +1,5 @@
+// personal:skill-sets seam side settings import
+import * as SkillSetState from "./personal/skillsets/state.ts";
 import {
   DEFAULT_SERVER_SETTINGS,
   ModelSelection,
@@ -785,9 +787,15 @@ const make = Effect.gen(function* () {
             ),
       );
 
+      // personal:skill-sets seam side settings write
+      const ordinarySettingsJson = yield* SkillSetState.saveSkillSetSettings(
+        settingsPath,
+        settings,
+        sparseSettingsJson,
+      );
       return yield* writeFileStringAtomically({
         filePath: settingsPath,
-        contents: `${sparseSettingsJson}\n`,
+        contents: `${ordinarySettingsJson}\n`,
       }).pipe(
         Effect.provideService(FileSystem.FileSystem, fs),
         Effect.provideService(Path.Path, pathService),
@@ -855,6 +863,8 @@ const make = Effect.gen(function* () {
         });
       }
     }
+    // personal:skill-sets seam side settings read
+    settings = yield* SkillSetState.loadSkillSetSettings(settingsPath, settings);
     // Settings saved by a server that kept the mode in `compactIdleThreads` move
     // it to `idleCompaction`, so that switch goes to clients as a boolean. The
     // defaults gain the field too, which tells clients this server reads modes.
@@ -1350,6 +1360,12 @@ const make = Effect.gen(function* () {
 
   const startWatcher = Effect.gen(function* () {
     const settingsDir = pathService.dirname(settingsPath);
+    // personal:skill-sets seam side settings watch directory
+    yield* fs
+      .makeDirectory(pathService.dirname(SkillSetState.skillSetStatePath(settingsPath)), {
+        recursive: true,
+      })
+      .pipe(Effect.orDie);
 
     yield* fs.makeDirectory(settingsDir, { recursive: true }).pipe(
       Effect.mapError(
@@ -1381,6 +1397,20 @@ const make = Effect.gen(function* () {
 
     const settingsReady = yield* Deferred.make<void>();
     const linkTargetReady = yield* Deferred.make<void>();
+    // personal:skill-sets seam side settings watch ready
+    const sideReady = yield* Deferred.make<void>();
+    // personal:skill-sets seam side settings reload binding
+    const sideReload = SkillSetState.reloadChanges(
+      getSettingsFromCache,
+      reloadSettings,
+      emitChange,
+    );
+    // personal:skill-sets seam side settings changes stream
+    yield* SkillSetState.startSkillSetSettingsWatch(
+      watchFileChanges(SkillSetState.skillSetStatePath(settingsPath), sideReady),
+      sideReload.pipe(writeSemaphore.withPermits(1), Effect.ignoreCause({ log: true })),
+      watcherScope,
+    );
     yield* Effect.gen(function* () {
       const [settingsEvents, resolveEvents] = yield* watchFileChanges(
         settingsPath,
@@ -1417,6 +1447,8 @@ const make = Effect.gen(function* () {
     );
     // Edits made once `start` returns must reach a registered watch.
     yield* Deferred.await(linkTargetReady);
+    // personal:skill-sets seam side settings watch await
+    yield* Deferred.await(sideReady);
   });
 
   const start = Effect.gen(function* () {

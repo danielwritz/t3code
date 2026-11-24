@@ -1,5 +1,75 @@
 [
   {
+    "file": "apps/server/src/serverSettings.ts",
+    "marker": "personal:skill-sets seam side settings import",
+    "connects": "imports fork-owned settings persistence"
+  },
+  {
+    "file": "apps/server/src/serverSettings.ts",
+    "marker": "personal:skill-sets seam side settings read",
+    "connects": "imports legacy registry once and overlays fork-owned state"
+  },
+  {
+    "file": "apps/server/src/serverSettings.ts",
+    "marker": "personal:skill-sets seam side settings write",
+    "connects": "routes skill-set settings writes away from settings.json"
+  },
+  {
+    "file": "apps/server/src/serverSettings.ts",
+    "marker": "personal:skill-sets seam side settings changes stream",
+    "connects": "reloads and broadcasts external fork-owned settings edits"
+  },
+  {
+    "file": "apps/server/src/serverSettings.ts",
+    "marker": "personal:skill-sets seam side settings reload binding",
+    "connects": "ignores side-file notifications for settings the service already holds"
+  },
+  {
+    "file": "apps/server/src/serverSettings.ts",
+    "marker": "personal:skill-sets seam side settings watch directory",
+    "connects": "prepares the fork-owned watch directory"
+  },
+  {
+    "file": "apps/server/src/serverSettings.ts",
+    "marker": "personal:skill-sets seam side settings watch ready",
+    "connects": "tracks registration of the side file watcher"
+  },
+  {
+    "file": "apps/server/src/serverSettings.ts",
+    "marker": "personal:skill-sets seam side settings watch await",
+    "connects": "prevents edits racing initial watcher registration"
+  },
+  {
+    "file": "apps/server/src/persistence/OrchestrationEventStore.ts",
+    "marker": "personal:skill-sets seam side events import",
+    "connects": "imports fork-owned thread persistence"
+  },
+  {
+    "file": "apps/server/src/persistence/OrchestrationEventStore.ts",
+    "marker": "personal:skill-sets seam side events codec",
+    "connects": "saves picks outside event payloads with rollback-safe event references"
+  },
+  {
+    "file": "apps/server/src/orchestration-v2/ProjectionStore.ts",
+    "marker": "personal:skill-sets seam side thread codecs import",
+    "connects": "imports fork-owned thread view codecs"
+  },
+  {
+    "file": "apps/server/src/orchestration-v2/ProjectionStore.ts",
+    "marker": "personal:skill-sets seam side thread codec bindings",
+    "connects": "strips persisted picks and restores picks only in thread views"
+  },
+  {
+    "file": "apps/server/src/cli/config.ts",
+    "marker": "personal:skill-sets seam migration guard import",
+    "connects": "imports read-only migration ledger guard"
+  },
+  {
+    "file": "apps/server/src/cli/config.ts",
+    "marker": "personal:skill-sets seam migration guard start",
+    "connects": "refuses newer homes before configuration creates directories or server resources"
+  },
+  {
     "file": "apps/web/src/components/chat/ProviderModelPicker.tsx",
     "marker": "personal:skill-sets seam",
     "connects": "renders the skill set tabs above the docked model picker"
