@@ -16,13 +16,13 @@ import {
 import { PeerLinkLinkPairingInput } from "./peerLink.ts";
 import { ORCHESTRATION_V2_WS_METHODS } from "./orchestrationV2.ts";
 import { WS_METHODS } from "./rpc.ts";
+// personal:skill-sets seam rpc scopes import
+import { SKILL_SET_RPC_SCOPES } from "./skillSets.ts";
 
 /** Incremental client enforcement; the server still authorizes every request. */
 export const CLIENT_GUARDED_RPC_SCOPES = {
   // personal:skill-sets seam foundation 1
-  "skillSets.status": AuthOrchestrationReadScope,
-  "skillSets.subscribe": AuthOrchestrationReadScope,
-  "skillSets.sync": AuthSettingsWriteScope,
+  ...SKILL_SET_RPC_SCOPES,
   [WS_METHODS.providerAuthRemoveMethod]: AuthProvidersManageScope,
   // An MCP sign-in stores a credential for the agent, as an account sign-in does.
   [WS_METHODS.providerMcpSignInStart]: AuthProvidersManageScope,

@@ -2,6 +2,13 @@ import * as Effect from "effect/Effect";
 import * as Schema from "effect/Schema";
 import * as Rpc from "effect/rpc/Rpc";
 import { ProjectIconOverride } from "./project.ts";
+import { agentProfileRpcs } from "./agentProfiles.ts";
+import {
+  AuthOrchestrationOperateScope,
+  AuthOrchestrationReadScope,
+  AuthSettingsWriteScope,
+} from "./auth.ts";
+export * from "./agentProfiles.ts";
 
 export const SkillSetConfig = Schema.Struct({
   name: Schema.String,
@@ -22,6 +29,11 @@ export const SkillSetConfig = Schema.Struct({
   ),
   autoSync: Schema.Boolean,
   disabledSkills: Schema.Array(Schema.String),
+  /** Agent profile overlay: item ids switched off (skills stay in `disabledSkills`). */
+  disabledItems: Schema.optionalKey(Schema.Array(Schema.String)),
+  /** Machine-policy hook items switched on (they are off unless listed here or referenced). */
+  enabledItems: Schema.optionalKey(Schema.Array(Schema.String)),
+  ignoreProjectInstructions: Schema.optionalKey(Schema.Boolean),
 });
 export type SkillSetConfig = typeof SkillSetConfig.Type;
 export const skillSetSettingsFields = {
@@ -82,7 +94,35 @@ export const skillSetRpcs = [
     success: Schema.Array(SkillSetStatus),
     stream: true,
   }),
+  ...agentProfileRpcs,
 ] as const;
+
+/** Client scope guards for every fork RPC; spread into `CLIENT_GUARDED_RPC_SCOPES`. */
+export const SKILL_SET_RPC_SCOPES = {
+  "skillSets.status": AuthOrchestrationReadScope,
+  "skillSets.subscribe": AuthOrchestrationReadScope,
+  "skillSets.sync": AuthSettingsWriteScope,
+  "agentProfiles.list": AuthOrchestrationReadScope,
+  "agentProfiles.inventory": AuthOrchestrationReadScope,
+  "agentProfiles.threadOptions": AuthOrchestrationReadScope,
+  "agentProfiles.setItemEnabled": AuthSettingsWriteScope,
+  "agentProfiles.setIgnoreProject": AuthSettingsWriteScope,
+  "agentProfiles.createFromReferences": AuthSettingsWriteScope,
+  "agentProfiles.setThreadIgnoreProject": AuthOrchestrationOperateScope,
+} as const;
+/** Trace aggregate labels for every fork RPC; spread into the server's `RPC_AGGREGATES`. */
+export const SKILL_SET_RPC_AGGREGATES = {
+  "skillSets.status": "skillSets",
+  "skillSets.subscribe": "skillSets",
+  "skillSets.sync": "skillSets",
+  "agentProfiles.list": "agentProfiles",
+  "agentProfiles.inventory": "agentProfiles",
+  "agentProfiles.threadOptions": "agentProfiles",
+  "agentProfiles.setItemEnabled": "agentProfiles",
+  "agentProfiles.setIgnoreProject": "agentProfiles",
+  "agentProfiles.createFromReferences": "agentProfiles",
+  "agentProfiles.setThreadIgnoreProject": "agentProfiles",
+} as const;
 
 export function isSkillSetSettingsKey(key: string): boolean {
   return (
