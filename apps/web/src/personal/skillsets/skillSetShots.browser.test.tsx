@@ -22,13 +22,13 @@ import {
   type FakeThread,
 } from "../../../test/fakeEnvironment";
 import { act, render } from "../../../test/render";
+import { hasPrivateSetup, setup } from "./setupFixture";
 import {
-  hasPrivateSetup,
-  setActiveSkillSet,
-  setSkillSetVariant,
-  setup,
-  type SkillSetVariant,
-} from "./skillSetsStore";
+  dispatchedCommands,
+  skillSetSettingsPatches,
+  skillSetProviderRequests,
+} from "../../../test/fakeEnvironment";
+import type { SkillSetConfig, SkillSetStatus } from "@t3tools/contracts";
 
 // The fake environment reads its label when it loads, before this file's own code runs.
 vi.hoisted(() => {
@@ -55,11 +55,50 @@ vi.mock(import("~/rpc/requestLatencyState"), async (original) => ({
 // Relative to this file: apps/web/.proto-shots. Vite only writes inside the app folder; the run
 // script copies these to skill-sets/shots.
 const SHOTS = "../../../.proto-shots";
-const MODEL: ModelSelection = {
+const PRIVATE_MODEL: ModelSelection = {
   instanceId: ProviderInstanceId.make("claudeAgent"),
   model: "claude-fable-5-2",
   options: [{ id: "effort", value: "high" }],
 };
+
+const MODEL: ModelSelection = hasPrivateSetup
+  ? PRIVATE_MODEL
+  : { instanceId: ProviderInstanceId.make("codex"), model: "gpt-5.4" };
+const configs: Record<string, SkillSetConfig> = Object.fromEntries(
+  setup.skillSets.map((set) => [
+    set.id,
+    {
+      name: set.name,
+      enabled: true,
+      source:
+        set.repo.state === "local"
+          ? { kind: "local", path: set.repo.path }
+          : {
+              kind: "git",
+              url: set.repo.label,
+              ...(set.repo.branch ? { branch: set.repo.branch } : {}),
+            },
+      ...(set.logo.kind === "monogram" ? { logo: set.logo } : {}),
+      autoSync: set.repo.state !== "local",
+      disabledSkills: set.skills.filter((skill) => !skill.enabled).map((skill) => skill.name),
+    },
+  ]),
+);
+const statuses: readonly SkillSetStatus[] = setup.skillSets.map((set) => ({
+  id: set.id,
+  state: set.repo.state,
+  ready: true,
+  commit: set.repo.commit ?? null,
+  commitDate: set.repo.commitDate ?? null,
+  lastChecked: "2026-03-17T19:24:00.000Z",
+  error: null,
+  skills: set.skills.map((skill) => ({
+    name: skill.name,
+    description: skill.description,
+    commandOnly: skill.manualOnly,
+    targetPath: `/sets/${set.id}/skills/${skill.name}/SKILL.md`,
+  })),
+}));
 
 // The thread shown, with the words it was asked for in, comes from the data file.
 const TURNS = setup.thread.turns;
@@ -92,11 +131,22 @@ const OTHERS = setup.thread.otherTitles.map((title, index) => ({
 
 const [firstProject, ...otherProjects] = setup.projects;
 
-function install() {
+function install(enabled = true, setsEnabled = true) {
   return installFakeEnvironment([...OTHERS, MAIN], {
     acceptCommands: true,
-    providers: setup.providers,
-    settings: { providerInstances: setup.providerInstances },
+    ...(setup.providers.length > 0 ? { providers: setup.providers } : {}),
+    skillSetStatuses: statuses,
+    settings: {
+      providerInstances: setup.providerInstances,
+      skillSetsEnabled: enabled,
+      skillSets: setsEnabled
+        ? configs
+        : Object.fromEntries(
+            Object.entries(configs).map(([id, config]) => [id, { ...config, enabled: false }]),
+          ),
+      defaultSkillSetId: DEFAULT_SET.id,
+      skillSetSyncIntervalMinutes: 7,
+    },
     project: { title: firstProject!.title, projectIcon: firstProject!.projectIcon } as never,
     extraProjects: otherProjects.map((project) => ({
       id: ProjectId.make(project.id),
@@ -155,63 +205,148 @@ function clock(): Disposable {
 
 async function openThread() {
   await page.viewport(1400, 900);
-  using _environment = install();
+  await using stack = new AsyncDisposableStack();
   const app = await mountApp(`/${ENVIRONMENT_ID}/${MAIN.id}`);
-  await expect.element(page.getByText(LAST_ANSWER_START)).toBeVisible();
+  stack.use(app.screen);
+  await expect.element(page.getByText(LAST_ANSWER_START).last()).toBeVisible();
   await document.fonts.ready;
-  return app;
+  return { ...app, screen: stack.move() };
 }
 
-const VARIANTS: ReadonlyArray<SkillSetVariant> = ["off", "tabs", "rail", "chip", "both"];
-
-it.skipIf(!hasPrivateSetup).each(VARIANTS)("shots: %s", async (variant) => {
+it("keeps the pick on its thread, updates the composer and uses a thread-specific catalog", async () => {
   using _clock = clock();
-  setSkillSetVariant(variant);
-  setActiveSkillSet(DEFAULT_SET.id);
+  using _environment = install();
   const { screen, router } = await openThread();
   await using _app = screen;
-  const label = variant === "off" ? "before" : variant;
-
-  await shot(`${label}-1-thread`, PICKER_CLIP);
-  if (variant === "chip") {
-    await page.getByRole("button", { name: /Skill set:/ }).click();
-    await expect.element(page.getByRole("menuitem", { name: "Manage skill sets" })).toBeVisible();
-  } else {
-    await page
-      .getByRole("button", { name: /Fable 5\.2/ })
-      .first()
-      .click();
-    await expect.element(page.getByPlaceholder("Search models...")).toBeVisible();
-  }
-  await shot(`${label}-2-picker`, PICKER_CLIP);
-  if (variant === "tabs" || variant === "rail" || variant === "both") {
-    // The same picker with another set chosen, to show the selected state move.
-    await page
-      .getByRole(variant === "rail" ? "button" : "tab", { name: new RegExp(OTHER_SET.name) })
-      .click();
-    await shot(`${label}-3-picker-${OTHER_SET.id}`, PICKER_CLIP);
-  }
+  const picker = page
+    .getByRole("button", { name: hasPrivateSetup ? /Fable 5\.2/ : /GPT-5\.4/i })
+    .first();
+  await expect
+    .element(page.getByRole("button", { name: `Skill set: ${DEFAULT_SET.name}` }))
+    .toBeVisible();
+  if (hasPrivateSetup) await shot("both-1-thread", PICKER_CLIP);
+  await picker.click();
+  await expect
+    .element(page.getByRole("tab", { name: DEFAULT_SET.name, exact: true }))
+    .toHaveAttribute("aria-selected", "true");
+  if (hasPrivateSetup) await shot("both-2-picker", PICKER_CLIP);
+  await page.getByRole("tab", { name: OTHER_SET.name, exact: true }).click();
+  await expect
+    .element(page.getByRole("tab", { name: OTHER_SET.name, exact: true }))
+    .toHaveAttribute("aria-selected", "true");
+  await vi.waitFor(() => {
+    const picks = dispatchedCommands().filter(
+      (command) => command.type === "thread.metadata.update" && command.skillSetId !== undefined,
+    );
+    expect(picks).toHaveLength(1);
+    expect(picks[0]).toMatchObject({ threadId: MAIN.id, skillSetId: OTHER_SET.id });
+    expect(skillSetProviderRequests()).toContainEqual(
+      expect.objectContaining({
+        threadId: MAIN.id,
+        cwd: expect.any(String),
+        workspaceSnapshotsOnDemand: true,
+      }),
+    );
+  });
+  if (hasPrivateSetup) await shot("both-3-picker-pstack", PICKER_CLIP);
   await userEvent.keyboard("{Escape}");
-
-  if (variant === "off") {
-    await act(() => router.navigate({ to: "/settings/providers" }));
-    await shot("before-3-settings", SETTINGS_CLIP);
+  await expect
+    .element(page.getByRole("button", { name: `Skill set: ${OTHER_SET.name}` }))
+    .toBeVisible();
+  if (!hasPrivateSetup) await shot("example-thread");
+  const skill = OTHER_SET.skills.find((skill) => skill.enabled);
+  if (skill) {
+    await page.getByTestId("composer-editor").fill(`$${skill.name}`);
+    await expect.element(page.getByRole("option", { name: new RegExp(`^${skill.name} `) })).toBeVisible();
+    await page.getByTestId("composer-editor").fill("");
   }
+  await act(() => router.navigate({ to: `/${ENVIRONMENT_ID}/${OTHERS[0]!.id}` as never }));
+  await expect
+    .element(page.getByRole("button", { name: `Skill set: ${DEFAULT_SET.name}` }))
+    .toBeVisible();
 });
 
-it.skipIf(!hasPrivateSetup)("shots: settings", async () => {
+it("captures the settings list and expanded sets", async () => {
   using _clock = clock();
-  setSkillSetVariant("tabs");
-  setActiveSkillSet(DEFAULT_SET.id);
+  using _environment = install();
   const { screen, router } = await openThread();
   await using _app = screen;
-  const otherDetails = page.getByRole("button", { name: `${OTHER_SET.name} details` });
   await act(() => router.navigate({ to: "/settings/skill-sets" as never }));
+  const details = page.getByRole("button", { name: `${OTHER_SET.name} details` });
+  await expect.element(details).toBeVisible();
+  if (hasPrivateSetup) await shot("settings-1-list", SETTINGS_CLIP);
+  await details.click();
+  if (hasPrivateSetup) await shot("settings-2-pstack", SETTINGS_CLIP);
+  await details.click();
+  await page.getByRole("button", { name: `${DEFAULT_SET.name} details` }).click();
+  if (hasPrivateSetup) await shot("settings-3-daniel", SETTINGS_CLIP);
+});
+
+it("saves settings switches, disabled skills, registration and interval", async () => {
+  using _clock = clock();
+  using _environment = install();
+  const { screen, router } = await openThread();
+  await using _app = screen;
+  await act(() => router.navigate({ to: "/settings/skill-sets" as never }));
+  const otherDetails = page.getByRole("button", { name: `${OTHER_SET.name} details` });
   await expect.element(otherDetails).toBeVisible();
-  await shot("settings-1-list", SETTINGS_CLIP);
   await otherDetails.click();
-  await shot(`settings-2-${OTHER_SET.id}`, SETTINGS_CLIP);
+  await page.getByRole("switch", { name: `Enable ${OTHER_SET.name}`, exact: true }).click();
+  await vi.waitFor(() =>
+    expect(skillSetSettingsPatches()).toContainEqual({
+      skillSets: { [OTHER_SET.id]: { ...configs[OTHER_SET.id], enabled: false } },
+    }),
+  );
+  await page.getByRole("switch", { name: `Default ${OTHER_SET.name}`, exact: true }).click();
+  await vi.waitFor(() =>
+    expect(skillSetSettingsPatches()).toContainEqual({ defaultSkillSetId: OTHER_SET.id }),
+  );
+  const firstSkill = OTHER_SET.skills[0];
+  if (firstSkill) {
+    await page.getByRole("switch", { name: `Load ${firstSkill.name}`, exact: true }).click();
+    await vi.waitFor(() =>
+      expect(
+        skillSetSettingsPatches().some(
+          (patch) =>
+            patch.skillSets?.[OTHER_SET.id]?.disabledSkills.includes(firstSkill.name) ===
+            firstSkill.enabled,
+        ),
+      ).toBe(true),
+    );
+  }
+  await page.getByRole("spinbutton", { name: "Sync interval in minutes" }).fill("11");
+  await userEvent.tab();
+  await vi.waitFor(() =>
+    expect(skillSetSettingsPatches()).toContainEqual({ skillSetSyncIntervalMinutes: 11 }),
+  );
   await otherDetails.click();
   await page.getByRole("button", { name: `${DEFAULT_SET.name} details` }).click();
-  await shot(`settings-3-${DEFAULT_SET.id}`, SETTINGS_CLIP);
+  await page.getByRole("textbox", { name: "New skill set name" }).fill("New Kit");
+  await page.getByRole("textbox", { name: "Git URL or local folder" }).fill("invalid");
+  await page.getByRole("button", { name: "Register skill set" }).click();
+  await expect.element(page.getByRole("alert")).toBeVisible();
+  await page
+    .getByRole("textbox", { name: "Git URL or local folder" })
+    .fill("https://github.com/example/new-kit");
+  await page.getByRole("button", { name: "Register skill set" }).click();
+  await expect.element(page.getByRole("button", { name: "New Kit details" })).toBeVisible();
+  await page.getByRole("switch", { name: "Enable skill sets", exact: true }).click();
+  await vi.waitFor(() =>
+    expect(skillSetSettingsPatches()).toContainEqual({ skillSetsEnabled: false }),
+  );
+});
+
+it.each([
+  { name: "master off", enabled: false, setsEnabled: true },
+  { name: "no enabled sets", enabled: true, setsEnabled: false },
+])("renders upstream composer and picker with $name", async ({ enabled, setsEnabled }) => {
+  using _environment = install(enabled, setsEnabled);
+  const { screen } = await openThread();
+  await using _app = screen;
+  await expect.element(page.getByRole("button", { name: /^Skill set:/ })).not.toBeInTheDocument();
+  await page
+    .getByRole("button", { name: hasPrivateSetup ? /Fable 5\.2/ : /GPT-5\.4/i })
+    .first()
+    .click();
+  await expect.element(page.getByRole("tablist", { name: "Skill sets" })).not.toBeInTheDocument();
 });

@@ -1,105 +1,147 @@
-// Prototype state for skill sets: which sets are registered, which one a thread runs on, and
-// which of the three picker placements is shown. In the real feature the registry lives in the
-// server settings and the active set on the thread; here it is client state over a fixture.
-import { useSyncExternalStore } from "react";
+import { useAtomValue } from "@effect/atom-react";
+import {
+  type EnvironmentId,
+  type SkillSetStatus,
+  type ServerSettings,
+  DEFAULT_SERVER_SETTINGS,
+  CommandId,
+  type ThreadId,
+} from "@t3tools/contracts";
+import { AsyncResult, Atom } from "effect/reactivity";
+import { randomUUID } from "~/lib/utils";
+import {
+  createContext,
+  useContext,
+  createElement,
+  memo,
+  type ComponentType,
+  type ReactNode,
+} from "react";
+import { type DraftId, useComposerDraftStore } from "~/composerDraftStore";
+import { useAtomCommand } from "~/state/use-atom-command";
+import { environmentThreadShells } from "~/state/threads";
+import { serverEnvironment } from "~/state/server";
+import { usePrimaryEnvironmentId } from "~/state/environments";
+import { activeSkillSet, joinSkillSets } from "./skillSets.logic";
+import { pickSkillSet, skillSetStatuses } from "./rpc";
 
-export type SkillSetVariant = "off" | "tabs" | "rail" | "chip" | "both";
+export type { SkillSet, SkillSetSkill } from "./skillSets.logic";
+export type SkillSetLogo = import("@t3tools/contracts").ProjectIconOverride;
 
-export type SkillSetLogo =
-  | { readonly kind: "image"; readonly src: string }
-  | { readonly kind: "monogram"; readonly text: string; readonly color: string };
+const emptySettings = Atom.make<ServerSettings | null>(null);
+const emptyStatuses = Atom.make(AsyncResult.success<readonly SkillSetStatus[]>([]));
+const emptyThread = Atom.make(null);
+const noPermission = Atom.make(false);
+const SkillSetContext = createContext<{
+  environmentId: EnvironmentId;
+  threadId: ThreadId | null;
+  draftId: DraftId | null;
+} | null>(null);
 
-export interface SkillSetSkill {
-  readonly name: string;
-  readonly description: string;
-  readonly manualOnly: boolean;
-  readonly listingTokens: number;
-  readonly enabled: boolean;
-  readonly installedFor?: ReadonlyArray<string>;
+export function SkillSetScope({
+  environmentId,
+  threadId,
+  draftId,
+  children,
+}: {
+  environmentId: EnvironmentId;
+  threadId: ThreadId | null;
+  draftId: DraftId | null;
+  children: ReactNode;
+}) {
+  return createElement(SkillSetContext, { value: { environmentId, threadId, draftId } }, children);
 }
 
-export interface SkillSet {
-  readonly id: string;
-  readonly name: string;
-  readonly tagline: string;
-  readonly logo: SkillSetLogo;
-  readonly repo: {
-    readonly state: "synced" | "local";
-    readonly label: string;
-    readonly path: string;
-    readonly upstream?: string;
-    readonly branch?: string;
-    readonly commit?: string;
-    readonly commitDate?: string;
-    readonly version?: string;
-    readonly proposed?: string;
+export function withSkillSetScope<
+  Props extends {
+    environmentId: EnvironmentId;
+    activeThreadId: ThreadId | null;
+    draftId: DraftId | null;
+  },
+>(Component: ComponentType<Props>) {
+  return memo(function SkillSetComposer(props: Props) {
+    return createElement(SkillSetScope, {
+      environmentId: props.environmentId,
+      threadId: props.activeThreadId,
+      draftId: props.draftId,
+      children: createElement(Component, props),
+    });
+  });
+}
+
+export function useSkillSetRegistry(environmentId: EnvironmentId | null) {
+  const settings =
+    useAtomValue(
+      environmentId ? serverEnvironment.settingsValueAtom(environmentId) : emptySettings,
+    ) ?? DEFAULT_SERVER_SETTINGS;
+  const result = useAtomValue(
+    environmentId && (settings.skillSetsEnabled || Object.keys(settings.skillSets).length > 0)
+      ? skillSetStatuses({ environmentId, input: {} })
+      : emptyStatuses,
+  );
+  const statuses = AsyncResult.getOrElse(result, () => []);
+  return {
+    settings,
+    statuses,
+    sets: joinSkillSets(settings.skillSets, statuses, settings.defaultSkillSetId),
   };
-  readonly isDefault: boolean;
-  readonly skills: ReadonlyArray<SkillSetSkill>;
-  readonly listingTokens: number;
-}
-
-/** The data the prototype and its screenshots run on. */
-interface SetupFixture {
-  readonly skillSets: ReadonlyArray<SkillSet>;
-  readonly thread: {
-    readonly title: string;
-    readonly otherTitles: ReadonlyArray<string>;
-    readonly turns: ReadonlyArray<ReadonlyArray<string>>;
-  };
-  readonly projects: ReadonlyArray<{
-    readonly id: string;
-    readonly title: string;
-    readonly projectIcon?: unknown;
-  }>;
-  readonly providers: ReadonlyArray<unknown>;
-  readonly providerInstances: unknown;
-  readonly clientSettings: unknown;
-}
-
-// setup.fixture.json is one user's real setup and stays out of git. A clean checkout has only
-// the neutral example, so the glob finds whichever files exist and the private one wins.
-const fixtures = import.meta.glob<SetupFixture>("./setup.fixture*.json", {
-  eager: true,
-  import: "default",
-});
-const PRIVATE_FIXTURE = fixtures["./setup.fixture.json"];
-
-export const hasPrivateSetup = PRIVATE_FIXTURE !== undefined;
-export const setup: SetupFixture = PRIVATE_FIXTURE ?? fixtures["./setup.fixture.example.json"]!;
-
-const SKILL_SETS = setup.skillSets;
-
-interface State {
-  readonly variant: SkillSetVariant;
-  readonly activeId: string;
-}
-
-let state: State = { variant: "off", activeId: SKILL_SETS.find((set) => set.isDefault)?.id ?? "" };
-const listeners = new Set<() => void>();
-const emit = () => {
-  for (const listener of listeners) listener();
-};
-const subscribe = (listener: () => void) => {
-  listeners.add(listener);
-  return () => listeners.delete(listener);
-};
-
-export function setSkillSetVariant(variant: SkillSetVariant) {
-  state = { ...state, variant };
-  emit();
-}
-
-export function setActiveSkillSet(activeId: string) {
-  state = { ...state, activeId };
-  emit();
 }
 
 export function useSkillSets() {
-  const current = useSyncExternalStore(subscribe, () => state);
+  const scope = useContext(SkillSetContext);
+  const primary = usePrimaryEnvironmentId();
+  const environmentId = scope?.environmentId ?? primary;
+  const registry = useSkillSetRegistry(environmentId);
+  const thread = useAtomValue(
+    scope?.threadId
+      ? environmentThreadShells.threadShellAtom({
+          environmentId: scope.environmentId,
+          threadId: scope.threadId,
+        })
+      : emptyThread,
+  );
+  const draft = useComposerDraftStore((state) =>
+    scope?.draftId ? state.draftThreadsByThreadKey[scope.draftId] : undefined,
+  );
+  const pick = draft?.skillSetId ?? thread?.skillSetId;
+  const active = activeSkillSet(
+    registry.settings.skillSetsEnabled,
+    registry.sets,
+    pick,
+    registry.settings.defaultSkillSetId,
+  );
+  const permitted = useAtomValue(
+    environmentId ? pickSkillSet.permissionAtom(environmentId) : noPermission,
+  );
+  const save = useAtomCommand(pickSkillSet, "change skill set");
+  const setActive = (skillSetId: string) => {
+    if (!scope || !permitted) return;
+    const draftId = scope.draftId;
+    if (draftId && draft) {
+      useComposerDraftStore.setState((state) => ({
+        draftThreadsByThreadKey: {
+          ...state.draftThreadsByThreadKey,
+          [draftId]: { ...state.draftThreadsByThreadKey[draftId]!, skillSetId },
+        },
+      }));
+    } else if (scope.threadId) {
+      void save({
+        environmentId: scope.environmentId,
+        input: {
+          type: "thread.metadata.update",
+          commandId: CommandId.make(randomUUID()),
+          threadId: scope.threadId,
+          skillSetId,
+        },
+      });
+    }
+  };
   return {
-    variant: current.variant,
-    sets: SKILL_SETS,
-    active: SKILL_SETS.find((set) => set.id === current.activeId) ?? SKILL_SETS[0]!,
+    ...registry,
+    active,
+    sets: registry.sets.filter((set) => set.enabled),
+    setActive,
+    permitted,
+    available: scope !== null,
   };
 }
