@@ -11,6 +11,7 @@ import {
 } from "@t3tools/contracts";
 import * as Effect from "effect/Effect";
 import * as Schema from "effect/Schema";
+import * as SqlClient from "effect/sql/SqlClient";
 import { layerWithRegistry } from "../../orchestration-v2/testkit/ProviderReplayHarness.ts";
 import { layerFromAdapters } from "../../orchestration-v2/ProviderAdapterRegistry.ts";
 import { OrchestratorV2 } from "../../orchestration-v2/Orchestrator.ts";
@@ -47,6 +48,11 @@ it.effect("persists create -> change -> server read -> web wire shell", () =>
       skillSetId: "alpha",
     });
     expect((yield* orchestrator.getThreadRecords(threadId, [])).thread.skillSetId).toBe("alpha");
+    const sql = yield* SqlClient.SqlClient;
+    const persisted = yield* sql<{ payload_json: string }>`SELECT payload_json FROM orchestration_v2_projection_threads WHERE thread_id = ${threadId}`;
+    expect(JSON.parse(persisted[0]!.payload_json).skillSetId).toBeUndefined();
+    const events = yield* sql<{ payload_json: string }>`SELECT payload_json FROM orchestration_events WHERE stream_id = ${threadId}`;
+    expect(events.every((row) => JSON.parse(row.payload_json).skillSetId === undefined)).toBe(true);
     const createdShell = threadShellFromProjection(
       yield* orchestrator.getThreadProjection(threadId),
     );

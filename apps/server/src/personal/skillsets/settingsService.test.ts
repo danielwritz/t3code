@@ -51,7 +51,8 @@ it.effect("persists settings, streams status snapshots and syncs a local linked 
           },
         },
       });
-      const saved = JSON.parse(yield* fs.readFileString(config.settingsPath));
+      expect(JSON.parse(yield* fs.readFileString(config.settingsPath)).skillSets).toBeUndefined();
+      const saved = JSON.parse(yield* fs.readFileString(config.stateDir + "/skill-sets/state.json"));
       expect(saved.skillSetSyncIntervalMinutes).toBe(7);
       expect(saved.skillSets.alpha.name).toBe("Alpha");
       const handlers = yield* SkillSets.skillSetRpcHandlers;
