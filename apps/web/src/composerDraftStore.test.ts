@@ -2941,6 +2941,7 @@ describe("composerDraftStore checkout pull request", () => {
             [draftId]: {
               ...persistedDraftThread(threadId),
               checkoutPullRequest: checkout,
+              skillSetId: "alpha",
               worktreeRepositories: ["/work/api"],
             },
             [legacyDraftId]: persistedDraftThread(ThreadId.make("thread-legacy")),
@@ -2960,8 +2961,15 @@ describe("composerDraftStore checkout pull request", () => {
       expect(checkoutPullRequestUrlToLink(legacy)).toBeNull();
       expect(
         partializeComposerDraftStoreState(store()).draftThreadsByThreadKey[draftId],
-      ).toMatchObject({ checkoutPullRequest: checkout, worktreeRepositories: ["/work/api"] });
+      ).toMatchObject({
+        checkoutPullRequest: checkout,
+        skillSetId: "alpha",
+        worktreeRepositories: ["/work/api"],
+      });
       expect(legacy).not.toHaveProperty("worktreeRepositories");
+      expect(legacy?.skillSetId).toBeUndefined();
+      store().setDraftThreadContext(draftId, { runtimeMode: "auto" });
+      expect(store().getDraftSession(draftId)?.skillSetId).toBe("alpha");
     } finally {
       await useComposerDraftStore.persist.clearStorage();
       vi.useRealTimers();

@@ -1,3 +1,5 @@
+// personal:skill-sets seam launch wire helper
+import { skillSetPick } from "@t3tools/contracts";
 // personal:skill-sets seam menus import
 import { skillSetMenuRefresh } from "./personal/skillsets/menus.ts";
 // personal:skill-sets seam foundation 1
@@ -2238,6 +2240,8 @@ export const layerWsRpc = (
                     .pipe(
                       Effect.andThen(
                         ThreadMessageIntake.launchThread({
+                          // personal:skill-sets seam launch wire forwarding
+                          ...skillSetPick(input),
                           commandId: input.commandId,
                           ...(input.threadId === undefined ? {} : { threadId: input.threadId }),
                           ...(input.reuseExistingThread === undefined

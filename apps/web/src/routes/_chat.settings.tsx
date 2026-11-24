@@ -1,3 +1,5 @@
+// personal:skill-sets seam settings environment scope helper
+import { withSkillSetSettingsScope } from "~/personal/skillsets/skillSets.logic";
 import { workspaceAreaProps } from "../lib/workspaceFocus";
 import { Outlet, createFileRoute, redirect, useLocation } from "@tanstack/react-router";
 import { useState, type ReactNode } from "react";
@@ -185,7 +187,13 @@ function SettingsRouteLayout() {
   return (
     <SettingsScopeProvider
       search={rawSearch}
-      singleEnvironment={pathname === "/settings/providers" || pathname === "/settings/secrets"}
+      singleEnvironment={
+        // personal:skill-sets seam registry is per environment
+        withSkillSetSettingsScope(
+          pathname,
+          pathname === "/settings/providers" || pathname === "/settings/secrets",
+        )
+      }
       deviceOnly={SETTINGS_DEVICE_ONLY_PATHS.has(pathname)}
       onChange={(next) => {
         // Send every axis so retain middleware recognizes "all" as an explicit target.

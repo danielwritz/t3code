@@ -1,3 +1,5 @@
+// personal:skill-sets seam draft shell helper
+import { skillSetPick } from "@t3tools/contracts";
 import { toServerClock } from "@t3tools/client-runtime/clock";
 import { msg } from "gt-react";
 import { m, type MessageResolver } from "../i18n/messages";
@@ -460,6 +462,8 @@ export function buildLocalDraftThread(
 ): Thread {
   const timestamp = DateTime.makeUnsafe(draftThread.createdAt);
   return presentThreadShell(draftThread.environmentId, {
+    // personal:skill-sets seam draft shell pick
+    ...skillSetPick(draftThread),
     id: threadId,
     projectId: draftThread.projectId,
     title: resolve(msg("New thread")),

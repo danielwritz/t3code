@@ -383,6 +383,25 @@ function launchInput(input: {
   };
 }
 
+it.effect("persists a launch skill set and leaves an omitted pick unset", () => {
+  const harness = makeHarness();
+  return Effect.gen(function* () {
+    const launches = yield* ThreadLaunch.ThreadLaunchService;
+    const threads = yield* ThreadManagement.ThreadManagementService;
+    for (const skillSetId of ["alpha", undefined]) {
+      const result = yield* launches.launch({
+        ...launchInput({
+          command: `command:skill-set:${skillSetId}`,
+          thread: `thread:skill-set:${skillSetId}`,
+        }),
+        ...(skillSetId === undefined ? {} : { skillSetId }),
+      });
+      const projection = yield* threads.getThreadProjection(result.threadId);
+      assert.equal(projection.thread.skillSetId, skillSetId);
+    }
+  }).pipe(Effect.provide(harness.layer));
+});
+
 it.effect.each(
   (["new", "existing"] as const).flatMap((target) =>
     (["user", "agent"] as const).map((createdBy) => ({ target, createdBy })),

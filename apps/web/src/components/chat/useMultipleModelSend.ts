@@ -1,3 +1,5 @@
+// personal:skill-sets seam draft launch helper
+import { skillSetPick } from "@t3tools/contracts";
 import { msg } from "gt-react";
 import { thrownErrorMessage } from "@t3tools/client-runtime/errors";
 import { m } from "~/i18n/messages";
@@ -191,6 +193,12 @@ export function useMultipleModelSend(input: MultipleModelSendInput) {
                   interactionMode: DEFAULT_INTERACTION_MODE,
                   bootstrap: {
                     createThread: {
+                      // personal:skill-sets seam draft launch pick
+                      ...skillSetPick(
+                        draftId
+                          ? (useComposerDraftStore.getState().getDraftSession(draftId) ?? {})
+                          : {},
+                      ),
                       projectId: project.id,
                       title,
                       modelSelection: target.selection,

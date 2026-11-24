@@ -123,9 +123,10 @@ function prototypeThread(name: string, title: string): FakeThread {
   };
 }
 
-const MAIN = prototypeThread("thread-skill-sets", setup.thread.title);
+const MAIN = { ...prototypeThread("thread-skill-sets", setup.thread.title), skillSetId: null };
 const OTHERS = setup.thread.otherTitles.map((title, index) => ({
   ...threadWithHistory(`thread-other-${index}`, 1, MODEL),
+  skillSetId: null,
   title,
 }));
 
@@ -203,12 +204,18 @@ function clock(): Disposable {
   return { [Symbol.dispose]: () => void vi.useRealTimers() };
 }
 
-async function openThread() {
+async function openThread(threadId = MAIN.id) {
   await page.viewport(1400, 900);
   await using stack = new AsyncDisposableStack();
-  const app = await mountApp(`/${ENVIRONMENT_ID}/${MAIN.id}`);
+  const app = await mountApp(`/${ENVIRONMENT_ID}/${threadId}`);
   stack.use(app.screen);
-  await expect.element(page.getByText(LAST_ANSWER_START).last()).toBeVisible();
+  await expect
+    .element(
+      threadId === MAIN.id
+        ? page.getByText(LAST_ANSWER_START).last()
+        : page.getByTestId("composer-editor"),
+    )
+    .toBeVisible();
   await document.fonts.ready;
   return { ...app, screen: stack.move() };
 }
@@ -216,7 +223,7 @@ async function openThread() {
 it("keeps the pick on its thread, updates the composer and uses a thread-specific catalog", async () => {
   using _clock = clock();
   using _environment = install();
-  const { screen, router } = await openThread();
+  const { screen } = await openThread();
   await using _app = screen;
   const picker = page
     .getByRole("button", { name: hasPrivateSetup ? /Fable 5\.2/ : /GPT-5\.4/i })
@@ -254,13 +261,30 @@ it("keeps the pick on its thread, updates the composer and uses a thread-specifi
     .element(page.getByRole("button", { name: `Skill set: ${OTHER_SET.name}` }))
     .toBeVisible();
   if (!hasPrivateSetup) await shot("example-thread");
+});
+
+it("keeps the skill and slash menus scoped to the picked thread", async () => {
+  using _environment = install();
+  const { screen, router } = await openThread(OTHERS[0]!.id);
+  await using _app = screen;
+  await page.getByRole("button", { name: `Skill set: ${DEFAULT_SET.name}` }).click();
+  await page.getByRole("menuitemradio", { name: new RegExp(OTHER_SET.name) }).click();
+  await expect
+    .element(page.getByRole("button", { name: `Skill set: ${OTHER_SET.name}` }))
+    .toBeVisible();
   const skill = OTHER_SET.skills.find((skill) => skill.enabled);
   if (skill) {
     await page.getByTestId("composer-editor").fill(`$${skill.name}`);
-    await expect.element(page.getByRole("option", { name: new RegExp(`^${skill.name} `) })).toBeVisible();
+    await expect
+      .element(page.getByRole("option", { name: new RegExp(`^(?:/skill:)?${skill.name} `) }))
+      .toBeVisible();
+    await page.getByTestId("composer-editor").fill(`/${skill.name}`);
+    await expect
+      .element(page.getByRole("option", { name: new RegExp(`^(?:/skill:)?${skill.name} `) }))
+      .toBeVisible();
     await page.getByTestId("composer-editor").fill("");
   }
-  await act(() => router.navigate({ to: `/${ENVIRONMENT_ID}/${OTHERS[0]!.id}` as never }));
+  await act(() => router.navigate({ to: `/${ENVIRONMENT_ID}/${OTHERS[1]!.id}` as never }));
   await expect
     .element(page.getByRole("button", { name: `Skill set: ${DEFAULT_SET.name}` }))
     .toBeVisible();

@@ -282,6 +282,7 @@ describe("V2 environment commands", () => {
         titleSeed: "Continue here",
         bootstrap: {
           createThread: {
+            skillSetId: "alpha",
             projectId: ProjectId.make("project-1"),
             title: "Thread",
             modelSelection: v2Projection.thread.modelSelection,
@@ -295,6 +296,7 @@ describe("V2 environment commands", () => {
       }).pipe(Effect.provideService(EnvironmentSupervisor.EnvironmentSupervisor, supervisor));
 
       expect(launches[0]).toMatchObject({
+        skillSetId: "alpha",
         threadId: v2ThreadId,
         title: "Continue here",
         generateTitle: true,

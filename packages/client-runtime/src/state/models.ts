@@ -1,3 +1,5 @@
+// personal:skill-sets seam shell presentation helper
+import { skillSetPick } from "@t3tools/contracts";
 import { backgroundWorkHoldsCompletion } from "@t3tools/shared/orchestrationV2PendingBackgroundWork";
 import { threadPullRequestsOf } from "../threadPullRequests.ts";
 import type {
@@ -153,6 +155,8 @@ function threadRunStatusIsActive(status: ThreadRuntimeSummary["status"]): boolea
 }
 
 export interface EnvironmentThreadShell {
+  // personal:skill-sets seam presentation type
+  readonly skillSetId?: string | null;
   readonly environmentId: EnvironmentId;
   readonly id: ThreadId;
   readonly projectId: ProjectId;
@@ -301,6 +305,8 @@ export function presentThreadShell(
         } satisfies ThreadRunSummary);
   const runtime = shellRuntime(thread);
   return {
+    // personal:skill-sets seam presented shell pick
+    ...skillSetPick(thread),
     environmentId,
     id: thread.id,
     projectId: thread.projectId,

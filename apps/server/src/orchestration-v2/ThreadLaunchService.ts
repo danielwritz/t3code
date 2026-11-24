@@ -1,3 +1,5 @@
+// personal:skill-sets seam launch pick helper
+import { skillSetPick } from "@t3tools/contracts";
 import * as WorktreeSetupTracker from "../project/WorktreeSetupTracker.ts";
 import * as ProjectCloneTracker from "../project/ProjectCloneTracker.ts";
 import * as TerminalManager from "../terminal/Manager.ts";
@@ -98,6 +100,8 @@ export interface ThreadLaunchInitialMessage {
 }
 
 export interface ThreadLaunchInput {
+  // personal:skill-sets seam launch pick type
+  readonly skillSetId?: string | null;
   readonly commandId: CommandId;
   readonly threadId?: ThreadId;
   readonly reuseExistingThread?: boolean;
@@ -1482,6 +1486,8 @@ const make = Effect.gen(function* () {
               })
             : threads.dispatch({
                 type: "thread.create",
+                // personal:skill-sets seam launch pick
+                ...skillSetPick(input),
                 commandId: input.commandId,
                 threadId: candidateThreadId,
                 projectId: input.projectId,

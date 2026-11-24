@@ -1,16 +1,15 @@
-// Settings -> Skill sets (prototype): register a repo of skills, give it a logo, keep it in sync,
-// and choose which skills in it load. Reads the fixture; nothing here writes to disk yet.
 import { T, useGT, useMessages, Var } from "gt-react";
-import {
-  ChevronRightIcon,
-  FolderGit2Icon,
-  GitBranchIcon,
-  ImageIcon,
-  PlusIcon,
-  RefreshCwIcon,
-  TriangleAlertIcon,
-} from "lucide-react";
+import { ChevronRightIcon, GitBranchIcon, PlusIcon, RefreshCwIcon } from "lucide-react";
 import { useState } from "react";
+import { useAtomValue } from "@effect/atom-react";
+import type { SkillSetConfig, ServerSettingsPatch } from "@t3tools/contracts";
+import { useSettingsScope } from "~/components/settings/SettingsScopeContext";
+import { useUpdateEnvironmentSettings } from "~/hooks/useSettings";
+import { useAtomCommand } from "~/state/use-atom-command";
+import { serverEnvironment } from "~/state/server";
+import { ProjectIconPickerDialog } from "~/components/settings/ProjectIconPickerDialog";
+import { newSkillSet } from "./skillSets.logic";
+import { syncSkillSet } from "./rpc";
 
 import { ProviderInstanceIcon } from "~/components/chat/ProviderInstanceIcon";
 import { SettingsGroup } from "~/components/settings/SettingsGroup";
@@ -19,25 +18,16 @@ import { Badge } from "~/components/ui/badge";
 import { Button } from "~/components/ui/button";
 import { Input } from "~/components/ui/input";
 import { Switch } from "~/components/ui/switch";
+import { Tooltip, TooltipTrigger, TooltipPopup } from "~/components/ui/tooltip";
 import { cn } from "~/lib/utils";
 import { SkillSetLogo, syncLine } from "./SkillSetPickers";
-import { useSkillSets, type SkillSet, type SkillSetSkill } from "./skillSetsStore";
+import { useSkillSetRegistry, type SkillSet, type SkillSetSkill } from "./skillSetsStore";
 
 const PROVIDERS = [
   { driver: "codex", name: "Codex" },
   { driver: "claudeAgent", name: "Claude" },
-  { driver: "claudeAgent", name: "Claude2" },
   { driver: "antigravity", name: "Antigravity" },
 ] as const;
-const LOGO_COLORS = [
-  "bg-blue-500",
-  "bg-rose-500",
-  "bg-amber-500",
-  "bg-emerald-500",
-  "bg-violet-500",
-  "bg-zinc-500",
-];
-
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <div className="grid grid-cols-[7.5rem_minmax(0,1fr)] items-center gap-3 px-4 py-2.5">
@@ -47,11 +37,24 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
   );
 }
 
-function SkillRow({ skill }: { skill: SkillSetSkill }) {
+function SkillRow({
+  skill,
+  onChange,
+  readOnly,
+}: {
+  skill: SkillSetSkill;
+  onChange: (enabled: boolean) => void;
+  readOnly: boolean;
+}) {
   const gt = useGT();
   return (
     <div className="flex items-center gap-3 px-4 py-2">
-      <Switch checked={skill.enabled} aria-label={gt("Load {name}", { name: skill.name })} />
+      <Switch
+        checked={skill.enabled}
+        onCheckedChange={onChange}
+        disabled={readOnly}
+        aria-label={gt("Load {name}", { name: skill.name })}
+      />
       <div className="flex min-w-0 flex-1 flex-col">
         <span className="flex items-center gap-1.5 font-mono text-xs font-medium">
           {skill.name}
@@ -63,112 +66,107 @@ function SkillRow({ skill }: { skill: SkillSetSkill }) {
         </span>
         <span className="truncate text-xs text-muted-foreground">{skill.description}</span>
       </div>
-      <span className="w-14 shrink-0 text-right font-mono text-3xs text-muted-foreground tabular-nums">
-        <T>
-          ~<Var>{skill.listingTokens}</Var> tok
-        </T>
-      </span>
     </div>
   );
 }
 
-function SkillSetDetail({ set }: { set: SkillSet }) {
+function SkillSetDetail({
+  set,
+  update,
+  patchSettings,
+  interval,
+  readOnly,
+  canSync,
+  sync,
+}: {
+  set: SkillSet;
+  update: (patch: Partial<SkillSetConfig>) => void;
+  patchSettings: (patch: ServerSettingsPatch) => void;
+  interval: number;
+  readOnly: boolean;
+  canSync: boolean;
+  sync: () => void;
+}) {
   const gt = useGT();
-  const local = set.repo.state === "local";
-  const logoModes = [
-    gt("Repo logo"),
-    gt("Monogram"),
-    gt("Icon", { $context: "logo source, an icon from the icon set" }),
-    gt("Upload", { $context: "logo source, an image the user uploads" }),
-  ];
+  const local = set.source.kind === "local";
+  const [iconOpen, setIconOpen] = useState(false);
   return (
     <div className="border-t border-border/50 bg-muted/20">
       <Field label={gt("Logo")}>
         <SkillSetLogo logo={set.logo} className="size-9" />
-        <div className="flex items-center rounded-md border border-border bg-popover p-0.5 text-xs">
-          {logoModes.map((mode, index) => (
-            <span
-              key={mode}
-              className={cn(
-                "rounded-sm px-2 py-0.5",
-                (set.logo.kind === "image" ? index === 0 : index === 1)
-                  ? "bg-foreground/10 font-medium"
-                  : "text-muted-foreground",
-              )}
-            >
-              {mode}
-            </span>
-          ))}
-        </div>
-        <div className="flex items-center gap-1">
-          {LOGO_COLORS.map((color, index) => (
-            <span
-              key={color}
-              className={cn(
-                "size-4 rounded-full",
-                color,
-                set.logo.kind === "monogram" && index === 0 && "ring-2 ring-ring ring-offset-1",
-              )}
-            />
-          ))}
-        </div>
-        <span className="flex items-center gap-1 text-xs text-muted-foreground">
-          <ImageIcon className="size-3.5" />
-          {set.logo.kind === "image"
-            ? gt("found in the repo")
-            : gt("same choices as a project icon")}
-        </span>
+        <Button variant="outline" size="xs" disabled={readOnly} onClick={() => setIconOpen(true)}>
+          <T>Change logo</T>
+        </Button>
+        <ProjectIconPickerDialog
+          current={set.logo}
+          projectName={set.name}
+          open={iconOpen}
+          onOpenChange={setIconOpen}
+          onSelect={(logo) => update({ logo })}
+        />
+      </Field>
+      <Field label={gt("Name")}>
+        <Input
+          key={set.name}
+          defaultValue={set.name}
+          size="compact"
+          disabled={readOnly}
+          aria-label={gt("Skill set name")}
+          onBlur={(event) => {
+            const name = event.target.value.trim();
+            if (name) update({ name });
+          }}
+        />
       </Field>
       <Field label={gt("Repo")}>
-        <Input
-          readOnly
-          value={local ? (set.repo.proposed ?? "") : set.repo.label}
-          size="compact"
-          font="mono"
-          className="w-72"
-        />
-        {local ? (
-          <>
-            <Button variant="outline" size="xs">
-              <FolderGit2Icon />
-              <T>Create repo and push</T>
-            </Button>
-            <span className="flex items-center gap-1 text-xs text-warning-foreground">
-              <TriangleAlertIcon className="size-3.5" />
-              <T>
-                lives only in <Var>{set.repo.path}</Var>
-              </T>
-            </span>
-          </>
-        ) : (
-          <>
-            <span className="flex items-center gap-1 font-mono text-xs text-muted-foreground">
-              <GitBranchIcon className="size-3.5" />
-              {set.repo.branch} @ {set.repo.commit}
-            </span>
-            {set.repo.upstream ? (
-              <span className="text-xs text-muted-foreground">
-                <T>
-                  mirrors <Var>{set.repo.upstream}</Var>
-                </T>
-              </span>
-            ) : null}
-          </>
-        )}
+        <Input readOnly value={set.repo.label} size="compact" font="mono" className="w-72" />
+        {!local && set.repo.branch ? (
+          <span className="flex items-center gap-1 font-mono text-xs text-muted-foreground">
+            <GitBranchIcon className="size-3.5" />
+            {set.repo.branch} @ {set.repo.commit}
+          </span>
+        ) : null}
       </Field>
       <Field label={gt("Auto-sync")}>
-        <Switch checked={!local} aria-label={gt("Auto-sync")} />
-        <span className="rounded-md border border-border bg-popover px-2 py-0.5 text-xs">
-          <T>every 15 minutes</T>
+        <Switch
+          checked={set.autoSync}
+          disabled={readOnly}
+          onCheckedChange={(autoSync) => update({ autoSync })}
+          aria-label={gt("Auto-sync")}
+        />
+        <Input
+          key={interval}
+          type="number"
+          min={1}
+          step={1}
+          defaultValue={interval}
+          size="compact"
+          className="w-20"
+          aria-label={gt("Sync interval in minutes")}
+          disabled={readOnly}
+          onBlur={(event) => {
+            const value = Number(event.target.value);
+            if (Number.isSafeInteger(value) && value > 0)
+              patchSettings({ skillSetSyncIntervalMinutes: value });
+          }}
+        />
+        <span className="text-xs text-muted-foreground">
+          <T>minutes</T>
         </span>
         <span className="text-xs text-muted-foreground">
           {local
-            ? gt("starts when the repo exists")
+            ? gt("Local folders are read in place")
             : gt("pulls {branch}; a thread picks up changes on its next message", {
                 branch: set.repo.branch ?? "",
               })}
         </span>
-        <Button variant="outline" size="xs" className="ml-auto" disabled={local}>
+        <Button
+          variant="outline"
+          size="xs"
+          className="ml-auto"
+          disabled={!canSync || set.status?.state === "syncing"}
+          onClick={sync}
+        >
           <RefreshCwIcon />
           <T>Sync now</T>
         </Button>
@@ -202,15 +200,21 @@ function SkillSetDetail({ set }: { set: SkillSet }) {
               </span>
             </T>
           </span>
-          <span className="font-mono text-3xs text-muted-foreground">
-            <T>
-              ~<Var>{set.listingTokens.toLocaleString()}</Var> tokens added to every thread
-            </T>
-          </span>
         </div>
         <div className="max-h-80 overflow-y-auto pb-2">
           {set.skills.map((skill) => (
-            <SkillRow key={skill.name} skill={skill} />
+            <SkillRow
+              key={skill.name}
+              skill={skill}
+              readOnly={readOnly}
+              onChange={(enabled) =>
+                update({
+                  disabledSkills: enabled
+                    ? set.disabledSkills.filter((name) => name !== skill.name)
+                    : [...new Set([...set.disabledSkills, skill.name])],
+                })
+              }
+            />
           ))}
         </div>
       </div>
@@ -221,7 +225,45 @@ function SkillSetDetail({ set }: { set: SkillSet }) {
 export function SkillSetsSettings() {
   const gt = useGT();
   const resolve = useMessages();
-  const { sets, active } = useSkillSets();
+  const { environment } = useSettingsScope();
+  const environmentId = environment?.environmentId ?? null;
+  const { sets, settings } = useSkillSetRegistry(environmentId);
+  const patchSettings = useUpdateEnvironmentSettings(environmentId);
+  const canWrite = useAtomValue(
+    serverEnvironment.updateSettings.permissionAtom(environmentId, {
+      patch: { skillSetsEnabled: true },
+    }),
+  );
+  const canSync = useAtomValue(syncSkillSet.permissionAtom(environmentId));
+  const sync = useAtomCommand(syncSkillSet, "sync skill set");
+  const [name, setName] = useState("");
+  const [source, setSource] = useState("");
+  const [error, setError] = useState<string | null>(null);
+  const update = (set: SkillSet, patch: Partial<SkillSetConfig>) => {
+    const config = settings.skillSets[set.id];
+    if (config) patchSettings({ skillSets: { [set.id]: { ...config, ...patch } } });
+  };
+  const syncOne = (id: string) => {
+    if (environmentId) void sync({ environmentId, input: { id } });
+  };
+  const register = () => {
+    const entry = newSkillSet(name, source, settings.skillSets);
+    if (entry.error) {
+      setError(resolve(entry.error));
+      return;
+    }
+    if (!entry.config || !entry.id) return;
+    patchSettings(
+      { skillSets: { [entry.id]: entry.config } },
+      {
+        onSaved: () => {
+          setName("");
+          setSource("");
+          setError(null);
+        },
+      },
+    );
+  };
   const [openId, setOpenId] = useState<string | null>(null);
   return (
     <div className="flex min-h-0 flex-1 flex-col">
@@ -231,13 +273,14 @@ export function SkillSetsSettings() {
           variant="plain"
           headerAction={
             <div className="flex items-center gap-3 text-xs text-muted-foreground">
-              <button type="button" className="cursor-pointer font-medium hover:text-foreground">
+              <button
+                type="button"
+                disabled={!canSync}
+                onClick={() => sets.forEach((set) => syncOne(set.id))}
+                className="cursor-pointer font-medium hover:text-foreground"
+              >
                 <T>Sync all</T>
               </button>
-              <span className="flex items-center gap-1">
-                <RefreshCwIcon className="size-3" />
-                <T>Checked 2m ago</T>
-              </span>
             </div>
           }
         >
@@ -248,6 +291,14 @@ export function SkillSetsSettings() {
             </T>
           </p>
           <SettingsGroup className="mt-3">
+            <Field label={gt("Enable skill sets")}>
+              <Switch
+                checked={settings.skillSetsEnabled}
+                disabled={!canWrite}
+                aria-label={gt("Enable skill sets")}
+                onCheckedChange={(skillSetsEnabled) => patchSettings({ skillSetsEnabled })}
+              />
+            </Field>
             {sets.map((set) => {
               const open = openId === set.id;
               return (
@@ -257,35 +308,29 @@ export function SkillSetsSettings() {
                     <div className="flex min-w-0 flex-1 flex-col gap-0.5">
                       <span className="flex items-center gap-2 text-sm font-medium">
                         {set.name}
-                        {set.repo.version ? (
-                          <span className="font-mono text-xs font-normal text-muted-foreground">
-                            <T>
-                              v<Var>{set.repo.version}</Var>
-                            </T>
-                          </span>
-                        ) : null}
                         {set.isDefault ? (
                           <Badge variant="outline" size="sm">
                             <T>Default</T>
                           </Badge>
                         ) : null}
-                        {set.id === active.id ? (
-                          <Badge variant="outline" size="sm">
-                            <T>This thread</T>
-                          </Badge>
-                        ) : null}
                       </span>
-                      <span className="truncate text-xs text-muted-foreground">{set.tagline}</span>
-                      <span className="flex items-center gap-1.5 font-mono text-3xs text-muted-foreground">
-                        <span
-                          className={cn(
-                            "size-1.5 rounded-full",
-                            set.repo.state === "local" ? "bg-warning" : "bg-success",
-                          )}
-                        />
-                        {set.repo.state === "local" ? set.repo.path : set.repo.label} ·{" "}
-                        {syncLine(set, resolve)}
-                      </span>
+                      <Tooltip>
+                        <TooltipTrigger
+                          render={
+                            <span className="flex min-w-0 items-center gap-1.5 truncate font-mono text-3xs text-muted-foreground" />
+                          }
+                        >
+                          <span
+                            className={cn(
+                              "size-1.5 rounded-full",
+                              set.repo.state === "local" ? "bg-warning" : "bg-success",
+                            )}
+                          />
+                          {set.repo.state === "local" ? set.repo.path : set.repo.label} ·{" "}
+                          {syncLine(set, resolve)}
+                        </TooltipTrigger>
+                        <TooltipPopup>{syncLine(set, resolve)}</TooltipPopup>
+                      </Tooltip>
                     </div>
                     <div className="flex shrink-0 flex-col items-end gap-0.5 text-xs">
                       <span className="font-medium tabular-nums">
@@ -293,13 +338,13 @@ export function SkillSetsSettings() {
                           count: set.skills.length,
                         })}
                       </span>
-                      <span className="font-mono text-3xs text-muted-foreground tabular-nums">
-                        <T>
-                          ~<Var>{set.listingTokens.toLocaleString()}</Var> tokens
-                        </T>
-                      </span>
                     </div>
-                    <Switch checked aria-label={gt("Enable {name}", { name: set.name })} />
+                    <Switch
+                      checked={set.enabled}
+                      disabled={!canWrite}
+                      onCheckedChange={(enabled) => update(set, { enabled })}
+                      aria-label={gt("Enable {name}", { name: set.name })}
+                    />
                     <button
                       type="button"
                       aria-label={gt("{name} details", { name: set.name })}
@@ -312,7 +357,42 @@ export function SkillSetsSettings() {
                       />
                     </button>
                   </div>
-                  {open ? <SkillSetDetail set={set} /> : null}
+                  {open ? (
+                    <>
+                      <SkillSetDetail
+                        set={set}
+                        update={(patch) => update(set, patch)}
+                        patchSettings={patchSettings}
+                        interval={settings.skillSetSyncIntervalMinutes}
+                        readOnly={!canWrite}
+                        canSync={canSync}
+                        sync={() => syncOne(set.id)}
+                      />
+                      <Field label={gt("Default")}>
+                        <Switch
+                          checked={set.isDefault}
+                          disabled={!canWrite}
+                          aria-label={gt("Default {name}", { name: set.name })}
+                          onCheckedChange={(checked) =>
+                            patchSettings({ defaultSkillSetId: checked ? set.id : null })
+                          }
+                        />
+                        <Button
+                          variant="outline"
+                          size="xs"
+                          disabled={!canWrite}
+                          onClick={() =>
+                            patchSettings({
+                              skillSets: { [set.id]: null },
+                              ...(set.isDefault ? { defaultSkillSetId: null } : {}),
+                            })
+                          }
+                        >
+                          <T>Remove skill set</T>
+                        </Button>
+                      </Field>
+                    </>
+                  ) : null}
                 </div>
               );
             })}
@@ -321,16 +401,34 @@ export function SkillSetsSettings() {
                 <PlusIcon className="size-4" />
               </span>
               <Input
+                value={name}
+                onChange={(event) => setName(event.target.value)}
+                disabled={!canWrite}
+                aria-label={gt("New skill set name")}
+                placeholder={gt("Name")}
+                size="compact"
+                className="w-36"
+              />
+              <Input
+                value={source}
+                onChange={(event) => setSource(event.target.value)}
+                disabled={!canWrite}
+                aria-label={gt("Git URL or local folder")}
                 placeholder={gt("github.com/owner/repo, or a local folder of skills")}
                 size="compact"
                 font="mono"
                 className="flex-1"
               />
-              <Button variant="outline" size="xs">
+              <Button variant="outline" size="xs" disabled={!canWrite} onClick={register}>
                 <T>Register skill set</T>
               </Button>
             </div>
           </SettingsGroup>
+          {error ? (
+            <p role="alert" className="mt-2 text-sm text-destructive">
+              {error}
+            </p>
+          ) : null}
           <p className="mt-2 text-xs text-muted-foreground">
             <T>
               Try one: <Var>{<span className="font-mono">garrytan/gstack</span>}</Var> ·{" "}

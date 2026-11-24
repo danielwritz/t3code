@@ -1039,13 +1039,10 @@ export const ChatComposer = withSkillSetScope(function ChatComposer(props: ChatC
         (multipleModelSelections === null ? providerSendBlockReason : null)));
   const isSendDisabled = sendDisabledReason !== null;
   // personal:skill-sets seam thread-specific menu provider
-  const selectedProviderStatus = useThreadSkillSetProvider({
-    environmentId,
-    threadId: routeKind === "draft" ? null : activeThreadId,
-    cwd: gitCwd,
-    provider: selectedProviderEntry?.snapshot ?? null,
-    skillSetId: activeThread?.skillSetId,
-  });
+  const selectedProviderStatus = useThreadSkillSetProvider(
+    props,
+    selectedProviderEntry?.snapshot ?? null,
+  );
   const selectedProviderSkills = selectedProviderStatus
     ? resolveProviderSkillsForCwd(selectedProviderStatus, gitCwd)
     : NO_PROVIDER_SKILLS;

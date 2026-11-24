@@ -1,3 +1,5 @@
+// personal:skill-sets seam command pick helper
+import { skillSetPick } from "@t3tools/contracts";
 import { msg } from "gt-i18n";
 import { translatableMessage } from "../errors/translatable.ts";
 import { remapComposerContextAttachments } from "@t3tools/shared/composerContextReferences";
@@ -91,6 +93,8 @@ export interface DeleteProjectInput extends CommandMetadata {
 }
 
 export interface CreateThreadInput extends CommandMetadata {
+  // personal:skill-sets seam create pick type
+  readonly skillSetId?: string | null;
   readonly threadId: ThreadId;
   readonly projectId: ProjectId;
   readonly title: string;
@@ -149,6 +153,8 @@ export interface VisitThreadInput extends ThreadCommandInput {
 export type MarkThreadUnreadInput = ThreadCommandInput;
 
 export interface UpdateThreadMetadataInput extends ThreadCommandInput {
+  // personal:skill-sets seam update pick type
+  readonly skillSetId?: string | null;
   readonly limitRecovery?: import("@t3tools/contracts").OrchestrationV2LimitRecoveryUpdate | null;
   readonly title?: string;
   readonly modelSelection?: ModelSelection;
@@ -169,6 +175,8 @@ export interface SetThreadInteractionModeInput extends ThreadCommandInput {
 
 interface StartThreadBootstrap {
   readonly createThread?: {
+    // personal:skill-sets seam bootstrap pick type
+    readonly skillSetId?: string | null;
     readonly projectId: ProjectId;
     readonly title: string;
     readonly modelSelection: ModelSelection;
@@ -502,6 +510,8 @@ export const createThread = Effect.fn("EnvironmentCommands.createThread")(functi
 ) {
   return yield* dispatch({
     type: "thread.create",
+    // personal:skill-sets seam create command pick
+    ...skillSetPick(input),
     commandId: yield* allocateCommandId(input),
     createdBy: "user",
     creationSource: input.creationSource ?? "web",
@@ -723,10 +733,14 @@ export const updateThreadMetadata = Effect.fn("EnvironmentCommands.updateThreadM
       input.worktreePath !== undefined ||
       input.regenerateTitle !== undefined ||
       input.linkedPullRequest !== undefined ||
-      input.limitRecovery !== undefined
+      input.limitRecovery !== undefined ||
+      // personal:skill-sets seam metadata pick condition
+      input.skillSetId !== undefined
     ) {
       result = yield* dispatch({
         type: "thread.metadata.update",
+        // personal:skill-sets seam metadata command pick
+        ...skillSetPick(input),
         ...(input.limitRecovery === undefined ? {} : { limitRecovery: input.limitRecovery }),
         commandId,
         threadId: input.threadId,
@@ -825,6 +839,8 @@ export const startThreadTurn = Effect.fn("EnvironmentCommands.startThreadTurn")(
                 : { branch: bootstrap.branch }),
             };
     const launch = request(ORCHESTRATION_V2_WS_METHODS.launchThread, {
+      // personal:skill-sets seam bootstrap launch pick
+      ...skillSetPick(thread),
       commandId,
       creationSource: input.creationSource ?? "web",
       threadId: input.threadId,

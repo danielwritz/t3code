@@ -9,14 +9,7 @@ import {
 } from "@t3tools/contracts";
 import { AsyncResult, Atom } from "effect/reactivity";
 import { randomUUID } from "~/lib/utils";
-import {
-  createContext,
-  useContext,
-  createElement,
-  memo,
-  type ComponentType,
-  type ReactNode,
-} from "react";
+import { createContext, useContext, memo, type ComponentType, type ReactNode } from "react";
 import { type DraftId, useComposerDraftStore } from "~/composerDraftStore";
 import { useAtomCommand } from "~/state/use-atom-command";
 import { environmentThreadShells } from "~/state/threads";
@@ -38,7 +31,7 @@ const SkillSetContext = createContext<{
   draftId: DraftId | null;
 } | null>(null);
 
-export function SkillSetScope({
+function SkillSetScope({
   environmentId,
   threadId,
   draftId,
@@ -49,7 +42,7 @@ export function SkillSetScope({
   draftId: DraftId | null;
   children: ReactNode;
 }) {
-  return createElement(SkillSetContext, { value: { environmentId, threadId, draftId } }, children);
+  return <SkillSetContext value={{ environmentId, threadId, draftId }}>{children}</SkillSetContext>;
 }
 
 export function withSkillSetScope<
@@ -60,12 +53,15 @@ export function withSkillSetScope<
   },
 >(Component: ComponentType<Props>) {
   return memo(function SkillSetComposer(props: Props) {
-    return createElement(SkillSetScope, {
-      environmentId: props.environmentId,
-      threadId: props.activeThreadId,
-      draftId: props.draftId,
-      children: createElement(Component, props),
-    });
+    return (
+      <SkillSetScope
+        environmentId={props.environmentId}
+        threadId={props.activeThreadId}
+        draftId={props.draftId}
+      >
+        <Component {...props} />
+      </SkillSetScope>
+    );
   });
 }
 
