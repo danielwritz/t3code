@@ -19,6 +19,8 @@ import { resolveLinuxDesktopEntryName } from "./DesktopEarlyElectronStartup.ts";
 import { resolveDesktopBaseDir, resolveDesktopStateDir } from "./DesktopStatePaths.ts";
 import { isNightlyDesktopVersion } from "../updates/updateChannels.ts";
 import type { OtlpProtocol } from "@t3tools/shared/observability";
+// personal:skill-sets seam personal saved environments file import
+import { personalConnectionFileName } from "../personal/connectionFiles.ts";
 
 export interface MakeDesktopEnvironmentInput {
   readonly dirname: string;
@@ -203,7 +205,11 @@ const make = Effect.fn("desktop.environment.make")(function* (
     stateDir,
     desktopSettingsPath: path.join(stateDir, "desktop-settings.json"),
     clientSettingsPath: path.join(stateDir, "client-settings.json"),
-    savedEnvironmentRegistryPath: path.join(stateDir, "saved-environments.json"),
+    // personal:skill-sets seam personal saved environments file name
+    savedEnvironmentRegistryPath: path.join(
+      stateDir,
+      personalConnectionFileName("saved-environments.json"),
+    ),
     serverSettingsPath: path.join(stateDir, "settings.json"),
     logDir: path.join(stateDir, "logs"),
     browserArtifactsDir: path.join(stateDir, "browser-artifacts"),

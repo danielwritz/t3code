@@ -1088,5 +1088,25 @@
     "file": "apps/desktop/src/app/DesktopStartupRecovery.ts",
     "marker": "personal:skill-sets seam newer data recovery headline",
     "connects": "newer data recovery headline"
+  },
+  {
+    "file": "apps/desktop/src/app/DesktopConnectionCatalogStore.ts",
+    "marker": "personal:skill-sets seam personal connection catalog file import",
+    "connects": "imports the personal connection file name helper"
+  },
+  {
+    "file": "apps/desktop/src/app/DesktopConnectionCatalogStore.ts",
+    "marker": "personal:skill-sets seam personal connection catalog file name",
+    "connects": "keeps the personal app off the other app's encrypted connection catalog"
+  },
+  {
+    "file": "apps/desktop/src/app/DesktopEnvironment.ts",
+    "marker": "personal:skill-sets seam personal saved environments file import",
+    "connects": "imports the personal connection file name helper"
+  },
+  {
+    "file": "apps/desktop/src/app/DesktopEnvironment.ts",
+    "marker": "personal:skill-sets seam personal saved environments file name",
+    "connects": "keeps the personal app off the other app's encrypted saved environments"
   }
 ]
