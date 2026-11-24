@@ -6,9 +6,7 @@ import * as NodePath from "node:path";
 import type { AgentProfileProvider } from "@t3tools/contracts";
 import { readMachineInventory } from "./inventory.ts";
 import {
-  MACHINE_POLICY_HOOKS_OFF_ENV,
   machinePolicyHookId,
-  machinePolicyHooksEnvironment,
   profileItems,
   profileView,
   readProfileFolder,
@@ -230,22 +228,6 @@ describe("agent profile model", () => {
     );
     expect(empty.codex.hooksFile).toBeNull();
     expect(empty.antigravity.machinePolicyHooksOff).toEqual([]);
-    expect(MACHINE_POLICY_HOOKS_OFF_ENV).toBe("T3_PROFILE_HOOKS_OFF");
-    expect(machinePolicyHooksEnvironment(empty.codex)).toEqual({
-      [MACHINE_POLICY_HOOKS_OFF_ENV]: "machine-guard",
-    });
-    expect(
-      machinePolicyHooksEnvironment({
-        machinePolicyHooksOff: [
-          ...empty.codex.machinePolicyHooksOff,
-          ...empty.claude.machinePolicyHooksOff,
-          ...empty.codex.machinePolicyHooksOff,
-        ],
-      }),
-    ).toEqual({ [MACHINE_POLICY_HOOKS_OFF_ENV]: "machine-guard,policy" });
-    expect(machinePolicyHooksEnvironment(empty.antigravity)).toEqual({
-      [MACHINE_POLICY_HOOKS_OFF_ENV]: "",
-    });
     const on = await resolveAll(
       root,
       { disabledSkills: [], enabledItems: ["policy:codex:hook:policy:hooks.json:PreToolUse:0"] },
@@ -254,9 +236,6 @@ describe("agent profile model", () => {
     expect(on.codex.machinePolicyHooksOff).toEqual([]);
     expect(on.codex.hooksFile).toBeNull();
     expect(on.codex.contentHash).not.toBe(empty.codex.contentHash);
-    expect(machinePolicyHooksEnvironment(on.codex)).toEqual({
-      [MACHINE_POLICY_HOOKS_OFF_ENV]: "",
-    });
   });
 
   it("names a machine-policy hook by the file name of the script its command runs", () => {

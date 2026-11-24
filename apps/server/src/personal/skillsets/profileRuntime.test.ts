@@ -118,6 +118,25 @@ it.effect(
         expect(created.items.map((item) => item.id)).toEqual(["ref:claude:instructions:CLAUDE.md"]);
         const own = yield* SkillSets.resolveAgentProfile("claudeAgent", { skillSetId: "mine" });
         expect(own?.instructions?.text).toBe("fake user rules");
+        const blank = yield* SkillSets.openHookSwitchSession(own!);
+        expect(blank.env).toEqual({ T3_PROFILE_HOOKS_TOKEN: "" });
+        const session = yield* SkillSets.openHookSwitchSession({
+          machinePolicyHooksOff: [
+            {
+              id: "x",
+              file: "x",
+              event: "PreToolUse",
+              commands: [],
+              guardId: "outside-post-guard",
+            },
+          ],
+        });
+        const switchFile = config.stateDir + "/skill-sets/hook-switches.json";
+        expect(Object.values(JSON.parse(yield* fs.readFileString(switchFile)))).toMatchObject([
+          { off: ["outside-post-guard"], pid: null },
+        ]);
+        yield* Effect.promise(() => session.close());
+        expect(JSON.parse(yield* fs.readFileString(switchFile))).toEqual({});
         const refused = yield* handlers["agentProfiles.setIgnoreProject"]({
           profileId: "absent",
           ignore: true,

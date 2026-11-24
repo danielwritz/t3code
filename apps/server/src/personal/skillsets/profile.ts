@@ -274,7 +274,7 @@ export interface ResolvedAgentProfile {
   readonly hooksFile: Record<string, unknown> | null;
   /**
    * Machine-policy hooks of this provider that the profile has switched off. The machine still
-   * runs them; pass `machinePolicyHooksEnvironment` to the process so their guards stand down.
+   * runs them; `openHookSwitchSession` (runtime.ts) tells their guards to stand down.
    */
   readonly machinePolicyHooksOff: readonly MachinePolicyHookOff[];
   /** Profile MCP servers by name, with `env` values from references (build time only). */
@@ -399,20 +399,4 @@ export function machinePolicyHookId(commands: readonly string[]): string {
   // Skip switches: `-File`, `--flag`, and short Windows ones such as `/c`.
   const script = rest.find((token) => !token.startsWith("-") && !/^\/\w{1,2}$/.test(token));
   return script === undefined ? scriptName(first) : scriptName(script);
-}
-
-/** Environment variable the guard scripts read (lead decision 14, guard slice contract). */
-export const MACHINE_POLICY_HOOKS_OFF_ENV = "T3_PROFILE_HOOKS_OFF";
-/**
- * Process environment for a provider started with this profile: the guard ids of the
- * machine-policy hooks switched off, comma-separated. Always set, empty when nothing is off
- * ("check as usual"), so an inherited value never leaks into a profile session.
- */
-export function machinePolicyHooksEnvironment(
-  profile: Pick<ResolvedAgentProfile, "machinePolicyHooksOff">,
-): Record<typeof MACHINE_POLICY_HOOKS_OFF_ENV, string> {
-  const ids = [...new Set(profile.machinePolicyHooksOff.map((hook) => hook.guardId))].filter((id) =>
-    /^[\w.-]+$/.test(id),
-  );
-  return { [MACHINE_POLICY_HOOKS_OFF_ENV]: ids.join(",") };
 }

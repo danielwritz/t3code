@@ -15,6 +15,12 @@ import type { ResolvedAgentProfile } from "./profile.ts";
 import { makeAgentProfileService, type AgentProfileService } from "./profileService.ts";
 import { ThreadProfileOptions, threadOptionsPath } from "./profileState.ts";
 import {
+  HOOK_SWITCH_TOKEN_ENV,
+  HookSwitchStore,
+  hookSwitchesPath,
+  type HookSwitchSession,
+} from "./hookSwitches.ts";
+import {
   resolveHome,
   resolveProfile,
   type SkillSetInstance,
@@ -40,6 +46,7 @@ export class SkillSets extends Context.Service<
     ) => Effect.Effect<ResolvedAgentProfile | undefined>;
     readonly profiles?: AgentProfileService;
     readonly inventory?: () => ReturnType<typeof readMachineInventory>;
+    readonly hookSwitches?: HookSwitchStore;
   }
 >()("t3/personal/skillsets/runtime/SkillSets") {}
 
@@ -55,6 +62,10 @@ const make = Effect.gen(function* () {
   );
   const inventory = () => readMachineInventory(inventoryPaths);
   const threadOptions = new ThreadProfileOptions(threadOptionsPath(config.settingsPath));
+  const hookSwitches = new HookSwitchStore(hookSwitchesPath(config.settingsPath));
+  yield* Effect.promise(() => hookSwitches.pruneStale()).pipe(
+    Effect.catchCause((cause) => Effect.logWarning("Could not prune hook switches", cause)),
+  );
   const runPromise = Effect.runPromiseWith(yield* Effect.context<never>());
   const profiles = makeAgentProfileService({
     stateDir: config.stateDir,
@@ -150,6 +161,7 @@ const make = Effect.gen(function* () {
     }),
     profiles,
     inventory,
+    hookSwitches,
   });
 });
 export const layer = Layer.effect(SkillSets, make);
@@ -161,6 +173,24 @@ export const resolveSkillSetHome = Effect.fn("resolveSkillSetHome")(function* (
   return yield* (yield* SkillSets).resolveHome(driver, instance, thread);
 });
 /** The thread's agent profile for one driver: what each provider builder applies. */
+/**
+ * Starts the machine-policy hook switch for one provider session (lead decision 19). Merge `env`
+ * into the provider process environment, call `setPid` once the process runs, and `close` when the
+ * session ends. With nothing switched off, the token variable is blank and no entry is written.
+ */
+export const openHookSwitchSession = Effect.fn("openHookSwitchSession")(function* (
+  profile: Pick<ResolvedAgentProfile, "machinePolicyHooksOff">,
+  pid?: number,
+) {
+  const store = (yield* SkillSets).hookSwitches;
+  if (!store)
+    return {
+      env: { [HOOK_SWITCH_TOKEN_ENV]: "" },
+      setPid: async () => {},
+      close: async () => {},
+    } satisfies HookSwitchSession;
+  return yield* Effect.promise(() => store.open(profile, pid));
+});
 export const resolveAgentProfile = Effect.fn("resolveAgentProfile")(function* (
   driver: string,
   thread: SkillSetThread,
