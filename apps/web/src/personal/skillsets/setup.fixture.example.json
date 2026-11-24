@@ -1,0 +1,136 @@
+{
+  "builtAt": "2026-01-01T00:00:00.000Z",
+  "providers": [],
+  "providerInstances": {},
+  "projects": [
+    {
+      "id": "project-example",
+      "title": "example-project",
+      "projectIcon": { "kind": "lucide", "name": "folder", "color": "blue" }
+    }
+  ],
+  "clientSettings": {},
+  "thread": {
+    "title": "Try the skill set picker",
+    "otherTitles": ["Write release notes", "Fix the flaky test"],
+    "turns": [
+      [
+        "Which skill sets can this thread use?",
+        "Three skill sets are registered: Alpha, Beta and Gamma. Pick one from the model picker."
+      ],
+      ["Switch this thread to Beta.", "Three skill sets are registered and Beta is now active."]
+    ]
+  },
+  "skillSets": [
+    {
+      "id": "alpha",
+      "name": "Alpha",
+      "tagline": "Everyday skills kept in a local folder",
+      "logo": { "kind": "monogram", "text": "A", "color": "blue" },
+      "repo": {
+        "state": "local",
+        "label": "~/skills/alpha",
+        "path": "~/skills/alpha",
+        "proposed": "github.com/example/alpha-skills"
+      },
+      "isDefault": true,
+      "skills": [
+        {
+          "name": "write-tests",
+          "description": "Write a failing test before changing code.",
+          "manualOnly": false,
+          "listingTokens": 42,
+          "installedFor": ["claudeAgent"],
+          "enabled": true
+        },
+        {
+          "name": "release-notes",
+          "description": "Draft release notes from merged changes.",
+          "manualOnly": true,
+          "listingTokens": 31,
+          "installedFor": ["claudeAgent"],
+          "enabled": true
+        },
+        {
+          "name": "tidy-imports",
+          "description": "Sort and group imports in changed files.",
+          "manualOnly": false,
+          "listingTokens": 27,
+          "installedFor": ["claudeAgent"],
+          "enabled": true
+        }
+      ],
+      "listingTokens": 100
+    },
+    {
+      "id": "beta",
+      "name": "Beta",
+      "tagline": "A shared set synced from a public repo",
+      "logo": { "kind": "monogram", "text": "B", "color": "emerald" },
+      "repo": {
+        "state": "synced",
+        "label": "github.com/example/beta-skills",
+        "path": "~/skills/beta",
+        "upstream": "github.com/example/beta-upstream",
+        "branch": "main",
+        "commit": "a1b2c3d",
+        "commitDate": "2026-01-01",
+        "version": "1.2.0"
+      },
+      "isDefault": false,
+      "skills": [
+        {
+          "name": "review-diff",
+          "description": "Review the current diff for bugs.",
+          "manualOnly": false,
+          "listingTokens": 38,
+          "installedFor": ["codex"],
+          "enabled": true
+        },
+        {
+          "name": "plan-feature",
+          "description": "Turn a request into a short plan.",
+          "manualOnly": true,
+          "listingTokens": 35,
+          "installedFor": ["codex"],
+          "enabled": true
+        }
+      ],
+      "listingTokens": 73
+    },
+    {
+      "id": "gamma",
+      "name": "Gamma",
+      "tagline": "A small set for writing docs",
+      "logo": { "kind": "monogram", "text": "G", "color": "amber" },
+      "repo": {
+        "state": "synced",
+        "label": "github.com/example/gamma-skills",
+        "path": "~/skills/gamma",
+        "branch": "main",
+        "commit": "e4f5a6b",
+        "commitDate": "2026-01-02"
+      },
+      "isDefault": false,
+      "skills": [
+        {
+          "name": "doc-outline",
+          "description": "Outline a document before writing it.",
+          "manualOnly": false,
+          "listingTokens": 29,
+          "installedFor": ["claudeAgent"],
+          "enabled": true
+        },
+        {
+          "name": "plain-words",
+          "description": "Rewrite text in short, plain sentences.",
+          "manualOnly": false,
+          "listingTokens": 33,
+          "installedFor": ["claudeAgent"],
+          "enabled": true
+        }
+      ],
+      "listingTokens": 62
+    }
+  ]
+}

@@ -62,7 +62,10 @@ const AT = DateTime.makeUnsafe("2026-03-17T19:12:28.000Z");
 
 const descriptor = {
   environmentId: ENVIRONMENT_ID,
-  label: "Render scenarios",
+  // personal:skill-sets seam
+  label:
+    (globalThis as { __fakeEnvironmentLabel?: string }).__fakeEnvironmentLabel ??
+    "Render scenarios",
   platform: { os: "linux", arch: "x64" },
   // A matching version, since a mismatch adds an update banner a typical user never sees.
   serverVersion: APP_VERSION,
@@ -111,6 +114,7 @@ const decodeServerConfig = Schema.decodeUnknownSync(ServerConfig);
 const makeServerConfig = (
   providers: ReadonlyArray<unknown>,
   supportsIssues = false,
+  settings: unknown = {}, // personal:skill-sets seam
 ): ServerConfig => ({
   ...decodeServerConfig({
     environment: {
@@ -130,7 +134,7 @@ const makeServerConfig = (
       otlpTracesEnabled: false,
       otlpMetricsEnabled: false,
     },
-    settings: {},
+    settings, // personal:skill-sets seam
     threadSnapshotPagination: true,
     threadResumeCompletionMarker: true,
     shellResumeCompletionMarker: true,
@@ -238,6 +242,8 @@ export interface FakeThread {
   readonly olderSettled?: true;
   readonly id: ThreadId;
   readonly title: string;
+  /** Defaults to the first project. */
+  readonly projectId?: ProjectId; // personal:skill-sets seam
   /** Defaults to GPT-5.4 on Codex. */
   readonly modelSelection?: ModelSelection;
   /** The first is the thread's active provider thread. */
@@ -323,7 +329,7 @@ function shellOf(thread: FakeThread): OrchestrationV2ThreadShell {
   const modelSelection = thread.modelSelection ?? MODEL;
   return {
     id: thread.id,
-    projectId: PROJECT_ID,
+    projectId: thread.projectId ?? PROJECT_ID, // personal:skill-sets seam
     title: thread.title,
     providerInstanceId: modelSelection.instanceId,
     modelSelection,
@@ -608,7 +614,16 @@ export function installFakeEnvironment(
   options?: {
     readonly acceptCommands?: boolean;
     readonly keybindings?: ResolvedKeybindingsConfig;
-    readonly extraProjects?: ReadonlyArray<Pick<OrchestrationProjectShell, "id" | "title">>;
+    // personal:skill-sets seam
+    readonly extraProjects?: ReadonlyArray<
+      Pick<OrchestrationProjectShell, "id" | "title"> & Partial<OrchestrationProjectShell>
+    >;
+    // personal:skill-sets seam
+    /** Server settings, such as the provider instances a user added. */
+    readonly settings?: unknown;
+    // personal:skill-sets seam
+    /** Fields laid over the project every fixture thread belongs to. */
+    readonly project?: Partial<Omit<OrchestrationProjectShell, "id">>;
     /** Commands left unanswered even when accepting, until `rejectPendingCommand`. */
     readonly holdCommand?: (command: OrchestrationV2Command) => boolean;
     readonly providers?: ReadonlyArray<unknown>;
@@ -619,17 +634,18 @@ export function installFakeEnvironment(
     ...makeServerConfig(
       options?.providers ?? [CODEX_PROVIDER],
       fixtures.some((thread) => (thread.issues?.length ?? 0) > 0),
+      options?.settings ?? {}, // personal:skill-sets seam
     ),
     keybindings: options?.keybindings ?? DEFAULT_RESOLVED_KEYBINDINGS,
   };
   dispatched = [];
   acceptCommands = options?.acceptCommands === true;
   projects = [
-    project,
+    { ...project, ...options?.project }, // personal:skill-sets seam
     ...(options?.extraProjects ?? []).map((extra) => ({
       ...project,
-      ...extra,
       workspaceRoot: `/workspace/${extra.title}`,
+      ...extra, // personal:skill-sets seam: after workspaceRoot, so an extra project can set it
     })),
   ];
   holdCommand = options?.holdCommand ?? (() => false);

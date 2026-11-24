@@ -11,6 +11,8 @@ import { focusRequestedPermission, useComposerMenuProps } from "./composerEventS
 import { ComposerPrimaryActions } from "./ComposerPrimaryActions";
 import { resolveModelPickerSelectedModel } from "./ModelPickerContent";
 import { ProviderModelPicker } from "./ProviderModelPicker";
+// personal:skill-sets seam
+import { SkillSetComposerChip } from "~/personal/skillsets/SkillSetPickers";
 import { resolveRuntimeModeOption, runtimeModeConfig } from "./runtimeModeConfig";
 import { useComposerMenuState } from "./useComposerMenuState";
 
@@ -320,20 +322,24 @@ export function ComposerModelPicker({
     }
   };
   return (
-    <ProviderModelPicker
-      {...pickerProps}
-      {...(multipleModelsEnabled
-        ? {
-            ...(multipleModelSelections !== null
-              ? { selectedModels: multipleModelSelections }
-              : {}),
-            onToggleModel: toggleModel,
-          }
-        : {})}
-      onInstanceModelChange={(instanceId, model) => {
-        onMultipleModelSelectionsChange(null);
-        onProviderModelSelect(instanceId, model);
-      }}
-    />
+    <>
+      {/* personal:skill-sets seam: the fragment and the chip before the model picker */}
+      <SkillSetComposerChip />
+      <ProviderModelPicker
+        {...pickerProps}
+        {...(multipleModelsEnabled
+          ? {
+              ...(multipleModelSelections !== null
+                ? { selectedModels: multipleModelSelections }
+                : {}),
+              onToggleModel: toggleModel,
+            }
+          : {})}
+        onInstanceModelChange={(instanceId, model) => {
+          onMultipleModelSelectionsChange(null);
+          onProviderModelSelect(instanceId, model);
+        }}
+      />
+    </>
   );
 }

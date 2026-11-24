@@ -28,6 +28,8 @@ export type SettingsPath =
   | "/settings/keybindings"
   | "/settings/snap-shot"
   | "/settings/providers"
+  // personal:skill-sets seam
+  | "/settings/skill-sets"
   | "/settings/threads"
   | "/settings/browser"
   | "/settings/devices"
@@ -106,6 +108,7 @@ export const SETTINGS_SECTION_LABELS: Readonly<Record<SettingsPath, string>> = {
   "/settings/keybindings": msg("Keybindings"),
   "/settings/snap-shot": msg("SnapShots"),
   "/settings/providers": msg("Providers"),
+  "/settings/skill-sets": msg("Skill sets"), // personal:skill-sets seam
   "/settings/threads": msg("Threads"),
   "/settings/browser": msg("Browser"),
   "/settings/devices": msg("Devices"),
@@ -156,6 +159,7 @@ const ALL_SETTINGS_NAV_GROUPS: ReadonlyArray<SettingsNavGroup> = [
     heading: msg("Agents"),
     paths: [
       "/settings/providers",
+      "/settings/skill-sets", // personal:skill-sets seam
       "/settings/threads",
       "/settings/browser",
       "/settings/devices",
@@ -1527,6 +1531,7 @@ const SETTINGS_CATEGORY_SCOPES: Readonly<Record<SettingsPath, SettingsSearchScop
   "/settings/snap-shot": null,
   "/settings/keybindings": null,
   "/settings/providers": null,
+  "/settings/skill-sets": null, // personal:skill-sets seam
   "/settings/threads": null,
   "/settings/browser": null,
   "/settings/devices": null,

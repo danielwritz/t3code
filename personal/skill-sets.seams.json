@@ -1,0 +1,122 @@
+[
+  {
+    "file": "apps/web/src/components/chat/ProviderModelPicker.tsx",
+    "marker": "personal:skill-sets seam",
+    "connects": "imports the skill set tabs and rail from personal/skillsets"
+  },
+  {
+    "file": "apps/web/src/components/chat/ProviderModelPicker.tsx",
+    "marker": "personal:skill-sets seam",
+    "connects": "renders the skill set tabs above the docked model picker"
+  },
+  {
+    "file": "apps/web/src/components/chat/ProviderModelPicker.tsx",
+    "marker": "personal:skill-sets seam",
+    "connects": "renders the skill set rail left of the provider rail"
+  },
+  {
+    "file": "apps/web/src/components/chat/ComposerFooterControls.tsx",
+    "marker": "personal:skill-sets seam",
+    "connects": "imports the skill set composer chip from personal/skillsets"
+  },
+  {
+    "file": "apps/web/src/components/chat/ComposerFooterControls.tsx",
+    "marker": "personal:skill-sets seam",
+    "connects": "wraps the model picker in a fragment and renders the composer chip before it"
+  },
+  {
+    "file": "apps/web/src/components/settings/SettingsSidebarNav.tsx",
+    "marker": "personal:skill-sets seam",
+    "connects": "imports the BlocksIcon used for the Skill sets entry"
+  },
+  {
+    "file": "apps/web/src/components/settings/SettingsSidebarNav.tsx",
+    "marker": "personal:skill-sets seam",
+    "connects": "gives /settings/skill-sets its sidebar icon"
+  },
+  {
+    "file": "apps/web/src/components/settings/settingsSearch.ts",
+    "marker": "personal:skill-sets seam",
+    "connects": "adds /settings/skill-sets to the SettingsPath union"
+  },
+  {
+    "file": "apps/web/src/components/settings/settingsSearch.ts",
+    "marker": "personal:skill-sets seam",
+    "connects": "gives /settings/skill-sets its translated section label"
+  },
+  {
+    "file": "apps/web/src/components/settings/settingsSearch.ts",
+    "marker": "personal:skill-sets seam",
+    "connects": "lists /settings/skill-sets in the Agents nav group after Providers"
+  },
+  {
+    "file": "apps/web/src/components/settings/settingsSearch.ts",
+    "marker": "personal:skill-sets seam",
+    "connects": "gives /settings/skill-sets no search scope in SETTINGS_CATEGORY_SCOPES"
+  },
+  {
+    "file": "apps/web/src/routes/_chat.settings.skill-sets.tsx",
+    "marker": "personal:skill-sets seam",
+    "connects": "new route file that mounts SkillSetsSettings from personal/skillsets"
+  },
+  {
+    "file": "apps/web/src/routeTree.gen.ts",
+    "generated": true,
+    "connects": "TanStack Router regenerates it with the /settings/skill-sets route"
+  },
+  {
+    "file": "apps/web/test/fakeEnvironment.ts",
+    "marker": "personal:skill-sets seam",
+    "connects": "environment label can be set through globalThis.__fakeEnvironmentLabel"
+  },
+  {
+    "file": "apps/web/test/fakeEnvironment.ts",
+    "marker": "personal:skill-sets seam",
+    "connects": "makeServerConfig takes a settings argument"
+  },
+  {
+    "file": "apps/web/test/fakeEnvironment.ts",
+    "marker": "personal:skill-sets seam",
+    "connects": "makeServerConfig passes the settings argument into the server config"
+  },
+  {
+    "file": "apps/web/test/fakeEnvironment.ts",
+    "marker": "personal:skill-sets seam",
+    "connects": "FakeThread takes an optional projectId"
+  },
+  {
+    "file": "apps/web/test/fakeEnvironment.ts",
+    "marker": "personal:skill-sets seam",
+    "connects": "a thread shell uses its own projectId before the default project"
+  },
+  {
+    "file": "apps/web/test/fakeEnvironment.ts",
+    "marker": "personal:skill-sets seam",
+    "connects": "extraProjects accept any project shell fields, such as projectIcon"
+  },
+  {
+    "file": "apps/web/test/fakeEnvironment.ts",
+    "marker": "personal:skill-sets seam",
+    "connects": "installFakeEnvironment takes a settings option"
+  },
+  {
+    "file": "apps/web/test/fakeEnvironment.ts",
+    "marker": "personal:skill-sets seam",
+    "connects": "installFakeEnvironment takes a project option laid over the default project"
+  },
+  {
+    "file": "apps/web/test/fakeEnvironment.ts",
+    "marker": "personal:skill-sets seam",
+    "connects": "installFakeEnvironment passes the settings option to makeServerConfig"
+  },
+  {
+    "file": "apps/web/test/fakeEnvironment.ts",
+    "marker": "personal:skill-sets seam",
+    "connects": "the default project takes the fields of the project option"
+  },
+  {
+    "file": "apps/web/test/fakeEnvironment.ts",
+    "marker": "personal:skill-sets seam",
+    "connects": "an extra project spreads after workspaceRoot, so it can set workspaceRoot"
+  }
+]
