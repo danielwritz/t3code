@@ -1,3 +1,5 @@
+// personal:skill-sets seam claude integration import
+import { makeClaudeSkillSets } from "../../personal/skillsets/claude.ts";
 import * as DocumentText from "../../provider/DocumentText.ts";
 import {
   compactDynamicToolOutput,
@@ -182,7 +184,6 @@ import {
   claudeLaunchArgParseOptions,
   claudeLaunchArgPluginDirectories,
   customClaudeApiEndpointHost,
-  discoverClaudeSkills,
   readClaudeSettingsEnv,
 } from "../../provider/Drivers/ClaudeSkills.ts";
 import {
@@ -5963,6 +5964,12 @@ export const makeClaudeAdapterV2 = Effect.fn("makeClaudeAdapterV2")(function* (
     adapterOptions.settings,
     adapterOptions.environment,
   ).pipe(Effect.provideService(Path.Path, path));
+  // personal:skill-sets seam claude integration
+  const skillSets = yield* makeClaudeSkillSets(
+    adapterOptions.instanceId,
+    adapterOptions.settings,
+    adapterOptions.environment,
+  ).pipe(Effect.provideService(Path.Path, path));
   const hostEnvironment = yield* HostProcess.Environment;
   const hostPlatform = yield* HostProcess.Platform;
   const customHome =
@@ -6155,12 +6162,12 @@ export const makeClaudeAdapterV2 = Effect.fn("makeClaudeAdapterV2")(function* (
     return "";
   });
 
-  const userInvocableSkills = (cwd: string | null) =>
-    discoverClaudeSkills(
-      adapterOptions.settings,
-      cwd ?? undefined,
-      adapterOptions.environment,
-    ).pipe(
+  // personal:skill-sets seam claude slash inventory
+  const userInvocableSkills = (
+    cwd: string | null,
+    thread: Parameters<typeof skillSets.discover>[1],
+  ) =>
+    skillSets.discover(cwd ?? undefined, thread).pipe(
       Effect.map(
         (skills) =>
           new Map(
@@ -13412,10 +13419,15 @@ export const makeClaudeAdapterV2 = Effect.fn("makeClaudeAdapterV2")(function* (
               ? {}
               : { allowedTools: queryPolicy.allowedTools }),
           });
-          const queryPolicyKey = claudeEffectiveQueryPolicyKey(
+          const baseQueryPolicyKey = claudeEffectiveQueryPolicyKey(
             queryPolicy,
             mcpOverrides,
             turnInput.runtimePolicy.workspace,
+          );
+          // personal:skill-sets seam claude process identity
+          const queryPolicyKey = yield* skillSets.queryPolicyKey(
+            baseQueryPolicyKey,
+            turnInput.appThread,
           );
           const resumeSessionAt = yield* getNativeConversationHeadId(turnInput.providerThread);
           const existing = yield* Ref.get(queryContext);
@@ -13586,6 +13598,11 @@ export const makeClaudeAdapterV2 = Effect.fn("makeClaudeAdapterV2")(function* (
             turnInput.nativeThreadHasTurns ?? turnInput.providerTurnOrdinal > 1;
           const shouldResume =
             resumeSessionAt !== undefined || openedWithResume || hasPersistedProviderTurn;
+          // personal:skill-sets seam claude turn home
+          const skillSetEnvironment = yield* skillSets.queryEnvironment(
+            adapterOptions.environment,
+            turnInput.appThread,
+          );
           const queryOptions = makeClaudeQueryOptions({
             agentFeedback: turnInput.agentFeedback ?? "off",
             modelSelection: turnInput.modelSelection,
@@ -13603,11 +13620,14 @@ export const makeClaudeAdapterV2 = Effect.fn("makeClaudeAdapterV2")(function* (
             // Delegated threads have no one typing, so they never ask for suggestions.
             promptSuggestions:
               !isDelegatedAppThread(turnInput.appThread) && (yield* promptSuggestionsEnabled),
-            ...(launchArgSettings === undefined
-              ? {}
-              : { sdkSettings: claudeSdkLaunchArgSettings(launchArgSettings) }),
+            // personal:skill-sets seam claude invocation skills
+            ...skillSets.querySettingsInput(
+              skillSetEnvironment,
+              launchArgSettings,
+              claudeSdkLaunchArgSettings,
+            ),
             environment: claudeQueryEnvironment(
-              adapterOptions.environment,
+              skillSetEnvironment,
               turnInput.appThread,
               turnInput.appThread.lineage.relationshipToParent === "subagent"
                 ? yield* resolveSubagentPromptCacheTtl(turnInput.runtimePolicy.cwd)
@@ -13927,7 +13947,8 @@ export const makeClaudeAdapterV2 = Effect.fn("makeClaudeAdapterV2")(function* (
               [
                 promptUuid === null
                   ? Effect.undefined
-                  : userInvocableSkills(turnInput.runtimePolicy.cwd),
+                  : // personal:skill-sets seam claude slash pick
+                    userInvocableSkills(turnInput.runtimePolicy.cwd, turnInput.appThread),
                 queryPolicyForTurn(turnInput),
               ],
               { concurrency: "unbounded" },
@@ -14532,7 +14553,11 @@ export const makeClaudeAdapterV2 = Effect.fn("makeClaudeAdapterV2")(function* (
               attachmentsDir,
               fileSystem,
               pdfReservation,
-              skills: yield* userInvocableSkills(currentTurn.input.runtimePolicy.cwd),
+              // personal:skill-sets seam claude dispatch pick
+              skills: yield* userInvocableSkills(
+                currentTurn.input.runtimePolicy.cwd,
+                currentTurn.input.appThread,
+              ),
             }).pipe(
               Effect.provideService(ChildProcessSpawner.ChildProcessSpawner, spawner),
               Effect.provideService(Path.Path, path),

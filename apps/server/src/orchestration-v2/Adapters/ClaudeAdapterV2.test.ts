@@ -1,3 +1,4 @@
+import * as SkillSets from "../../personal/skillsets/runtime.ts";
 // @effect-diagnostics nodeBuiltinImport:off -- workflow fixtures use files and the fake Claude CLI uses Node streams
 import * as NodeEvents from "node:events";
 import * as NodeFS from "node:fs";
@@ -1563,6 +1564,57 @@ describe("ClaudeAdapterV2 append-system-prompt-file launch argument", () => {
       .pipe(Effect.exit);
     return { exit, opened };
   });
+
+  it.effect.each(["off", "failure", "selected"] as const)(
+    "keeps turns working with skill sets %s",
+    (mode) =>
+      Effect.gen(function* () {
+        const fs = yield* FileSystem.FileSystem;
+        const cwd = yield* fs.makeTempDirectoryScoped({ prefix: "claude-set-adapter-" });
+        const { exit, opened } = yield* startTurnWithLaunchArgs(
+          '--settings \'{"env":{"PRESERVE_SKILL_TEST":"yes"},"syncClaudeAiPlugins":false}\'',
+          cwd,
+        ).pipe(
+          Effect.provideService(HostProcess.HomeDirectory, cwd),
+          Effect.provideService(SkillSets.SkillSets, {
+            resolveHome: () =>
+              mode === "failure"
+                ? Effect.die("resolver unavailable")
+                : mode === "off"
+                  ? Effect.undefined
+                  : Effect.succeed({ homePath: cwd, skillsDir: cwd, skills: [] }),
+            statuses: Effect.succeed([]),
+            syncNow: () => Effect.succeed([]),
+            changes: Stream.empty,
+          }),
+        );
+        assert.isTrue(Exit.isSuccess(exit));
+        assert.deepInclude(opened[0]?.settings, {
+          env: { PRESERVE_SKILL_TEST: "yes" },
+          syncClaudeAiPlugins: false,
+        });
+        if (mode === "selected")
+          assert.deepInclude(opened[0]?.settings, { syncClaudeAiSkills: false });
+        else
+          assert.isUndefined(
+            typeof opened[0]?.settings === "object"
+              ? opened[0]?.settings?.syncClaudeAiSkills
+              : undefined,
+          );
+        if (mode === "selected") assert.equal(opened[0]?.env?.CLAUDE_CONFIG_DIR, cwd);
+        else assert.deepEqual(opened[0]?.env, {});
+      }).pipe(
+        Effect.provide(
+          Layer.mergeAll(
+            IdAllocator.layer,
+            McpProviderSessions.layer,
+            NodeServices.layer,
+            NodeCrypto.layer,
+          ),
+        ),
+        Effect.scoped,
+      ),
+  );
 
   const appendSystemPrompt = (options: ClaudeAdapterV2.ClaudeAgentSdkQueryOptions | undefined) =>
     (options?.systemPrompt as { readonly append?: string } | undefined)?.append;
@@ -4133,6 +4185,65 @@ describe("ClaudeAdapterV2 background wake turns", () => {
     });
   const makeWakeHarness = makeWakeHarnessWithOptions();
 
+  it.effect("reopens the Claude process on the next message after the picked set changes", () =>
+    Effect.gen(function* () {
+      const fs = yield* FileSystem.FileSystem;
+      const path = yield* Path.Path;
+      const root = yield* fs.makeTempDirectoryScoped({ prefix: "claude-repick-" });
+      for (const name of ["alpha", "beta"]) yield* fs.makeDirectory(path.join(root, name));
+      const harness = yield* makeWakeHarnessWithOptions({ freshQueueOnReopen: true }).pipe(
+        Effect.provideService(HostProcess.HomeDirectory, root),
+        Effect.provideService(SkillSets.SkillSets, {
+          resolveHome: (_driver, _instance, thread) =>
+            Effect.succeed({
+              homePath: path.join(root, thread.skillSetId ?? "alpha"),
+              skillsDir: root,
+              skills: [],
+            }),
+          statuses: Effect.succeed([]),
+          syncNow: () => Effect.succeed([]),
+          changes: Stream.empty,
+        }),
+      );
+      for (const [index, skillSetId] of ["alpha", "alpha", "beta"].entries()) {
+        const input = makeClaudeTestTurnInput({
+          threadId: harness.threadId,
+          providerThread: harness.providerThread,
+          now: yield* DateTime.now,
+          attemptId: RunAttemptId.make(`repick-${index}`),
+          providerTurnOrdinal: index + 1,
+          text: "Continue.",
+          attachments: [],
+        });
+        yield* harness.runtime.startTurn({
+          ...input,
+          appThread: { ...input.appThread, skillSetId },
+        });
+        assert.equal(harness.processQueues.length, index < 2 ? 1 : 2);
+        assert.equal(
+          harness.getOpenedOptions()?.env?.CLAUDE_CONFIG_DIR,
+          path.join(root, skillSetId),
+        );
+        assert.deepInclude(harness.getOpenedOptions()?.settings, { syncClaudeAiSkills: false });
+        if (index === 2) assert.equal(harness.getOpenedOptions()?.resume, WAKE_NATIVE_SESSION);
+        yield* harness.offerAndWait(
+          makeResultFrame({ uuid: `repick-result-${index}`, result: "Done." }),
+        );
+        yield* Queue.take(harness.terminalReceipts);
+      }
+    }).pipe(
+      Effect.provide(
+        Layer.mergeAll(
+          IdAllocator.layer,
+          McpProviderSessions.layer,
+          NodeServices.layer,
+          NodeCrypto.layer,
+        ),
+      ),
+      Effect.scoped,
+    ),
+  );
+
   describe("ClaudeAdapterV2 session title sync", () => {
     type TitleSyncHarness = Effect.Success<ReturnType<typeof makeWakeHarnessWithOptions>>;
     const startTurn = Effect.fnUntraced(function* (
@@ -5480,31 +5591,48 @@ describe("ClaudeAdapterV2 background wake turns", () => {
     );
 
     // regression: #21806 bypass policy reads the custom home and project, never ambient ~/.claude
-    it.effect(
-      "combines a normalized custom home with project policy without reading the ambient user tier",
-      () =>
+    it.effect.each([false, true])(
+      "preserves policy sources with a selected set and custom home %s",
+      (custom) =>
         Effect.gen(function* () {
           const fileSystem = yield* FileSystem.FileSystem;
           const path = yield* Path.Path;
           const home = yield* fileSystem.makeTempDirectoryScoped({
             prefix: "t3-claude-policy-home-",
           });
-          yield* fileSystem.makeDirectory(path.join(home, "profile"));
+          const realHome = path.join(home, custom ? "profile" : ".claude");
+          yield* fileSystem.makeDirectory(realHome);
+          const builtHome = path.join(home, "built");
+          yield* fileSystem.makeDirectory(builtHome);
           yield* fileSystem.writeFileString(
-            path.join(home, "profile", "settings.json"),
+            path.join(realHome, "settings.json"),
             `{
           // Claude accepts comments and trailing commas.
           "permissions": { "disableBypassPermissionsMode": "disable", },
         }`,
           );
           const resolveSettings = vi.mocked(ClaudeSdk.resolveSettings).mockResolvedValue({
-            effective: { disableAutoMode: "disable" },
+            effective: {
+              disableAutoMode: "disable",
+              permissions: { disableBypassPermissionsMode: "disable" },
+            },
             provenance: {},
             sources: [{ source: "project", settings: { disableAutoMode: "disable" } }],
           });
           const harness = yield* makeWakeHarnessWithOptions({
-            settings: { ...DEFAULT_CLAUDE_SETTINGS, homePath: " ~/profile " },
-          }).pipe(Effect.provideService(HostProcess.HomeDirectory, home));
+            settings: { ...DEFAULT_CLAUDE_SETTINGS, homePath: custom ? " ~/profile " : "" },
+          }).pipe(
+            Effect.provideService(HostProcess.HomeDirectory, home),
+            Effect.provideService(SkillSets.SkillSets, {
+              resolveHome: (_driver, instance) => {
+                assert.equal(instance.realHome, realHome);
+                return Effect.succeed({ homePath: builtHome, skillsDir: builtHome, skills: [] });
+              },
+              statuses: Effect.succeed([]),
+              syncNow: () => Effect.succeed([]),
+              changes: Stream.empty,
+            }),
+          );
           yield* harness.runtime.startTurn(
             makeClaudeTestTurnInput({
               threadId: harness.threadId,
@@ -5517,10 +5645,12 @@ describe("ClaudeAdapterV2 background wake turns", () => {
           );
           assert.equal(harness.getOpenedOptions()?.permissionMode, "default");
           assert.isUndefined(harness.getOpenedOptions()?.allowDangerouslySkipPermissions);
-          assert.deepEqual(resolveSettings.mock.calls[0]?.[0]?.settingSources, [
-            "project",
-            "local",
-          ]);
+          assert.deepEqual(
+            resolveSettings.mock.calls[0]?.[0]?.settingSources,
+            custom ? ["project", "local"] : ["user", "project", "local"],
+          );
+          assert.equal(harness.getOpenedOptions()?.env?.CLAUDE_CONFIG_DIR, builtHome);
+          assert.isUndefined(harness.getOpenedOptions()?.settingSources);
         }).pipe(
           Effect.provide(
             Layer.mergeAll(

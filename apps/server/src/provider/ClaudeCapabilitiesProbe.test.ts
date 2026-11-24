@@ -37,6 +37,18 @@ it("drops strict MCP mode, and only that, next to an administrator's managed-mcp
   assert.equal(options.strictMcpConfig, undefined);
   assert.deepEqual(options.mcpServers, {});
   assert.equal(options.env?.ENABLE_CLAUDEAI_MCP_SERVERS, "false");
+  assert.deepEqual(options.settings, { disableAllHooks: true });
+  const selected = buildClaudeCapabilitiesProbeQueryOptions({
+    executablePath: "/usr/bin/claude",
+    abortController: new AbortController(),
+    environment: { HOME: "/home/user" },
+    cwd: undefined,
+    managedMcpConfig: true,
+    spawnVia: undefined,
+    skillSetHome: true,
+  });
+  assert.deepEqual(selected.settings, { disableAllHooks: true, syncClaudeAiSkills: false });
+  assert.deepEqual(selected.settingSources, options.settingSources);
 });
 
 // A shell trampoline would not do: dash drops the exported function, and the launcher exits 127.

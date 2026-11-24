@@ -1,3 +1,5 @@
+// personal:skill-sets seam claude driver import
+import { makeClaudeSkillSets } from "../../personal/skillsets/claude.ts";
 import { ClaudeSettings, ProviderDriverKind } from "@t3tools/contracts";
 import * as Cache from "effect/Cache";
 import type * as Cause from "effect/Cause";
@@ -33,7 +35,6 @@ import {
   checkClaudeProviderStatus,
   makePendingClaudeProvider,
   probeClaudeCapabilities,
-  probeClaudeWorkspaceSnapshot,
   type ClaudeCapabilitiesProbe,
 } from "../ClaudeProvider.ts";
 import { makeManagedServerProvider } from "@t3tools/provider-core/server/managedProvider";
@@ -203,6 +204,8 @@ export const ClaudeDriver: ProviderDriver<ClaudeSettings, ClaudeDriverEnv, Path.
           }),
       ),
     );
+    // personal:skill-sets seam claude driver integration
+    const skillSets = yield* makeClaudeSkillSets(instanceId, effectiveConfig, processEnv);
     const textGeneration = yield* makeClaudeTextGeneration(
       effectiveConfig,
       processEnv,
@@ -430,11 +433,10 @@ export const ClaudeDriver: ProviderDriver<ClaudeSettings, ClaudeDriverEnv, Path.
       snapshot,
       invalidateCaches: Cache.invalidateAll(capabilitiesProbeCache),
       workspaceRescans: Stream.fromQueue(workspaceRescans),
-      snapshotForCwd: (cwd: string) =>
+      // personal:skill-sets seam claude thread menu
+      snapshotForCwd: (cwd, thread) =>
         snapshot.getSnapshot.pipe(
-          Effect.flatMap((machineSnapshot) =>
-            probeClaudeWorkspaceSnapshot(effectiveConfig, machineSnapshot, cwd, processEnv),
-          ),
+          Effect.flatMap((machineSnapshot) => skillSets.snapshot(machineSnapshot, cwd, thread)),
           Effect.provideService(FileSystem.FileSystem, fileSystem),
           Effect.provideService(Path.Path, path),
         ),

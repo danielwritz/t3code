@@ -62,10 +62,16 @@ it("falls back when off, unpicked, not ready or build fails, and omits disabled 
   expect(warnings).toHaveLength(1);
   const result = await resolveHome(deps, "codex", instance, {});
   expect(result?.skills.map((s) => s.name)).toEqual(["on"]);
+  if (!result) throw new Error("Expected selected home");
+  await NodeFSP.mkdir(NodePath.join(result.skillsDir, "synced"));
+  for (const _build of [1, 2]) {
+    expect((await resolveHome(deps, "codex", instance, {}))?.homePath).toBe(result.homePath);
+    expect(warnings.at(-1)).toContain("retained provider-created skill entries: synced");
+  }
   expect(
     await resolveHome(deps, "codex", { ...instance, realHome: NodePath.join(root, "missing") }, {}),
   ).toBeUndefined();
-  expect(warnings).toHaveLength(2);
+  expect(warnings).toHaveLength(4);
   const snapshot = {
     skills: [
       { name: "old", path: NodePath.join(home, "skills", "old"), enabled: true, scope: "user" },

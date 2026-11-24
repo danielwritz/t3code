@@ -57,7 +57,7 @@ function contains(parent: string, child: string) {
   );
 }
 /** Only mutates the managed output. Targets and the real home are always read-only. */
-export async function buildSkillSetHome(input: HomeInput): Promise<string> {
+export async function buildSkillSetHome(input: HomeInput) {
   const skillParts = input.skillsEntry.split(/[\\/]/);
   for (const part of skillParts) safeEntry(part);
   for (const skill of input.skills) safeEntry(skill.name);
@@ -107,15 +107,19 @@ export async function buildSkillSetHome(input: HomeInput): Promise<string> {
   if (existing?.isSymbolicLink()) await NodeFSP.rm(skillsDir);
   await NodeFSP.mkdir(skillsDir, { recursive: true });
   const enabled = new Set(input.skills.map((skill) => skill.name));
+  const foreignEntries: string[] = [];
   for (const entry of await NodeFSP.readdir(skillsDir)) {
+    const path = NodePath.join(skillsDir, entry);
+    if (!(await NodeFSP.lstat(path)).isSymbolicLink()) {
+      foreignEntries.push(entry);
+      continue;
+    }
     if (!enabled.has(entry)) {
-      const path = NodePath.join(skillsDir, entry);
-      if (!(await NodeFSP.lstat(path)).isSymbolicLink())
-        throw new Error(`Refusing to remove non-link: ${path}`);
       await NodeFSP.rm(path);
     }
   }
   for (const skill of input.skills)
-    await link(skill.targetPath, NodePath.join(skillsDir, skill.name));
-  return output;
+    if (!foreignEntries.includes(skill.name))
+      await link(skill.targetPath, NodePath.join(skillsDir, skill.name));
+  return { homePath: output, foreignEntries };
 }

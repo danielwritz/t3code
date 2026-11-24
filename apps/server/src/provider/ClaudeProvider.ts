@@ -1,3 +1,5 @@
+// personal:skill-sets seam claude probe settings import
+import { claudeSkillSetInvocationSettings } from "../personal/skillsets/claudeSettings.ts";
 // @effect-diagnostics-next-line nodeBuiltinImport:off -- the SDK's spawn hook returns a Node child process.
 import * as NodeChildProcess from "node:child_process";
 
@@ -275,6 +277,8 @@ export function buildClaudeCapabilitiesProbeQueryOptions(input: {
   readonly cwd: string | undefined;
   readonly managedMcpConfig: boolean;
   readonly spawnVia: "env" | "launcher-thread" | undefined;
+  // personal:skill-sets seam claude probe option
+  readonly skillSetHome?: boolean | undefined;
 }): ClaudeQueryOptions {
   return {
     ...(input.spawnVia === "env" ? { spawnClaudeCodeProcess: spawnClaudeProbeThroughEnv } : {}),
@@ -286,7 +290,8 @@ export function buildClaudeCapabilitiesProbeQueryOptions(input: {
     abortController: input.abortController,
     settingSources: [...CLAUDE_CAPABILITIES_PROBE_SETTING_SOURCES],
     // Keep settings for slash-command discovery, but disable hooks so health checks do not run SessionStart repeatedly.
-    settings: { disableAllHooks: true },
+    // personal:skill-sets seam claude probe settings
+    settings: claudeSkillSetInvocationSettings({ disableAllHooks: true }, input.skillSetHome),
     allowedTools: [],
     // Exclude filesystem MCP servers; omit strict mode when managed-mcp.json already excludes them and forbids the flag.
     mcpServers: {},
@@ -491,6 +496,8 @@ const probeClaudeCapabilities = (
   environment?: NodeJS.ProcessEnv,
   cwd?: string,
   includeStatus = true,
+  // personal:skill-sets seam claude probe input
+  skillSetHome?: boolean,
 ) => {
   const abort = new AbortController();
   const abortProbe = Effect.sync(() => {
@@ -531,6 +538,8 @@ const probeClaudeCapabilities = (
             cwd,
             managedMcpConfig,
             spawnVia,
+            // personal:skill-sets seam claude probe forwarding
+            skillSetHome,
           }),
         });
         const init = await q.initializationResult();
@@ -642,6 +651,8 @@ export const probeClaudeWorkspaceSnapshot = Effect.fn("probeClaudeWorkspaceSnaps
   machineSnapshot: ServerProvider,
   cwd: string,
   environment?: NodeJS.ProcessEnv,
+  // personal:skill-sets seam claude snapshot input
+  skillSetHome?: boolean,
 ): Effect.fn.Return<ProviderWorkspaceSnapshot, never, FileSystem.FileSystem | Path.Path> {
   if (!claudeSettings.enabled) return machineSnapshot;
   const skills = yield* discoverClaudeSkills(claudeSettings, cwd, environment);
@@ -649,7 +660,10 @@ export const probeClaudeWorkspaceSnapshot = Effect.fn("probeClaudeWorkspaceSnaps
   // A deleted worktree can never answer the probe. Pending would make clients rescan it forever.
   const cwdExists = yield* fileSystem.exists(cwd).pipe(Effect.orElseSucceed(() => true));
   const probeResult = cwdExists
-    ? yield* probeClaudeCapabilities(claudeSettings, environment, cwd, false).pipe(Effect.result)
+    ? // personal:skill-sets seam claude snapshot probe
+      yield* probeClaudeCapabilities(claudeSettings, environment, cwd, false, skillSetHome).pipe(
+        Effect.result,
+      )
     : undefined;
   const capabilities =
     probeResult && Result.isSuccess(probeResult) ? probeResult.success : undefined;

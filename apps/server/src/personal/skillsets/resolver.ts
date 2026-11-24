@@ -33,7 +33,7 @@ interface ResolverDependencies {
   readonly statuses: readonly SkillSetStatus[];
   readonly warn: (message: string) => void;
 }
-const builds = new Map<string, Promise<string>>();
+const builds = new Map<string, ReturnType<typeof buildSkillSetHome>>();
 export async function resolveHome(
   deps: ResolverDependencies,
   driver: string,
@@ -61,18 +61,26 @@ export async function resolveHome(
   const outputPath = NodePath.join(deps.stateDir, "skill-sets", "homes", digest);
   try {
     // Serialize rebuilds of a shared home; each caller still sees new real-home entries.
-    const previous = builds.get(outputPath) ?? Promise.resolve("");
+    const previous = builds.get(outputPath) ?? Promise.resolve(undefined);
     const build = previous
-      .catch(() => "")
+      .catch(() => undefined)
       .then(() => buildSkillSetHome({ ...instance, outputPath, skills }));
     builds.set(outputPath, build);
-    let homePath: string;
+    let home: Awaited<ReturnType<typeof buildSkillSetHome>>;
     try {
-      homePath = await build;
+      home = await build;
     } finally {
       if (builds.get(outputPath) === build) builds.delete(outputPath);
     }
-    return { homePath, skillsDir: NodePath.join(homePath, instance.skillsEntry), skills };
+    if (home.foreignEntries.length)
+      deps.warn(
+        `Skill set ${id} retained provider-created skill entries: ${home.foreignEntries.join(", ")}`,
+      );
+    return {
+      homePath: home.homePath,
+      skillsDir: NodePath.join(home.homePath, instance.skillsEntry),
+      skills,
+    };
   } catch (error) {
     deps.warn(`Could not build skill set ${id}; using provider home: ${String(error)}`);
     return;

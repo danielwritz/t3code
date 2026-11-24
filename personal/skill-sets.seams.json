@@ -368,5 +368,95 @@
     "file": "packages/client-runtime/src/rpc/client.ts",
     "marker": "personal:skill-sets seam client subscription",
     "connects": "allows status updates through the shared connected-environment subscribe helper"
+  },
+  {
+    "file": "apps/server/src/orchestration-v2/Adapters/ClaudeAdapterV2.ts",
+    "marker": "personal:skill-sets seam claude integration import",
+    "connects": "imports Claude skill-set integration"
+  },
+  {
+    "file": "apps/server/src/orchestration-v2/Adapters/ClaudeAdapterV2.ts",
+    "marker": "personal:skill-sets seam claude integration",
+    "connects": "captures the scoped resolver for each adapter"
+  },
+  {
+    "file": "apps/server/src/orchestration-v2/Adapters/ClaudeAdapterV2.ts",
+    "marker": "personal:skill-sets seam claude turn home",
+    "connects": "resolves the current thread pick before every query"
+  },
+  {
+    "file": "apps/server/src/orchestration-v2/Adapters/ClaudeAdapterV2.ts",
+    "marker": "personal:skill-sets seam claude slash inventory",
+    "connects": "discovers slash skills through the selected home"
+  },
+  {
+    "file": "apps/server/src/orchestration-v2/Adapters/ClaudeAdapterV2.ts",
+    "marker": "personal:skill-sets seam claude slash pick",
+    "connects": "passes the current thread pick to slash inventory"
+  },
+  {
+    "file": "apps/server/src/orchestration-v2/Adapters/ClaudeAdapterV2.ts",
+    "marker": "personal:skill-sets seam claude dispatch pick",
+    "connects": "passes the current thread pick to skill dispatch"
+  },
+  {
+    "file": "apps/server/src/provider/Drivers/ClaudeDriver.ts",
+    "marker": "personal:skill-sets seam claude driver import",
+    "connects": "imports the Claude integration"
+  },
+  {
+    "file": "apps/server/src/provider/Drivers/ClaudeDriver.ts",
+    "marker": "personal:skill-sets seam claude driver integration",
+    "connects": "captures the shared scoped resolver for menu requests"
+  },
+  {
+    "file": "apps/server/src/provider/Drivers/ClaudeDriver.ts",
+    "marker": "personal:skill-sets seam claude thread menu",
+    "connects": "discovers menus from the requesting thread home"
+  },
+  {
+    "file": "apps/server/src/orchestration-v2/Adapters/ClaudeAdapterV2.ts",
+    "marker": "personal:skill-sets seam claude process identity",
+    "connects": "connects Claude skill-set process identity"
+  },
+  {
+    "file": "apps/server/src/orchestration-v2/Adapters/ClaudeAdapterV2.ts",
+    "marker": "personal:skill-sets seam claude invocation skills",
+    "connects": "connects Claude skill-set invocation skills"
+  },
+  {
+    "file": "apps/server/src/provider/ClaudeProvider.ts",
+    "marker": "personal:skill-sets seam claude probe settings import",
+    "connects": "connects Claude skill-set probe settings import"
+  },
+  {
+    "file": "apps/server/src/provider/ClaudeProvider.ts",
+    "marker": "personal:skill-sets seam claude probe option",
+    "connects": "connects Claude skill-set probe option"
+  },
+  {
+    "file": "apps/server/src/provider/ClaudeProvider.ts",
+    "marker": "personal:skill-sets seam claude probe settings",
+    "connects": "connects Claude skill-set probe settings"
+  },
+  {
+    "file": "apps/server/src/provider/ClaudeProvider.ts",
+    "marker": "personal:skill-sets seam claude probe input",
+    "connects": "connects Claude skill-set probe input"
+  },
+  {
+    "file": "apps/server/src/provider/ClaudeProvider.ts",
+    "marker": "personal:skill-sets seam claude probe forwarding",
+    "connects": "connects Claude skill-set probe forwarding"
+  },
+  {
+    "file": "apps/server/src/provider/ClaudeProvider.ts",
+    "marker": "personal:skill-sets seam claude snapshot input",
+    "connects": "connects Claude skill-set snapshot input"
+  },
+  {
+    "file": "apps/server/src/provider/ClaudeProvider.ts",
+    "marker": "personal:skill-sets seam claude snapshot probe",
+    "connects": "connects Claude skill-set snapshot probe"
   }
 ]
