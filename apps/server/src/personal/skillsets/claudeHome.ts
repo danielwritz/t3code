@@ -16,5 +16,13 @@ export async function linkClaudeGlobalConfig(home: string, userHome: string) {
       return;
     throw new Error("Claude global config link is no longer shared");
   }
-  await NodeFSP.symlink(target, destination, "file");
+  await NodeFSP.symlink(target, destination, "file").catch(async (error: NodeJS.ErrnoException) => {
+    if (
+      error.code === "EEXIST" &&
+      (await NodeFSP.lstat(destination)).isSymbolicLink() &&
+      (await NodeFSP.realpath(destination)) === (await NodeFSP.realpath(target))
+    )
+      return;
+    throw error;
+  });
 }

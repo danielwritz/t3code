@@ -23,10 +23,9 @@ it.layer(NodeServices.layer)("Claude skill sets", (it) => {
       const built = path.join(root, "built");
       yield* fs.makeDirectory(built);
       yield* fs.writeFileString(path.join(root, ".claude.json"), "{}");
-      yield* Effect.promise(() => Promise.all([
-        linkClaudeGlobalConfig(built, root),
-        linkClaudeGlobalConfig(built, root),
-      ]));
+      yield* Effect.promise(() =>
+        Promise.all([linkClaudeGlobalConfig(built, root), linkClaudeGlobalConfig(built, root)]),
+      );
       expect(yield* fs.realPath(path.join(built, ".claude.json"))).toBe(
         yield* fs.realPath(path.join(root, ".claude.json")),
       );
