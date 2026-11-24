@@ -4,32 +4,89 @@
       "shared": {
         "file": "instructions.md",
         "lines": 40,
-        "preview": "# Working rules: plain language, tests first, small commits."
+        "preview": "# Working rules: plain language, tests first, small commits.",
+        "text": "# Working rules\n\nUse plain language.\nWrite the test first.\nCommit in small steps.\n"
       },
       "claudeAgent": {
         "file": "CLAUDE.md",
         "lines": 52,
-        "preview": "# Working rules for Claude: plain language, tests first, small commits."
+        "preview": "# Working rules for Claude: plain language, tests first, small commits.",
+        "text": "# Working rules for Claude\n\nUse plain language.\nWrite the test first.\nCommit in small steps.\n"
       }
     },
     "plugins": {
-      "claudeAgent": ["example-review@example-market", "example-design@example-market"],
-      "codex": ["example-browser@example-bundled"]
+      "claudeAgent": [
+        {
+          "id": "example-review",
+          "source": "example-review@example-market",
+          "version": "1.2.0",
+          "description": "Reviews a change before it is committed.",
+          "adds": {
+            "commands": ["review"],
+            "agents": ["reviewer"]
+          }
+        },
+        {
+          "id": "example-design",
+          "source": "example-design@example-market",
+          "version": "0.4.1",
+          "description": "Design guidance for new screens.",
+          "adds": {
+            "skills": ["design-pass"]
+          }
+        }
+      ],
+      "codex": [
+        {
+          "id": "example-browser",
+          "source": "example-browser@example-bundled",
+          "version": "2.0.0",
+          "description": "Drives a browser for checks.",
+          "adds": {
+            "mcpServers": ["browser"]
+          }
+        }
+      ]
     },
     "hooks": {
       "claudeAgent": [
-        { "event": "PreToolUse", "matcher": "Bash", "command": "node hooks/command-guard.mjs" },
-        { "event": "UserPromptSubmit", "command": "node hooks/add-context.mjs" }
+        {
+          "event": "PreToolUse",
+          "matcher": "Bash",
+          "command": "node hooks/command-guard.mjs",
+          "timeout": 30
+        },
+        {
+          "event": "UserPromptSubmit",
+          "command": "node hooks/add-context.mjs"
+        }
       ],
       "codex": [
-        { "event": "PreToolUse", "matcher": "Bash", "command": "node hooks/command-guard.mjs" }
+        {
+          "event": "PreToolUse",
+          "matcher": "Bash",
+          "command": "node hooks/command-guard.mjs"
+        }
       ]
     },
     "mcp": [
-      { "name": "calendar", "transport": "stdio", "target": "node servers/calendar.mjs" },
-      { "name": "docs", "transport": "http", "target": "https://docs.example.com/mcp" }
+      {
+        "name": "calendar",
+        "transport": "stdio",
+        "target": "node servers/calendar.mjs",
+        "args": ["--readonly"]
+      },
+      {
+        "name": "docs",
+        "transport": "http",
+        "target": "https://docs.example.com/mcp"
+      }
     ],
-    "ignoreProjectInstructions": false
+    "ignoreProjectInstructions": false,
+    "skillDocs": {
+      "write-tests": "---\nname: write-tests\ndescription: Write a failing test before the code.\n---\n\n# Write tests\n\n1. Write one small failing test.\n2. Make it pass.\n"
+    },
+    "disabled": ["plugin:claudeAgent:example-design", "hook:claudeAgent:1"]
   },
   "beta": {
     "instructions": {},

@@ -17,7 +17,6 @@ import { ProjectIconPickerDialog } from "~/components/settings/ProjectIconPicker
 import { newSkillSet } from "./skillSets.logic";
 import { syncSkillSet } from "./rpc";
 
-import { ProviderInstanceIcon } from "~/components/chat/ProviderInstanceIcon";
 import { SettingsGroup } from "~/components/settings/SettingsGroup";
 import {
   SettingsPageContainer,
@@ -31,16 +30,19 @@ import { Switch } from "~/components/ui/switch";
 import { Tooltip, TooltipTrigger, TooltipPopup } from "~/components/ui/tooltip";
 import { cn } from "~/lib/utils";
 import { SkillSetLogo, syncLine } from "./SkillSetPickers";
-import { useSkillSetRegistry, type SkillSet, type SkillSetSkill } from "./skillSetsStore";
+import { useSkillSetRegistry, type SkillSet } from "./skillSetsStore";
 import {
-  PROFILE_PROVIDERS,
-  instructionsFor,
+  HooksSection,
+  InstructionsSection,
+  McpSection,
+  PluginsSection,
+  SkillsSection,
+} from "./ProfileSections";
+import {
   isStockProfile,
   setProfileIgnoresProject,
   useProfileIgnoresProject,
   useProfileParts,
-  type ProfileParts,
-  type ProfileProvider,
 } from "./profileParts";
 
 function Field({ label, children }: { label: string; children: ReactNode }) {
@@ -49,272 +51,6 @@ function Field({ label, children }: { label: string; children: ReactNode }) {
       <span className="text-sm font-medium">{label}</span>
       <div className="flex min-w-0 flex-wrap items-center gap-2">{children}</div>
     </div>
-  );
-}
-
-function ProviderLabel({ provider }: { provider: (typeof PROFILE_PROVIDERS)[number] }) {
-  return (
-    <span className="flex items-center gap-2 text-sm">
-      <ProviderInstanceIcon
-        driverKind={provider.driver as never}
-        displayName={provider.name}
-        className="size-4"
-        iconClassName="size-3.5"
-      />
-      {provider.name}
-    </span>
-  );
-}
-
-/** One row per provider: what this part of the profile gives Claude, Codex and Antigravity. */
-function ProviderRows({ render }: { render: (provider: ProfileProvider) => ReactNode }) {
-  return PROFILE_PROVIDERS.map((provider) => (
-    <div
-      key={provider.driver}
-      className="grid grid-cols-[7.5rem_minmax(0,1fr)] items-start gap-3 px-4 py-2.5"
-    >
-      <ProviderLabel provider={provider} />
-      <div className="min-w-0 text-sm">{render(provider.driver)}</div>
-    </div>
-  ));
-}
-
-function Nothing({ children }: { children: ReactNode }) {
-  return <span className="text-sm text-muted-foreground">{children}</span>;
-}
-
-function Note({ children }: { children: ReactNode }) {
-  return <p className="px-4 py-2.5 text-xs text-muted-foreground">{children}</p>;
-}
-
-function SkillRow({
-  skill,
-  onChange,
-  readOnly,
-}: {
-  skill: SkillSetSkill;
-  onChange: (enabled: boolean) => void;
-  readOnly: boolean;
-}) {
-  const gt = useGT();
-  return (
-    <div className="flex items-center gap-3 px-4 py-2">
-      <Switch
-        checked={skill.enabled}
-        onCheckedChange={onChange}
-        disabled={readOnly}
-        aria-label={gt("Load {name}", { name: skill.name })}
-      />
-      <div className="flex min-w-0 flex-1 flex-col">
-        <span className="flex items-center gap-1.5 font-mono text-xs font-medium">
-          {skill.name}
-          {skill.manualOnly ? (
-            <span className="rounded-sm border border-border px-1 font-sans text-3xs font-normal text-muted-foreground">
-              <T>/command only</T>
-            </span>
-          ) : null}
-        </span>
-        <span className="truncate text-xs text-muted-foreground">{skill.description}</span>
-      </div>
-    </div>
-  );
-}
-
-function InstructionsSection({ parts }: { parts: ProfileParts }) {
-  const gt = useGT();
-  return (
-    <SettingsSection title={gt("Instructions")}>
-      <ProviderRows
-        render={(provider) => {
-          const file = instructionsFor(parts, provider);
-          if (!file)
-            return (
-              <Nothing>
-                <T>None. No global instructions load.</T>
-              </Nothing>
-            );
-          return (
-            <div className="flex min-w-0 flex-col gap-0.5">
-              <span className="flex items-center gap-2">
-                <span className="font-mono text-xs font-medium">{file.file}</span>
-                <span className="text-xs text-muted-foreground">
-                  {gt("{count, plural, one {{count} line} other {{count} lines}}", {
-                    count: file.lines,
-                  })}
-                </span>
-              </span>
-              <span className="truncate text-xs text-muted-foreground">{file.preview}</span>
-            </div>
-          );
-        }}
-      />
-    </SettingsSection>
-  );
-}
-
-function SkillsSection({
-  set,
-  readOnly,
-  update,
-}: {
-  set: SkillSet;
-  readOnly: boolean;
-  update: (patch: Partial<SkillSetConfig>) => void;
-}) {
-  const gt = useGT();
-  const loading = set.skills.filter((skill) => skill.enabled).length;
-  return (
-    <SettingsSection
-      title={gt("Skills")}
-      headerAction={
-        <span className="text-xs text-muted-foreground">
-          {gt("{count} of {total} load", { count: loading, total: set.skills.length })}
-        </span>
-      }
-    >
-      <Note>
-        <T>
-          The same skills for Claude, Codex and Antigravity, plus the skills built into each CLI.
-        </T>
-      </Note>
-      {set.skills.length === 0 ? (
-        <Note>
-          <T>No skills of its own.</T>
-        </Note>
-      ) : (
-        <div className="max-h-80 overflow-y-auto py-1">
-          {set.skills.map((skill) => (
-            <SkillRow
-              key={skill.name}
-              skill={skill}
-              readOnly={readOnly}
-              onChange={(enabled) =>
-                update({
-                  disabledSkills: enabled
-                    ? set.disabledSkills.filter((name) => name !== skill.name)
-                    : [...new Set([...set.disabledSkills, skill.name])],
-                })
-              }
-            />
-          ))}
-        </div>
-      )}
-    </SettingsSection>
-  );
-}
-
-function PluginsSection({ parts }: { parts: ProfileParts }) {
-  const gt = useGT();
-  return (
-    <SettingsSection title={gt("Plugins")}>
-      <ProviderRows
-        render={(provider) => {
-          const plugins = parts.plugins[provider] ?? [];
-          if (plugins.length === 0)
-            return (
-              <Nothing>
-                <T>None</T>
-              </Nothing>
-            );
-          return (
-            <span className="flex flex-wrap gap-1.5">
-              {plugins.map((plugin) => (
-                <Badge key={plugin} variant="outline" size="sm">
-                  <span className="font-mono">{plugin}</span>
-                </Badge>
-              ))}
-            </span>
-          );
-        }}
-      />
-    </SettingsSection>
-  );
-}
-
-function HooksSection({ parts }: { parts: ProfileParts }) {
-  const gt = useGT();
-  return (
-    <SettingsSection title={gt("Hooks")}>
-      <Note>
-        <T>
-          Hooks are off unless this profile adds them. Without one, no hook runs, safety guards
-          included.
-        </T>
-      </Note>
-      <ProviderRows
-        render={(provider) => {
-          const hooks = parts.hooks[provider] ?? [];
-          if (hooks.length === 0)
-            return (
-              <Nothing>
-                <T>Off</T>
-              </Nothing>
-            );
-          return (
-            <div className="flex flex-col gap-1">
-              {hooks.map((hook) => (
-                <span
-                  key={`${hook.event}:${hook.matcher ?? ""}:${hook.command}`}
-                  className="flex min-w-0 items-baseline gap-2"
-                >
-                  <span className="shrink-0 text-xs font-medium">
-                    {hook.matcher ? `${hook.event} · ${hook.matcher}` : hook.event}
-                  </span>
-                  <span className="truncate font-mono text-xs text-muted-foreground">
-                    {hook.command}
-                  </span>
-                </span>
-              ))}
-            </div>
-          );
-        }}
-      />
-    </SettingsSection>
-  );
-}
-
-function McpSection({ parts }: { parts: ProfileParts }) {
-  const gt = useGT();
-  return (
-    <SettingsSection title={gt("MCP servers")}>
-      <Note>
-        <T>
-          One list, given to Claude, Codex and Antigravity in each one's own format. T3 Code's own
-          tools are always added.
-        </T>
-      </Note>
-      {parts.mcp.length === 0 ? (
-        <Note>
-          <T>None besides T3 Code's own tools.</T>
-        </Note>
-      ) : (
-        parts.mcp.map((server) => (
-          <div
-            key={server.name}
-            className="grid grid-cols-[7.5rem_minmax(0,1fr)_auto] items-center gap-3 px-4 py-2.5"
-          >
-            <span className="truncate text-sm font-medium">{server.name}</span>
-            <span className="truncate font-mono text-xs text-muted-foreground">
-              {server.target}
-            </span>
-            <span className="flex items-center gap-2">
-              <Badge variant="outline" size="sm">
-                {server.transport}
-              </Badge>
-              {PROFILE_PROVIDERS.map((provider) => (
-                <ProviderInstanceIcon
-                  key={provider.driver}
-                  driverKind={provider.driver as never}
-                  displayName={provider.name}
-                  className="size-4"
-                  iconClassName="size-3.5"
-                />
-              ))}
-            </span>
-          </div>
-        ))
-      )}
-    </SettingsSection>
   );
 }
 
@@ -444,7 +180,13 @@ function ProfilePage({
           />
         </Field>
         <Field label={gt("Source")}>
-          <Input readOnly value={set.repo.label} size="compact" font="mono" className="w-72" />
+          <Input
+            readOnly
+            value={set.repo.label}
+            size="compact"
+            font="mono"
+            className="min-w-72 flex-1"
+          />
           {!local && set.repo.branch ? (
             <span className="flex items-center gap-1 font-mono text-xs text-muted-foreground">
               <GitBranchIcon className="size-3.5" />
@@ -541,9 +283,9 @@ function ProfilePage({
       </SettingsSection>
 
       <InstructionsSection parts={parts} />
-      <SkillsSection set={set} readOnly={readOnly} update={update} />
-      <PluginsSection parts={parts} />
-      <HooksSection parts={parts} />
+      <SkillsSection set={set} parts={parts} readOnly={readOnly} update={update} />
+      <PluginsSection profileId={set.id} parts={parts} readOnly={readOnly} />
+      <HooksSection profileId={set.id} parts={parts} readOnly={readOnly} />
       <McpSection parts={parts} />
     </>
   );

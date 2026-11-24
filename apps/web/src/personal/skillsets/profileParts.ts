@@ -10,18 +10,38 @@ export type ProfileProvider = (typeof PROFILE_PROVIDERS)[number]["driver"];
 
 export interface ProfileFile {
   readonly file: string;
+  readonly path?: string;
   readonly lines: number;
   readonly preview: string;
+  readonly text?: string;
+}
+/** What a plugin brings with it, read from its installed folder. */
+export interface ProfilePluginAdds {
+  readonly skills?: readonly string[];
+  readonly commands?: readonly string[];
+  readonly agents?: readonly string[];
+  readonly hooks?: readonly string[];
+  readonly mcpServers?: readonly string[];
+}
+export interface ProfilePlugin {
+  readonly id: string;
+  readonly source?: string;
+  readonly version?: string;
+  readonly description?: string;
+  readonly path?: string;
+  readonly adds?: ProfilePluginAdds;
 }
 export interface ProfileHook {
   readonly event: string;
   readonly matcher?: string;
   readonly command: string;
+  readonly timeout?: number;
 }
 export interface ProfileMcpServer {
   readonly name: string;
   readonly transport: "stdio" | "http";
   readonly target: string;
+  readonly args?: readonly string[];
 }
 
 /**
@@ -30,11 +50,20 @@ export interface ProfileMcpServer {
  */
 export interface ProfileParts {
   readonly instructions: Partial<Record<ProfileProvider | "shared", ProfileFile>>;
-  readonly plugins: Partial<Record<ProfileProvider, readonly string[]>>;
+  readonly plugins: Partial<Record<ProfileProvider, readonly ProfilePlugin[]>>;
   readonly hooks: Partial<Record<ProfileProvider, readonly ProfileHook[]>>;
   readonly mcp: readonly ProfileMcpServer[];
   readonly ignoreProjectInstructions: boolean;
+  /** SKILL.md text by skill name, for the skill detail view. */
+  readonly skillDocs?: Readonly<Record<string, string>>;
+  /** Switched-off entries, as `plugin:<provider>:<id>` or `hook:<provider>:<index>`. */
+  readonly disabled?: readonly string[];
 }
+
+export const pluginKey = (provider: ProfileProvider, id: string) => `plugin:${provider}:${id}`;
+export const hookKey = (provider: ProfileProvider, index: number) => `hook:${provider}:${index}`;
+export const hookFile = (provider: ProfileProvider) =>
+  `hooks/${provider === "claudeAgent" ? "claude" : provider}.json`;
 
 const NO_PARTS: ProfileParts = {
   instructions: {},
@@ -60,15 +89,22 @@ interface ProfileState {
   readonly parts: Readonly<Record<string, ProfileParts>>;
   readonly ignoreByProfile: Readonly<Record<string, boolean>>;
   readonly ignoreByThread: Readonly<Record<string, boolean>>;
+  readonly switchedByProfile: Readonly<Record<string, Readonly<Record<string, boolean>>>>;
 }
 const useProfileState = create<ProfileState>(() => ({
   parts: {},
   ignoreByProfile: {},
   ignoreByThread: {},
+  switchedByProfile: {},
 }));
 
 export function __setProfilePartsForTests(parts: Readonly<Record<string, ProfileParts>>) {
-  useProfileState.setState({ parts, ignoreByProfile: {}, ignoreByThread: {} });
+  useProfileState.setState({
+    parts,
+    ignoreByProfile: {},
+    ignoreByThread: {},
+    switchedByProfile: {},
+  });
 }
 
 export function useProfileParts(profileId: string | undefined) {
@@ -99,5 +135,21 @@ export function useThreadIgnoresProject(profileId: string | undefined, threadKey
 export function setThreadIgnoresProject(threadKey: string, ignore: boolean) {
   useProfileState.setState((state) => ({
     ignoreByThread: { ...state.ignoreByThread, [threadKey]: ignore },
+  }));
+}
+
+/** Whether a plugin or hook entry is switched on: the user's choice, else the profile's file. */
+export function useProfileEntryOn(profileId: string) {
+  const parts = useProfileParts(profileId);
+  const switched = useProfileState((state) => state.switchedByProfile[profileId]);
+  return (key: string) => switched?.[key] ?? !parts.disabled?.includes(key);
+}
+
+export function setProfileEntryOn(profileId: string, key: string, on: boolean) {
+  useProfileState.setState((state) => ({
+    switchedByProfile: {
+      ...state.switchedByProfile,
+      [profileId]: { ...state.switchedByProfile[profileId], [key]: on },
+    },
   }));
 }

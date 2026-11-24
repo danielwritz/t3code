@@ -127,7 +127,10 @@ const statuses: readonly SkillSetStatus[] = [
       name: skill.name,
       description: skill.description,
       commandOnly: skill.manualOnly,
-      targetPath: `/sets/${set.id}/skills/${skill.name}/SKILL.md`,
+      targetPath:
+        set.repo.state === "local"
+          ? `${set.repo.path}/${skill.name}/SKILL.md`
+          : `/sets/${set.id}/skills/${skill.name}/SKILL.md`,
     })),
   })),
   {
@@ -468,7 +471,10 @@ it("shows a profile's five sections and an empty profile as the stock agent", as
   if (hook)
     await expect.element(page.getByText(hook.command, { exact: true }).first()).toBeVisible();
   const server = parts.mcp[0];
-  if (server) await expect.element(page.getByText(server.name, { exact: true })).toBeVisible();
+  if (server)
+    await expect
+      .element(page.getByRole("button", { name: `Show ${server.name}`, exact: true }))
+      .toBeVisible();
   await expect
     .element(page.getByText(/Stock agent: only the skills built into each CLI/))
     .not.toBeInTheDocument();
@@ -501,7 +507,7 @@ function growSettingsDialog() {
 it("captures a full and an empty profile page", async () => {
   using _clock = clock();
   using _environment = install();
-  const { screen } = await openProfiles(2300);
+  const { screen } = await openProfiles(4200);
   await using _app = screen;
   await page.getByRole("button", { name: `${FULL_SET.name} details` }).click();
   await expect.element(page.getByRole("heading", { name: "MCP servers" })).toBeVisible();
@@ -544,4 +550,87 @@ it("lists profiles as picker tabs and lets one thread ignore project instruction
   await expect
     .element(page.getByLabelText("Ignoring project instructions"))
     .not.toBeInTheDocument();
+});
+
+const V2 = "profiles-round-2";
+
+it("switches each plugin and hook on its own and shows each row's detail", async () => {
+  using _clock = clock();
+  using _environment = install();
+  const { screen } = await openProfiles();
+  await using _app = screen;
+  await page.getByRole("button", { name: `${FULL_SET.name} details` }).click();
+  const parts = profileParts[FULL_SET.id]!;
+  const off = (key: string) => parts.disabled?.includes(key) ?? false;
+
+  const plugins = parts.plugins.claudeAgent ?? [];
+  const plugin = plugins.find((entry) => !off(`plugin:claudeAgent:${entry.id}`))!;
+  const offPlugin = plugins.find((entry) => off(`plugin:claudeAgent:${entry.id}`));
+  const pluginSwitch = (id: string) =>
+    page.getByRole("switch", { name: `Use ${id} with Claude`, exact: true });
+  if (offPlugin) await expect.element(pluginSwitch(offPlugin.id)).not.toBeChecked();
+  await expect.element(pluginSwitch(plugin.id)).toBeChecked();
+
+  const hookSwitch = (number: number) =>
+    page.getByRole("switch", {
+      name: `Run ${parts.hooks.claudeAgent![number - 1]!.event} hook ${number} for Claude`,
+      exact: true,
+    });
+  const firstHookOn = !off("hook:claudeAgent:0");
+  if (firstHookOn) await expect.element(hookSwitch(1)).toBeChecked();
+  else await expect.element(hookSwitch(1)).not.toBeChecked();
+
+  page.getByRole("heading", { name: "Hooks", exact: true }).element().scrollIntoView();
+  if (hasPrivateSetup) await shot(`${V2}/v2-2-hooks-switches`, SETTINGS_CLIP);
+
+  await page.getByRole("button", { name: `Show ${plugin.id} for Claude` }).click();
+  const dialog = page.getByRole("dialog", { name: plugin.id });
+  await expect.element(dialog).toBeVisible();
+  await expect.element(dialog.getByText("Adds commands")).toBeVisible();
+  if (plugin.version) await expect.element(dialog.getByText(plugin.version)).toBeVisible();
+  if (hasPrivateSetup) await shot(`${V2}/v2-3-plugin-detail`);
+  await userEvent.keyboard("{Escape}");
+  await expect.element(dialog).not.toBeInTheDocument();
+
+  const hook = parts.hooks.claudeAgent![0]!;
+  await page
+    .getByRole("button", { name: `Show ${hook.event} hook 1 for Claude`, exact: true })
+    .click();
+  const hookDialog = page.getByRole("dialog", { name: hook.event });
+  await expect.element(hookDialog.getByText(hook.command, { exact: true })).toBeVisible();
+  await expect.element(hookDialog.getByText("hooks/claude.json")).toBeVisible();
+  if (hasPrivateSetup) await shot(`${V2}/v2-4-hook-detail`);
+  await userEvent.keyboard("{Escape}");
+
+  const skill =
+    FULL_SET.skills.find((entry) => parts.skillDocs?.[entry.name]) ?? FULL_SET.skills[0]!;
+  await page.getByRole("button", { name: `Show ${skill.name}`, exact: true }).click();
+  const skillDialog = page.getByRole("dialog", { name: skill.name });
+  await expect.element(skillDialog.getByText(skill.description).first()).toBeVisible();
+  if (parts.skillDocs?.[skill.name])
+    await expect.element(skillDialog.getByText("SKILL.md", { exact: true })).toBeVisible();
+  if (hasPrivateSetup) await shot(`${V2}/v2-5-skill-detail`);
+  await userEvent.keyboard("{Escape}");
+
+  await pluginSwitch(plugin.id).click();
+  await expect.element(pluginSwitch(plugin.id)).not.toBeChecked();
+  const codexPlugin = parts.plugins.codex?.[0];
+  if (codexPlugin)
+    await expect
+      .element(page.getByRole("switch", { name: `Use ${codexPlugin.id} with Codex`, exact: true }))
+      .toBeChecked();
+  await hookSwitch(1).click();
+  if (firstHookOn) await expect.element(hookSwitch(1)).not.toBeChecked();
+  else await expect.element(hookSwitch(1)).toBeChecked();
+});
+
+it("captures the whole profile page with plugin and hook switches", async () => {
+  using _clock = clock();
+  using _environment = install();
+  const { screen } = await openProfiles(4200);
+  await using _app = screen;
+  await page.getByRole("button", { name: `${FULL_SET.name} details` }).click();
+  await expect.element(page.getByRole("heading", { name: "MCP servers" })).toBeVisible();
+  growSettingsDialog();
+  if (hasPrivateSetup) await shot(`${V2}/v2-1-profile-switches`);
 });
