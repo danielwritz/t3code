@@ -159,6 +159,7 @@ export function useSkillSets() {
     setActive,
     permitted: permitted && !owner.attached,
     available: scope !== null,
+    threadKey: scope?.threadId ?? scope?.draftId ?? null,
   };
 }
 
