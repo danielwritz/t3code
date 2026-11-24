@@ -40,6 +40,7 @@ function makeSourceThread(): OrchestrationV2AppThread {
     id: sourceThreadId,
     projectId: ProjectId.make("project:fork-snooze"),
     title: "Snoozed source",
+    skillSetId: "alpha",
     providerInstanceId,
     modelSelection,
     runtimeMode: "full-access",
@@ -159,6 +160,7 @@ it.effect("resets a fork's pin, snooze, settle and delegation state but keeps it
       thread: sourceThread,
     });
 
+    assert.equal(result.targetThread.skillSetId, "alpha");
     assert.isNull(result.targetThread.snoozedUntil);
     assert.isNull(result.targetThread.snoozedAt);
     assert.isNull(result.targetThread.lastSnoozeWakeAt);

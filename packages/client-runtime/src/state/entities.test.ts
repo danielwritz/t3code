@@ -22,6 +22,15 @@ import { canSnooze, effectiveSnoozed } from "./threadSettled.ts";
 const environmentId = EnvironmentId.make("environment-v2");
 
 describe("V2 client presentation", () => {
+  it("preserves explicit, cleared and absent skill set picks in the web shell", () => {
+    for (const skillSetId of ["alpha", null, undefined]) {
+      const shell = presentThreadShell(environmentId, {
+        ...v2ThreadShell,
+        ...(skillSetId === undefined ? {} : { skillSetId }),
+      });
+      expect(shell.skillSetId).toBe(skillSetId);
+    }
+  });
   it("an async question allows snooze and wakes an older snooze", () => {
     const runId = RunId.make("run-async-question");
     const running = {

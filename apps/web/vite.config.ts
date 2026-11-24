@@ -143,7 +143,8 @@ const browserTestProject = {
     browser: {
       enabled: true,
       headless: true,
-      provider: playwright(),
+      // personal:skill-sets seam muted browser proof
+      provider: playwright({ launchOptions: { args: ["--mute-audio"] } }),
       instances: [{ browser: "chromium" }],
       screenshotFailures: false,
       commands: {

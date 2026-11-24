@@ -2,17 +2,7 @@
   {
     "file": "apps/web/src/components/chat/ProviderModelPicker.tsx",
     "marker": "personal:skill-sets seam",
-    "connects": "imports the skill set tabs and rail from personal/skillsets"
-  },
-  {
-    "file": "apps/web/src/components/chat/ProviderModelPicker.tsx",
-    "marker": "personal:skill-sets seam",
     "connects": "renders the skill set tabs above the docked model picker"
-  },
-  {
-    "file": "apps/web/src/components/chat/ProviderModelPicker.tsx",
-    "marker": "personal:skill-sets seam",
-    "connects": "renders the skill set rail left of the provider rail"
   },
   {
     "file": "apps/web/src/components/chat/ComposerFooterControls.tsx",
@@ -458,5 +448,225 @@
     "file": "apps/server/src/provider/ClaudeProvider.ts",
     "marker": "personal:skill-sets seam claude snapshot probe",
     "connects": "connects Claude skill-set snapshot probe"
+  },
+  {
+    "file": "apps/web/src/components/chat/ProviderModelPicker.tsx",
+    "marker": "personal:skill-sets seam",
+    "connects": "imports the skill set tabs from personal/skillsets"
+  },
+  {
+    "file": "apps/server/src/orchestration-v2/ThreadLaunchService.ts",
+    "marker": "personal:skill-sets seam launch pick helper",
+    "connects": "launch pick helper"
+  },
+  {
+    "file": "apps/server/src/orchestration-v2/ThreadLaunchService.ts",
+    "marker": "personal:skill-sets seam launch pick type",
+    "connects": "launch pick type"
+  },
+  {
+    "file": "apps/server/src/orchestration-v2/ThreadLaunchService.ts",
+    "marker": "personal:skill-sets seam launch pick",
+    "connects": "launch pick"
+  },
+  {
+    "file": "apps/server/src/ws.ts",
+    "marker": "personal:skill-sets seam launch wire helper",
+    "connects": "launch wire helper"
+  },
+  {
+    "file": "apps/server/src/ws.ts",
+    "marker": "personal:skill-sets seam launch wire forwarding",
+    "connects": "launch wire forwarding"
+  },
+  {
+    "file": "apps/web/src/components/chat/ChatComposer.tsx",
+    "marker": "personal:skill-sets seam menu catalog",
+    "connects": "menu catalog"
+  },
+  {
+    "file": "apps/web/src/components/chat/ChatComposer.tsx",
+    "marker": "personal:skill-sets seam composer scope",
+    "connects": "composer scope"
+  },
+  {
+    "file": "apps/web/src/components/chat/ChatComposer.tsx",
+    "marker": "personal:skill-sets seam thread-specific menu provider",
+    "connects": "thread-specific menu provider"
+  },
+  {
+    "file": "apps/web/src/components/chat/ChatComposer.tsx",
+    "marker": "personal:skill-sets seam composer context",
+    "connects": "composer context"
+  },
+  {
+    "file": "apps/web/src/components/chat/useComposerSend.ts",
+    "marker": "personal:skill-sets seam draft launch helper",
+    "connects": "draft launch helper"
+  },
+  {
+    "file": "apps/web/src/components/chat/useComposerSend.ts",
+    "marker": "personal:skill-sets seam draft launch pick",
+    "connects": "draft launch pick"
+  },
+  {
+    "file": "apps/web/src/components/chat/useMultipleModelSend.ts",
+    "marker": "personal:skill-sets seam draft launch helper",
+    "connects": "draft launch helper"
+  },
+  {
+    "file": "apps/web/src/components/chat/useMultipleModelSend.ts",
+    "marker": "personal:skill-sets seam draft launch pick",
+    "connects": "draft launch pick"
+  },
+  {
+    "file": "apps/web/src/components/ChatView.logic.ts",
+    "marker": "personal:skill-sets seam draft shell helper",
+    "connects": "draft shell helper"
+  },
+  {
+    "file": "apps/web/src/components/ChatView.logic.ts",
+    "marker": "personal:skill-sets seam draft shell pick",
+    "connects": "draft shell pick"
+  },
+  {
+    "file": "apps/web/src/composerDraftStore.ts",
+    "marker": "personal:skill-sets seam persisted draft pick",
+    "connects": "persisted draft pick"
+  },
+  {
+    "file": "apps/web/src/composerDraftStore.ts",
+    "marker": "personal:skill-sets seam draft pick type",
+    "connects": "draft pick type"
+  },
+  {
+    "file": "apps/web/src/composerDraftStore.ts",
+    "marker": "personal:skill-sets seam normalized draft pick",
+    "connects": "normalized draft pick"
+  },
+  {
+    "file": "apps/web/src/composerDraftStore.ts",
+    "marker": "personal:skill-sets seam hydrated draft pick",
+    "connects": "hydrated draft pick"
+  },
+  {
+    "file": "apps/web/src/composerDraftStore.ts",
+    "marker": "personal:skill-sets seam preserve draft pick on context change",
+    "connects": "preserve draft pick on context change"
+  },
+  {
+    "file": "apps/web/test/fakeEnvironment.ts",
+    "marker": "personal:skill-sets seam fake runtime imports",
+    "connects": "fake runtime imports"
+  },
+  {
+    "file": "apps/web/test/fakeEnvironment.ts",
+    "marker": "personal:skill-sets seam fake thread pick",
+    "connects": "fake thread pick"
+  },
+  {
+    "file": "apps/web/test/fakeEnvironment.ts",
+    "marker": "personal:skill-sets seam fake shell pick",
+    "connects": "fake shell pick"
+  },
+  {
+    "file": "apps/web/test/fakeEnvironment.ts",
+    "marker": "personal:skill-sets seam fake settings and statuses",
+    "connects": "fake settings and statuses"
+  },
+  {
+    "file": "apps/web/test/fakeEnvironment.ts",
+    "marker": "personal:skill-sets seam fake RPC handlers",
+    "connects": "fake RPC handlers"
+  },
+  {
+    "file": "apps/web/test/fakeEnvironment.ts",
+    "marker": "personal:skill-sets seam fake metadata broadcast",
+    "connects": "fake metadata broadcast"
+  },
+  {
+    "file": "apps/web/test/fakeEnvironment.ts",
+    "marker": "personal:skill-sets seam fake status option",
+    "connects": "fake status option"
+  },
+  {
+    "file": "apps/web/test/fakeEnvironment.ts",
+    "marker": "personal:skill-sets seam reset fake skill state",
+    "connects": "reset fake skill state"
+  },
+  {
+    "file": "apps/web/vite.config.ts",
+    "marker": "personal:skill-sets seam muted browser proof",
+    "connects": "muted browser proof"
+  },
+  {
+    "file": "packages/client-runtime/src/operations/commands.ts",
+    "marker": "personal:skill-sets seam command pick helper",
+    "connects": "command pick helper"
+  },
+  {
+    "file": "packages/client-runtime/src/operations/commands.ts",
+    "marker": "personal:skill-sets seam create pick type",
+    "connects": "create pick type"
+  },
+  {
+    "file": "packages/client-runtime/src/operations/commands.ts",
+    "marker": "personal:skill-sets seam update pick type",
+    "connects": "update pick type"
+  },
+  {
+    "file": "packages/client-runtime/src/operations/commands.ts",
+    "marker": "personal:skill-sets seam bootstrap pick type",
+    "connects": "bootstrap pick type"
+  },
+  {
+    "file": "packages/client-runtime/src/operations/commands.ts",
+    "marker": "personal:skill-sets seam create command pick",
+    "connects": "create command pick"
+  },
+  {
+    "file": "packages/client-runtime/src/operations/commands.ts",
+    "marker": "personal:skill-sets seam metadata pick condition",
+    "connects": "metadata pick condition"
+  },
+  {
+    "file": "packages/client-runtime/src/operations/commands.ts",
+    "marker": "personal:skill-sets seam metadata command pick",
+    "connects": "metadata command pick"
+  },
+  {
+    "file": "packages/client-runtime/src/operations/commands.ts",
+    "marker": "personal:skill-sets seam bootstrap launch pick",
+    "connects": "bootstrap launch pick"
+  },
+  {
+    "file": "packages/client-runtime/src/state/models.ts",
+    "marker": "personal:skill-sets seam shell presentation helper",
+    "connects": "shell presentation helper"
+  },
+  {
+    "file": "packages/client-runtime/src/state/models.ts",
+    "marker": "personal:skill-sets seam presentation type",
+    "connects": "presentation type"
+  },
+  {
+    "file": "packages/client-runtime/src/state/models.ts",
+    "marker": "personal:skill-sets seam presented shell pick",
+    "connects": "presented shell pick"
+  },
+  {
+    "file": "packages/contracts/src/orchestrationV2.ts",
+    "marker": "personal:skill-sets seam launch wire pick",
+    "connects": "launch wire pick"
+  },
+  {
+    "file": "apps/web/src/routes/_chat.settings.tsx",
+    "marker": "personal:skill-sets seam settings environment scope helper",
+    "connects": "settings environment scope helper"
+  },
+  {
+    "file": "apps/web/src/routes/_chat.settings.tsx",
+    "marker": "personal:skill-sets seam registry is per environment",
+    "connects": "registry is per environment"
   }
 ]

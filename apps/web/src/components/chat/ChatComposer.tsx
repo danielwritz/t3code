@@ -1,3 +1,7 @@
+// personal:skill-sets seam menu catalog
+import { useThreadSkillSetProvider } from "~/personal/skillsets/useThreadSkillSetProvider";
+// personal:skill-sets seam composer scope
+import { withSkillSetScope } from "~/personal/skillsets/skillSetsStore";
 import { copySnapshot } from "./copySnapshot";
 import { VoiceInputSetup } from "./VoiceInputSetup";
 import { useComposerTypingGuard } from "./useComposerTypingGuard";
@@ -62,7 +66,6 @@ import { splitTransferredFiles } from "./workspaceFileDrop";
 import { createModelSelection, normalizeModelSlug } from "@t3tools/shared/model";
 import { USAGE_LIMITS_COMMAND } from "@t3tools/shared/usageLimits";
 import {
-  memo,
   use,
   useEffect,
   useEffectEvent,
@@ -520,7 +523,8 @@ export interface ChatComposerProps {
 const NO_PROVIDER_SKILLS: ServerProvider["skills"] = [];
 const NO_PROVIDER_SLASH_COMMANDS: ServerProvider["slashCommands"] = [];
 
-export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps) {
+// personal:skill-sets seam composer context
+export const ChatComposer = withSkillSetScope(function ChatComposer(props: ChatComposerProps) {
   const gt = useGT();
   const m = useMessages();
   const {
@@ -1034,7 +1038,11 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
         runtimeModeCeilingDenial ??
         (multipleModelSelections === null ? providerSendBlockReason : null)));
   const isSendDisabled = sendDisabledReason !== null;
-  const selectedProviderStatus = selectedProviderEntry?.snapshot ?? null;
+  // personal:skill-sets seam thread-specific menu provider
+  const selectedProviderStatus = useThreadSkillSetProvider(
+    props,
+    selectedProviderEntry?.snapshot ?? null,
+  );
   const selectedProviderSkills = selectedProviderStatus
     ? resolveProviderSkillsForCwd(selectedProviderStatus, gitCwd)
     : NO_PROVIDER_SKILLS;

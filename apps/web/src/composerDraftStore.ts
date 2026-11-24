@@ -404,6 +404,8 @@ type LegacyPersistedComposerDraftStoreState = PersistedComposerDraftStoreState &
   LegacyV2StoreFields;
 
 const PersistedDraftThreadState = Schema.Struct({
+  // personal:skill-sets seam persisted draft pick
+  skillSetId: Schema.optionalKey(Schema.NullOr(Schema.String)),
   threadId: ThreadId,
   environmentId: Schema.String,
   projectId: ProjectId,
@@ -504,6 +506,8 @@ export function composerDraftHasUserContent(
 }
 
 export interface DraftSessionState {
+  // personal:skill-sets seam draft pick type
+  skillSetId?: string | null;
   threadId: ThreadId;
   environmentId: EnvironmentId;
   projectId: ProjectId;
@@ -1989,6 +1993,11 @@ function normalizePersistedDraftThreads(
       }
       const normalizedEnvironmentId = environmentId as EnvironmentId;
       draftThreadsByThreadKey[threadKey] = {
+        // personal:skill-sets seam normalized draft pick
+        ...(typeof candidateDraftThread.skillSetId === "string" ||
+        candidateDraftThread.skillSetId === null
+          ? { skillSetId: candidateDraftThread.skillSetId }
+          : {}),
         threadId,
         environmentId: normalizedEnvironmentId,
         projectId: projectId as ProjectId,
@@ -2786,6 +2795,10 @@ function toHydratedDraftThreadState(
   persistedDraftThread: PersistedDraftThreadState,
 ): DraftThreadState {
   return {
+    // personal:skill-sets seam hydrated draft pick
+    ...(persistedDraftThread.skillSetId === undefined
+      ? {}
+      : { skillSetId: persistedDraftThread.skillSetId }),
     threadId: persistedDraftThread.threadId,
     environmentId: persistedDraftThread.environmentId as EnvironmentId,
     projectId: persistedDraftThread.projectId,
@@ -3090,6 +3103,8 @@ const composerDraftStore = create<ComposerDraftStoreState>()(
                   : existing.worktreeRepositories
                 : (options.worktreeRepositories ?? undefined);
             const nextDraftThread: DraftThreadState = {
+              // personal:skill-sets seam preserve draft pick on context change
+              ...(existing.skillSetId === undefined ? {} : { skillSetId: existing.skillSetId }),
               threadId: existing.threadId,
               environmentId: nextProjectRef.environmentId,
               projectId: nextProjectRef.projectId,

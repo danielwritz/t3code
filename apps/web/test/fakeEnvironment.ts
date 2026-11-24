@@ -1,3 +1,10 @@
+// personal:skill-sets seam fake runtime imports
+import { applyServerSettingsPatch } from "@t3tools/shared/serverSettings";
+import type {
+  SkillSetStatus,
+  ServerSettingsPatch,
+  ServerConfigStreamEvent,
+} from "@t3tools/contracts";
 // An in-process environment for app render scenarios: a fetch stub for its HTTP API and a
 // session that answers the shell, thread and config subscriptions from fixtures. Other RPCs
 // stay pending so nothing retries on timers. Everything above the wire is the app's own.
@@ -234,6 +241,8 @@ function run(
 }
 
 export interface FakeThread {
+  // personal:skill-sets seam fake thread pick
+  readonly skillSetId?: string | null | undefined;
   /** Makes this a side chat of that thread. */
   readonly sideChatOf?: ThreadId;
   /** Makes this a subagent the provider started under that thread, which takes no messages. */
@@ -329,6 +338,8 @@ function shellOf(thread: FakeThread): OrchestrationV2ThreadShell {
   const modelSelection = thread.modelSelection ?? MODEL;
   return {
     id: thread.id,
+    // personal:skill-sets seam fake shell pick
+    ...(thread.skillSetId === undefined ? {} : { skillSetId: thread.skillSetId }),
     projectId: thread.projectId ?? PROJECT_ID, // personal:skill-sets seam
     title: thread.title,
     providerInstanceId: modelSelection.instanceId,
@@ -456,13 +467,121 @@ const subscribe = <A>(first: ReadonlyArray<A>, register?: (queue: Queue.Queue<A>
     }),
   );
 
+// personal:skill-sets seam fake settings and statuses
+let skillStatuses: readonly SkillSetStatus[] = [];
+let settingsPatches: ServerSettingsPatch[] = [];
+let configSubscriber: Queue.Queue<ServerConfigStreamEvent> | null = null;
+let skillStatusSubscriber: Queue.Queue<readonly SkillSetStatus[]> | null = null;
+let providerRequests: unknown[] = [];
+export const skillSetSettingsPatches = () => settingsPatches;
+export const skillSetProviderRequests = () => providerRequests;
+
 const handlers: Record<string, (input: never) => unknown> = {
+  // personal:skill-sets seam fake RPC handlers
+  "skillSets.status": () => Effect.sync(() => skillStatuses),
+  "skillSets.subscribe": () =>
+    subscribe([skillStatuses], (queue) => {
+      skillStatusSubscriber = queue;
+      return () => {
+        if (skillStatusSubscriber === queue) skillStatusSubscriber = null;
+      };
+    }),
+  "skillSets.sync": () => Effect.succeed(skillStatuses),
+  [WS_METHODS.serverUpdateSettings]: (input: { patch: ServerSettingsPatch }) =>
+    Effect.gen(function* () {
+      settingsPatches.push(input.patch);
+      const settings = applyServerSettingsPatch(baseServerConfig.settings, input.patch);
+      baseServerConfig = { ...baseServerConfig, settings };
+      if (configSubscriber)
+        yield* Queue.offer(configSubscriber, {
+          version: 1,
+          type: "snapshot",
+          config: serverConfig(),
+        });
+      if (skillStatusSubscriber) yield* Queue.offer(skillStatusSubscriber, skillStatuses);
+      return settings;
+    }),
+  [WS_METHODS.serverRefreshProviders]: (input: {
+    threadId?: ThreadId;
+    instanceId?: import("@t3tools/contracts").ProviderInstanceId;
+    cwd?: string;
+  }) =>
+    Effect.sync(() => {
+      providerRequests.push(input);
+      return {
+        providers: serverConfig().providers.map((provider) => {
+          if (
+            !input.threadId ||
+            !input.cwd ||
+            (input.instanceId && input.instanceId !== provider.instanceId)
+          )
+            return provider;
+          const settings = baseServerConfig.settings;
+          const pick =
+            threads.find((thread) => thread.id === input.threadId)?.skillSetId ??
+            settings.defaultSkillSetId;
+          const config = pick ? settings.skillSets[pick] : undefined;
+          const status = skillStatuses.find((status) => status.id === pick);
+          const skills =
+            settings.skillSetsEnabled && config?.enabled && status
+              ? status.skills
+                  .filter((skill) => !config.disabledSkills.includes(skill.name))
+                  .map((skill) => ({
+                    name: skill.name,
+                    path: skill.targetPath,
+                    enabled: true,
+                    scope: "user",
+                    description: skill.description,
+                    userInvocationOnly: skill.commandOnly,
+                  }))
+              : provider.skills;
+          return {
+            ...provider,
+            workspaceSnapshots: [
+              {
+                cwd: input.cwd,
+                checkedAt: "2026-03-17T19:26:00.000Z",
+                skills,
+                slashCommands: provider.slashCommands,
+              },
+            ],
+          };
+        }),
+      };
+    }),
   // Recorded, and accepted only when the scenario asks, since a pending command holds every
   // later command on its thread. Accepted commands' events never arrive.
   [ORCHESTRATION_V2_WS_METHODS.dispatchCommand]: (command: OrchestrationV2Command) =>
     Effect.suspend(() => {
       dispatched.push(command);
       if (acceptCommands && !holdCommand(command)) {
+        // personal:skill-sets seam fake metadata broadcast
+        if (command.type === "thread.metadata.update" && command.skillSetId !== undefined)
+          return Effect.gen(function* () {
+            const thread = threads.find((thread) => thread.id === command.threadId);
+            if (thread) {
+              const updated = { ...thread, skillSetId: command.skillSetId };
+              threads = threads.map((thread) =>
+                thread.id === command.threadId ? updated : thread,
+              );
+              sequence += 1;
+              if (shellSubscriber)
+                yield* Queue.offer(shellSubscriber, {
+                  kind: "thread.updated",
+                  sequence,
+                  location: "active",
+                  thread: shellOf(updated),
+                });
+              const subscriber = threadSubscribers.get(updated.id);
+              if (subscriber)
+                yield* Queue.offer(subscriber, {
+                  kind: "snapshot",
+                  snapshotSequence: sequence,
+                  projection: projectionOf(updated),
+                });
+            }
+            return { sequence };
+          });
         if (command.type !== "thread.fork" || !command.sideChat || shellSubscriber === null)
           return Effect.succeed({ sequence: sequence + 1 });
         const fork: FakeThread = {
@@ -557,7 +676,15 @@ const handlers: Record<string, (input: never) => unknown> = {
       };
     }),
   [WS_METHODS.subscribeServerConfig]: () =>
-    subscribe([{ version: 1 as const, type: "snapshot" as const, config: serverConfig() }]),
+    subscribe<ServerConfigStreamEvent>(
+      [{ version: 1 as const, type: "snapshot" as const, config: serverConfig() }],
+      (queue) => {
+        configSubscriber = queue;
+        return () => {
+          if (configSubscriber === queue) configSubscriber = null;
+        };
+      },
+    ), // personal:skill-sets seam fake config stream
 };
 
 // Unanswered calls stay pending, like a server that has not replied yet.
@@ -574,7 +701,15 @@ const session: EnvironmentConnectionLease["session"] = {
   client: client as unknown as WsRpcProtocolClient,
   initialConfig: Effect.sync(serverConfig),
   subscribeServerConfig: () =>
-    subscribe([{ version: 1 as const, type: "snapshot" as const, config: serverConfig() }]),
+    subscribe<ServerConfigStreamEvent>(
+      [{ version: 1 as const, type: "snapshot" as const, config: serverConfig() }],
+      (queue) => {
+        configSubscriber = queue;
+        return () => {
+          if (configSubscriber === queue) configSubscriber = null;
+        };
+      },
+    ), // personal:skill-sets seam fake config stream
   ready: Effect.void,
   probe: Effect.void,
   inboundFrames: Effect.succeed(0),
@@ -612,6 +747,8 @@ const encodedDescriptor = Schema.encodeSync(ExecutionEnvironmentDescriptor)(
 export function installFakeEnvironment(
   fixtures: ReadonlyArray<FakeThread>,
   options?: {
+    // personal:skill-sets seam fake status option
+    readonly skillSetStatuses?: readonly SkillSetStatus[];
     readonly acceptCommands?: boolean;
     readonly keybindings?: ResolvedKeybindingsConfig;
     // personal:skill-sets seam
@@ -629,6 +766,11 @@ export function installFakeEnvironment(
     readonly providers?: ReadonlyArray<unknown>;
   },
 ): Disposable {
+  // personal:skill-sets seam reset fake skill state
+  sequence += 1;
+  skillStatuses = options?.skillSetStatuses ?? [];
+  settingsPatches = [];
+  providerRequests = [];
   threads = fixtures;
   baseServerConfig = {
     ...makeServerConfig(

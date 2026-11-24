@@ -20,7 +20,7 @@ import {
 import { Badge } from "../ui/badge";
 import { Popover, PopoverPopup, PopoverTrigger } from "../ui/popover";
 // personal:skill-sets seam
-import { SkillSetPickerRail, SkillSetPickerTabs } from "~/personal/skillsets/SkillSetPickers";
+import { SkillSetPickerTabs } from "~/personal/skillsets/SkillSetPickers";
 import { Tooltip, TooltipPopup, TooltipTrigger } from "../ui/tooltip";
 import { cn } from "~/lib/utils";
 import { useMediaQuery } from "../../hooks/useMediaQuery";
@@ -479,8 +479,6 @@ export const ProviderModelPicker = memo(function ProviderModelPicker(props: {
               {/* One fixed height, so a model with more options never resizes the popup. Short
                   windows shrink it and keep the footer. */}
               <div className="flex h-86.5 min-h-0 max-sm:h-auto max-sm:flex-col">
-                {/* personal:skill-sets seam */}
-                <SkillSetPickerRail />
                 {picker}
                 <div
                   data-model-picker-effort

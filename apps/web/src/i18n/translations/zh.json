@@ -12806,5 +12806,83 @@
   "99d51127f573296b": "其他账号",
   "8ec2c57414669b79": "连接第二个 {tracker} 工作区或用户。",
   "99963c0142e17f00": "用于新的 {tracker} 账号。",
-  "6d8e4ebc889bace9": "添加账号"
+  "6d8e4ebc889bace9": "添加账号",
+  "2247c5a2e3914f9b": "Skill sets",
+  "3fa5261ce7d65629": "Syncing",
+  "f10194087b25d28c": "Sync failed",
+  "51c48c925d4f29a9": "Synced",
+  "d925e1fce2735ebd": "Checked {date}",
+  "81d795162ce38937": "Add skill set",
+  "544fd95a6b1a436c": "Skill set: {name}",
+  "9c485b961bd78bb3": "Skill set",
+  "9caf4ddf4356e88f": "{count, plural, one {{count} skill} other {{count} skills}}",
+  "5307d1f341886ff2": "Skill set",
+  "513334fd4ef99a14": "Manage skill sets",
+  "405fd37ac10b8ed7": "Enter a name containing letters or numbers.",
+  "914896f1b3e74d4d": "A skill set with this name already exists.",
+  "6a6c58bebf5e8f73": "Enter a git URL or an absolute local folder path.",
+  "8ba1974143558642": "Load {name}",
+  "853bb9c17edaed3e": "Logo",
+  "798f6bf2a7d7c0b1": "Skill set name",
+  "f255eb586002080f": "Repo",
+  "41c6a69d3065f8da": "Auto-sync",
+  "6627b41477a23f30": "Sync interval in minutes",
+  "55058a909ef3bc28": "Local folders are read in place",
+  "57db949883c55729": "pulls {branch}; a thread picks up changes on its next message",
+  "0a540a242d92f92b": "Loads for",
+  "f26922b9970aaaa9": "Enable skill sets",
+  "28497bec7d8aec23": "{name} details",
+  "c1fcf5aba1ea1b2a": "Default {name}",
+  "f35e0a1c44e81aba": "New skill set name",
+  "b4d5ca8339c60f55": "Git URL or local folder",
+  "7e0dfdebc3ba6139": "github.com/owner/repo, or a local folder of skills",
+  "1071f5b1714464ae": "/command only",
+  "a53739ec6ab852b1": "Change logo",
+  "cb20a44dabc40ee5": "minutes",
+  "1bb42d428fcb6392": "Sync now",
+  "1adc4b4cf5742877": "one set, every provider account",
+  "a9c4c9379e408076": [
+    "Skills",
+    " ",
+    {
+      "t": "span",
+      "i": 1,
+      "c": [
+        "(",
+        {
+          "i": 2,
+          "k": "_gt_value_2",
+          "v": "v"
+        },
+        " load)"
+      ]
+    }
+  ],
+  "1f0271f65d7d750d": "Sync all",
+  "b74a884402d6c014": "A skill set is a git repo of agent skills. T3 Code keeps each registered repo in sync and loads only the set a thread picks, on any provider account.",
+  "affaa9baf4210546": "Default",
+  "df7f5cdb92553b6e": "Remove skill set",
+  "35d46cdadbd91f7d": "Register skill set",
+  "9f2786c72dabea75": [
+    "Try one: ",
+    {
+      "i": 1,
+      "k": "_gt_value_1",
+      "v": "v"
+    },
+    " ·",
+    " ",
+    {
+      "i": 2,
+      "k": "_gt_value_2",
+      "v": "v"
+    },
+    " ·",
+    " ",
+    {
+      "i": 3,
+      "k": "_gt_value_3",
+      "v": "v"
+    }
+  ]
 }
