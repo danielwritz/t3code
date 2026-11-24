@@ -20,6 +20,7 @@ class NewerSkillSetHomeError extends Schema.TaggedError<NewerSkillSetHomeError>(
   {},
 ) {
   override readonly [Runtime.errorExitCode] = NEWER_DATA_EXIT_CODE;
+  override readonly [Runtime.errorReported] = false;
   override get message() {
     return NEWER_DATA_MESSAGE;
   }

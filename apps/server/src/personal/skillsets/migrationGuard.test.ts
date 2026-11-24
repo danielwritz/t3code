@@ -51,6 +51,7 @@ it("accepts equal and older ledgers, refuses unknown IDs and names without chang
     expect(refused.stdout + refused.stderr).toContain(
       `${NEWER_DATA_MARKER}\n${NEWER_DATA_MESSAGE}`,
     );
+    expect((refused.stdout + refused.stderr).split(NEWER_DATA_MESSAGE)).toHaveLength(2);
     db.prepare("DELETE FROM effect_sql_migrations WHERE migration_id = ?").run(last[0] + 1);
     db.prepare("UPDATE effect_sql_migrations SET name = 'UnknownName' WHERE migration_id = ?").run(
       last[0],
