@@ -11,6 +11,12 @@ import * as Path from "effect/Path";
 import * as Schema from "effect/Schema";
 import type { AntigravityProfile } from "../../provider/antigravityAuthSupport.ts";
 import { discoverAntigravitySkills } from "../../provider/Drivers/AntigravitySkills.ts";
+import {
+  antigravityHooksConfig,
+  antigravityMcpConfig,
+  antigravityOwnedEntries,
+  antigravityPluginConfig,
+} from "./antigravityProfile.ts";
 import type { SkillSetThread } from "./resolver.ts";
 import * as SkillSets from "./runtime.ts";
 
@@ -32,6 +38,7 @@ export const resolveAntigravitySkillSetProfile = Effect.fn("resolveAntigravitySk
     instanceId: string,
     profileDirectory: string,
     thread: SkillSetThread,
+    userHome?: string,
   ) {
     const fs = yield* FileSystem.FileSystem;
     const path = yield* Path.Path;
@@ -46,18 +53,28 @@ export const resolveAntigravitySkillSetProfile = Effect.fn("resolveAntigravitySk
           realHome: profileDirectory,
           skillsEntry: "config/skills",
           privateEntries: ["config", "antigravity-cli"],
+          owned: antigravityOwnedEntries,
         },
         thread,
       );
       if (!resolved) return undefined;
       const config = path.join(resolved.homePath, "config");
       yield* fs.makeDirectory(config, { recursive: true });
-      for (const entry of ["skills.json", "plugins.json", "config.json"]) {
+      const generated = [
+        "skills.json",
+        "plugins.json",
+        "config.json",
+        "hooks.json",
+        "mcp_config.json",
+      ];
+      for (const entry of generated) {
         const file = path.join(config, entry);
         const info = yield* fs
           .lstat(file)
           .pipe(Effect.catchReason("PlatformError", "NotFound", () => Effect.undefined));
-        if (info?.type === "SymbolicLink") yield* fs.remove(file);
+        // Links and plugins.json copies come from older builds of this home.
+        if (info?.type === "SymbolicLink" || (info && entry === "plugins.json"))
+          yield* fs.remove(file);
       }
       // agy skips Windows junctions during discovery; explicit canonical targets keep linked sets visible.
       yield* writeFileStringAtomically({
@@ -68,24 +85,45 @@ export const resolveAntigravitySkillSetProfile = Effect.fn("resolveAntigravitySk
           })),
         }),
       });
-      for (const entry of ["plugins", "plugins.json", "config.json"]) {
-        const target = path.join(profileDirectory, "config", entry);
-        const destination = path.join(config, entry);
-        if (!(yield* fs.exists(target))) continue;
-        const info = yield* fs.stat(target);
-        if (info.type === "Directory") {
-          if (!(yield* fs.exists(destination)))
-            yield* Effect.tryPromise({
-              try: () =>
-                NodeFSP.symlink(target, destination, platform === "win32" ? "junction" : "dir"),
-              catch: (cause) => new AntigravityProfileLinkError({ cause }),
-            });
-        } else
-          yield* writeFileStringAtomically({
-            filePath: destination,
-            contents: yield* fs.readFileString(target),
-          });
-      }
+      const profile = resolved.profile;
+      if (!profile) return resolved;
+      // Plugin files stay where they were installed: the instance first, else the real home.
+      const pluginSources = [
+        path.join(profileDirectory, "config", "plugins"),
+        ...(userHome ? [path.join(userHome, ".gemini", "config", "plugins")] : []),
+      ];
+      let pluginSource: string | undefined;
+      for (const candidate of pluginSources)
+        if (pluginSource === undefined && (yield* fs.exists(candidate))) pluginSource = candidate;
+      const pluginLink = path.join(config, "plugins");
+      const linked = yield* fs.readLink(pluginLink).pipe(
+        Effect.map((value): string | undefined => path.resolve(config, value)),
+        Effect.orElseSucceed(() => undefined),
+      );
+      if (linked !== undefined && linked !== pluginSource) yield* fs.remove(pluginLink);
+      if (pluginSource !== undefined && linked !== pluginSource)
+        yield* Effect.tryPromise({
+          try: () =>
+            NodeFSP.symlink(pluginSource, pluginLink, platform === "win32" ? "junction" : "dir"),
+          catch: (cause) => new AntigravityProfileLinkError({ cause }),
+        });
+      const pluginFolders = pluginSource
+        ? (yield* fs.readDirectory(pluginSource)).filter((name) => !name.startsWith("."))
+        : [];
+      const instanceConfig = yield* fs
+        .readFileString(path.join(profileDirectory, "config", "config.json"))
+        .pipe(Effect.orElseSucceed((): string | undefined => undefined));
+      const hooks = antigravityHooksConfig(profile);
+      for (const [entry, contents] of [
+        [
+          "config.json",
+          antigravityPluginConfig({ instanceConfig, pluginFolders, enabled: profile.plugins }),
+        ],
+        ["mcp_config.json", antigravityMcpConfig(profile.mcpServers)],
+        ...(hooks === undefined ? [] : [["hooks.json", hooks] as const]),
+      ] as const)
+        yield* writeFileStringAtomically({ filePath: path.join(config, entry), contents });
+      if (hooks === undefined) yield* fs.remove(path.join(config, "hooks.json"), { force: true });
       return resolved;
     }).pipe(
       Effect.catchCause((cause) =>
@@ -104,12 +142,14 @@ export const applyAntigravitySkillSetProfile = Effect.fn("applyAntigravitySkillS
     instanceId: string,
     profile: AntigravityProfile,
     thread: SkillSetThread,
+    userHome?: string,
   ) {
     const resolved = yield* resolveAntigravitySkillSetProfile(
       service,
       instanceId,
       profile.geminiHome,
       thread,
+      userHome,
     );
     return resolved ? { ...profile, geminiHome: resolved.homePath } : profile;
   },
@@ -133,6 +173,7 @@ export const antigravitySkillSetSnapshot = Effect.fn("antigravitySkillSetSnapsho
       input.instanceId,
       input.profileDirectory,
       input.thread ?? {},
+      input.userHome,
     );
     if (!resolved)
       return yield* discoverAntigravitySkills(input).pipe(
@@ -194,12 +235,13 @@ export const makeAntigravitySkillSetIntegration = Effect.fn("makeAntigravitySkil
       );
     const identity = (thread: SkillSetThread) =>
       provide(
-        resolveAntigravitySkillSetProfile(service, instanceId, profileDirectory, thread),
+        resolveAntigravitySkillSetProfile(service, instanceId, profileDirectory, thread, userHome),
       ).pipe(
         Effect.map((resolved) =>
           resolved
             ? [
                 resolved.homePath,
+                resolved.profile?.contentHash ?? "",
                 ...resolved.skills.map((skill) => `${skill.name}:${skill.targetPath}`),
               ].join("\0")
             : undefined,
@@ -208,7 +250,7 @@ export const makeAntigravitySkillSetIntegration = Effect.fn("makeAntigravitySkil
     return {
       sessionInputIdentity: identity,
       applyProfile: (profile: AntigravityProfile, thread: SkillSetThread) =>
-        provide(applyAntigravitySkillSetProfile(service, instanceId, profile, thread)),
+        provide(applyAntigravitySkillSetProfile(service, instanceId, profile, thread, userHome)),
       snapshot: (
         cwd: string,
         thread: SkillSetThread | undefined,

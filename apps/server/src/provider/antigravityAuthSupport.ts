@@ -257,6 +257,8 @@ const antigravityUserConfigFiles = [
   ["AGENTS.md"],
   ["GEMINI.md"],
   ["config", "skills.json"],
+  // personal:skill-sets seam antigravity user hooks
+  ["config", "hooks.json"],
 ] as const;
 
 /** Private GEMINI_HOME isolates credentials/hooks/MCP; link global skills and rules from the real ~/.gemini. */

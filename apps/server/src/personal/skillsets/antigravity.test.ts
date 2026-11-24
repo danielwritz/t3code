@@ -14,7 +14,7 @@ import { discoverAntigravitySkills } from "../../provider/Drivers/AntigravitySki
 const decodeProvider = Schema.decodeUnknownSync(ServerProvider);
 it.layer(NodeServices.layer)("Antigravity skill sets", (it) => {
   it.effect(
-    "replaces both native user roots and skills.json entries while retaining project and plugin skills",
+    "replaces both native user roots and skills.json entries, keeps project skills and switches off plugins the profile does not list",
     () =>
       Effect.gen(function* () {
         const fs = yield* FileSystem.FileSystem;
@@ -140,12 +140,7 @@ it.layer(NodeServices.layer)("Antigravity skill sets", (it) => {
           profileDirectory: resolved!.homePath,
           userGeminiHome: resolved!.homePath,
         });
-        expect(skills.map((s) => s.name)).toEqual([
-          "alpha",
-          "plugin-skill",
-          "project-skill",
-          "secondary",
-        ]);
+        expect(skills.map((s) => s.name)).toEqual(["alpha", "project-skill", "secondary"]);
         const baseline = decodeProvider({
           instanceId: "fixture",
           driver: "antigravity",
@@ -184,14 +179,12 @@ it.layer(NodeServices.layer)("Antigravity skill sets", (it) => {
         }).pipe(Effect.provide(service));
         expect(menu.skills.map((skill) => skill.name)).toEqual([
           "alpha",
-          "plugin-skill",
           "project-skill",
           "secondary",
         ]);
         expect(menu.slashCommands.map((command) => command.name)).toEqual([
           "compact",
           "alpha",
-          "plugin-skill",
           "project-skill",
           "secondary",
         ]);
